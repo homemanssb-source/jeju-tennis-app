@@ -57,10 +57,10 @@ export default function RegisterPage() {
     }])
 
     if (error) {
-      showToast?.('가입 실패: ' + error.message, 'error')
+      showToast?.('등록 실패: ' + error.message, 'error')
     } else {
       setSubmitted(true)
-      showToast?.('회원 등록 신청이 완료되었습니다!')
+      showToast?.('동호인 등록 신청이 완료되었습니다!')
     }
     setSubmitting(false)
   }
@@ -68,7 +68,7 @@ export default function RegisterPage() {
   if (submitted) {
     return (
       <div className="pb-20">
-        <PageHeader title="👤 회원가입" />
+        <PageHeader title="👤 동호인등록" />
         <div className="max-w-lg mx-auto px-5 py-12 text-center">
           <p className="text-5xl mb-4">🎉</p>
           <h2 className="text-lg font-bold text-gray-900 mb-2">등록 신청 완료!</h2>
@@ -77,11 +77,11 @@ export default function RegisterPage() {
             <p className="text-sm font-semibold mb-2">💰 등록비 안내</p>
             <p className="text-sm text-gray-700">제주은행 계좌로 등록비를 입금해주세요.</p>
             <p className="text-sm text-gray-700 mt-1">입금자명은 <b>본인 이름</b>으로 해주세요.</p>
-            <p className="text-xs text-sub mt-2">입금 확인 후 자동으로 활성화됩니다.</p>
+            <p className="text-xs text-sub mt-2">입금 확인 후 관리자가 활성화합니다.</p>
           </div>
           <button onClick={() => { setSubmitted(false); setForm({ name: '', gender: '', phone: '', club: '', division: '', grade: '' }); setAgreed(false) }}
             className="mt-6 text-sm text-accent hover:underline">
-            다른 회원 등록하기
+            다른 동호인 등록하기
           </button>
         </div>
       </div>
@@ -90,9 +90,13 @@ export default function RegisterPage() {
 
   return (
     <div className="pb-20">
-      <PageHeader title="👤 회원가입" subtitle="동호인회 회원 등록 신청" />
+      <PageHeader title="👤 동호인등록" subtitle="동호인회 회원 등록 신청" />
 
       <div className="max-w-lg mx-auto px-5 py-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+          <p className="text-xs text-amber-700">⚠️ 등록 후 <b>등록비 납부</b>가 확인되면 관리자가 활성화합니다.</p>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -188,11 +192,11 @@ export default function RegisterPage() {
           <button type="submit" disabled={submitting}
             className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm
               hover:bg-blue-700 transition-colors disabled:opacity-50">
-            {submitting ? '처리 중...' : '회원 등록 신청'}
+            {submitting ? '처리 중...' : '동호인 등록 신청'}
           </button>
 
           <p className="text-xs text-sub text-center">
-            가입 후 등록비 납부 시 회원이 활성화됩니다.
+            등록 후 등록비 납부 확인 시 활성화됩니다.
           </p>
         </form>
       </div>

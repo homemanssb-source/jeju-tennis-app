@@ -31,7 +31,10 @@ export default function RankingPage() {
       p_division: division, p_season_year: seasonYear, p_limit: 50, p_offset: 0,
     })
     if (error) showToast?.('랭킹 조회 실패', 'error')
-    else setRankings(data || [])
+    else {
+      // 0점 제외
+      setRankings((data || []).filter(p => p.total_points > 0))
+    }
     setLoading(false)
   }
 
