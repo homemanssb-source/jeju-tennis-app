@@ -126,8 +126,8 @@ export default function UploadAdmin() {
         tournamentCache[tournamentName] = true
       }
 
-      const { data: dup } = await supabase.from('tournament_results').select('id').eq('member_id', memberId).eq('tournament_name', tournamentName).eq('season_year', seasonYear).limit(1)
-      if (dup && dup.length > 0) { skippedList.push(`${memberName} / ${tournamentName}: 이미 등록됨`); continue }
+      const { data: dup } = await supabase.from('tournament_results').select('id').eq('member_id', memberId).eq('tournament_name', tournamentName).eq('division', division || '').eq('season_year', seasonYear).limit(1)
+      if (dup && dup.length > 0) { skippedList.push(`${memberName} / ${tournamentName} / ${division}: 이미 등록됨`); continue }
 
       const { error } = await supabase.from('tournament_results').insert([{
         member_id: memberId, member_name: memberName, tournament_name: tournamentName,
