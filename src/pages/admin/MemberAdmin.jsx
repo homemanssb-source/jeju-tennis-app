@@ -5,212 +5,234 @@ import { ToastContext } from '../../App'
 export default function MemberAdmin() {
   const showToast = useContext(ToastContext)
   const [members, setMembers] = useState([])
-  const [grades, setGrades] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterDiv, setFilterDiv] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [filterMembership, setFilterMembership] = useState('')
-  const [showForm, setShowForm] = useState(false)
+  const [filterClub, setFilterClub] = useState('')
+  const [divisions, setDivisions] = useState([])
+  const [clubs, setClubs] = useState([])
+  const [selected, setSelected] = useState(new Set())
+  const [modal, setModal] = useState(null)
   const [editMember, setEditMember] = useState(null)
-  const [membershipModal, setMembershipModal] = useState(null)
-  const [membershipForm, setMembershipForm] = useState({ status: '', until: '', reason: '' })
+  const [gradeForm, setGradeForm] = useState({ newGrade: '', reason: '' })
+  const [grades, setGrades] = useState([])
   const [form, setForm] = useState({
-    member_id: '', name: '', display_name: '', gender: '',
-    phone: '', club: '', division: '', grade: '', status: '활성',
+    member_id: '', name: '', display_name: '', phone: '',
+    club: '', division: '', grade: '', gender: '', status: '\uD65C\uC131'
   })
 
   useEffect(() => { fetchMembers(); fetchGrades() }, [])
-
-  async function fetchMembers() {
-    setLoading(true)
-    const { data } = await supabase.from('members').select('*').neq('status', '삭제').order('name')
-    setMembers(data || [])
-    setLoading(false)
-  }
 
   async function fetchGrades() {
     const { data } = await supabase.rpc('get_grade_options')
     if (data) setGrades(data.map(d => d.grade_value))
   }
 
-  function filtered() {
-    let list = members
-    if (search.trim()) {
-      const q = search.trim().toLowerCase()
-      list = list.filter(m => (m.name || '').toLowerCase().includes(q) || (m.member_id || '').toLowerCase().includes(q) || (m.club || '').toLowerCase().includes(q))
+  async function fetchMembers() {
+    setLoading(true)
+    const { data } = await supabase.from('members').select('*').order('name')
+    if (data) {
+      setMembers(data)
+      setDivisions([...new Set(data.map(m => m.division).filter(Boolean))])
+      setClubs([...new Set(data.map(m => m.club).filter(Boolean))].sort())
     }
-    if (filterStatus) list = list.filter(m => m.status === filterStatus)
-    if (filterMembership === 'valid') list = list.filter(m => m.membership_paid_until && new Date(m.membership_paid_until) >= new Date())
-    else if (filterMembership === 'expired') list = list.filter(m => !m.membership_paid_until || new Date(m.membership_paid_until) < new Date())
-    return list
+    setLoading(false)
   }
 
-  function isMembershipValid(m) { return m.membership_paid_until && new Date(m.membership_paid_until) >= new Date() }
+  const filtered = members.filter(m => {
+    if (filterStatus && m.status !== filterStatus) return false
+    if (filterDiv && m.division !== filterDiv) return false
+    if (filterClub && m.club !== filterClub) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (m.name || '').toLowerCase().includes(q) ||
+        (m.member_id || '').toLowerCase().includes(q) ||
+        (m.display_name || '').toLowerCase().includes(q) ||
+        (m.club || '').toLowerCase().includes(q)
+    }
+    return true
+  })
 
-  function startEdit(m) {
-    setEditMember(m)
-    setForm({ member_id: m.member_id, name: m.name || '', display_name: m.display_name || '', gender: m.gender || '',
-      phone: m.phone || '', club: m.club || '', division: m.division || '', grade: m.grade || '', status: m.status || '활성' })
-    setShowForm(true)
+  function toggleSelect(id) {
+    const s = new Set(selected)
+    s.has(id) ? s.delete(id) : s.add(id)
+    setSelected(s)
   }
 
-  function startAdd() {
-    setEditMember(null)
-    setForm({ member_id: 'M' + Date.now().toString().slice(-8), name: '', display_name: '', gender: '',
-      phone: '', club: '', division: '', grade: '', status: '활성' })
-    setShowForm(true)
+  function toggleSelectAll() {
+    if (selected.size === filtered.length) setSelected(new Set())
+    else setSelected(new Set(filtered.map(m => m.member_id)))
   }
+
+  async function batchUpdateStatus(newStatus) {
+    if (selected.size === 0) { showToast?.('\uD68C\uC6D0\uC744 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.', 'error'); return }
+    const label = newStatus === '\uD65C\uC131' ? '\uD65C\uC131\uD654' : '\uD734\uBA74 \uCC98\uB9AC'
+    if (!confirm(`\uC120\uD0DD\uD55C ${selected.size}\uBA85\uC744 ${label}\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) return
+
+    const ids = [...selected]
+    const { error } = await supabase.from('members')
+      .update({ status: newStatus })
+      .in('member_id', ids)
+
+    if (error) showToast?.('\uCC98\uB9AC \uC2E4\uD328: ' + error.message, 'error')
+    else showToast?.(`${ids.length}\uBA85 ${label} \uC644\uB8CC!`)
+    setSelected(new Set())
+    fetchMembers()
+  }
+
+  function openAdd() {
+    setForm({ member_id: 'M' + Date.now().toString().slice(-8), name: '', display_name: '', phone: '', club: '', division: '', grade: '', gender: '', status: '\uD65C\uC131' })
+    setModal('add')
+  }
+
+  function openEdit(m) { setForm({ ...m }); setEditMember(m); setModal('edit') }
+
+  function openGrade(m) { setEditMember(m); setGradeForm({ newGrade: '', reason: '' }); setModal('grade') }
 
   async function handleSave() {
-    if (!form.name || !form.member_id) { showToast?.('이름과 회원ID는 필수입니다.', 'error'); return }
-    const data = { ...form, display_name: form.display_name || form.name,
-      name_norm: form.name.replace(/[^가-힣a-zA-Z0-9]/g, '').toLowerCase() }
-
-    if (editMember) {
-      if (editMember.grade !== form.grade && form.grade) {
-        await supabase.rpc('admin_set_member_grade', { p_member_id: form.member_id, p_new_grade: form.grade, p_reason: '관리자 수동 수정', p_entered_by: 'admin' })
-        delete data.grade; delete data.before_grade; delete data.grade_changed_at; delete data.grade_source
-      }
-      const { error } = await supabase.from('members').update(data).eq('member_id', form.member_id)
-      if (error) { showToast?.(error.message, 'error'); return }
-      showToast?.('회원 정보 수정 완료')
+    if (!form.member_id || !form.name) { showToast?.('\uD68C\uC6D0ID\uC640 \uC774\uB984\uC740 \uD544\uC218\uC785\uB2C8\uB2E4.', 'error'); return }
+    if (modal === 'add') {
+      const { error } = await supabase.from('members').insert([{ ...form, name_norm: form.name.replace(/[^가-힣a-zA-Z0-9]/g, '').toLowerCase() }])
+      if (error) { showToast?.('\uCD94\uAC00 \uC2E4\uD328: ' + error.message, 'error'); return }
+      showToast?.('\uD68C\uC6D0\uC774 \uCD94\uAC00\uB418\uC5C8\uC2B5\uB2C8\uB2E4.')
     } else {
-      const { error } = await supabase.from('members').insert([data])
-      if (error) { showToast?.(error.message, 'error'); return }
-      showToast?.('회원 추가 완료')
+      const { error } = await supabase.from('members').update(form).eq('member_id', editMember.member_id)
+      if (error) { showToast?.('\uC218\uC815 \uC2E4\uD328: ' + error.message, 'error'); return }
+      showToast?.('\uD68C\uC6D0 \uC815\uBCF4\uAC00 \uC218\uC815\uB418\uC5C8\uC2B5\uB2C8\uB2E4.')
     }
-    setShowForm(false); fetchMembers()
+    setModal(null); fetchMembers()
   }
 
   async function handleDelete(m) {
-    if (!confirm(`${m.name} 회원을 삭제(비활성)하시겠습니까?`)) return
-    await supabase.from('members').update({ status: '삭제' }).eq('member_id', m.member_id)
-    showToast?.('삭제됨'); fetchMembers()
+    if (!confirm(`${m.name} \uD68C\uC6D0\uC744 \uC0AD\uC81C \uCC98\uB9AC\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) return
+    await supabase.from('members').update({ status: '\uC0AD\uC81C' }).eq('member_id', m.member_id)
+    showToast?.('\uC0AD\uC81C \uCC98\uB9AC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.'); fetchMembers()
   }
 
-  function openMembershipModal(m) {
-    setMembershipModal(m)
-    setMembershipForm({ status: m.status || '활성', until: m.membership_paid_until || new Date().getFullYear() + '-12-31', reason: '' })
+  async function handleGradeChange() {
+    if (!gradeForm.newGrade) { showToast?.('\uC0C8 \uB4F1\uAE09\uC744 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.', 'error'); return }
+    const { error } = await supabase.from('members')
+      .update({ grade: gradeForm.newGrade, grade_source: 'manual' })
+      .eq('member_id', editMember.member_id)
+    if (error) { showToast?.('\uB4F1\uAE09 \uBCC0\uACBD \uC2E4\uD328: ' + error.message, 'error'); return }
+    showToast?.(`${editMember.name}: ${editMember.grade || '\uC5C6\uC74C'} \u2192 ${gradeForm.newGrade}`)
+    setModal(null); fetchMembers()
   }
 
-  async function handleMembershipSave() {
-    if (!membershipModal || !membershipForm.reason) { showToast?.('변경 사유를 입력해주세요.', 'error'); return }
-    const { data, error } = await supabase.rpc('admin_set_membership', {
-      p_member_id: membershipModal.member_id, p_status: membershipForm.status,
-      p_until: membershipForm.until || null, p_reason: membershipForm.reason, p_entered_by: 'admin'
-    })
-    if (error || !data?.ok) { showToast?.(data?.message || error?.message || '변경 실패', 'error'); return }
-    showToast?.('등록 상태 변경 완료'); setMembershipModal(null); fetchMembers()
-  }
-
-  const list = filtered()
-  const totalActive = members.filter(m => m.status === '활성').length
-  const totalDormant = members.filter(m => m.status === '휴면').length
-  const totalMembershipValid = members.filter(m => isMembershipValid(m)).length
+  // \uD074\uB7FD\uBCC4 \uD1B5\uACC4
+  const clubStats = {}
+  filtered.forEach(m => {
+    const c = m.club || '\uC18C\uC18D\uC5C6\uC74C'
+    if (!clubStats[c]) clubStats[c] = { total: 0, active: 0, dormant: 0 }
+    clubStats[c].total++
+    if (m.status === '\uD65C\uC131') clubStats[c].active++
+    else if (m.status === '\uD734\uBA74') clubStats[c].dormant++
+  })
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold">👥 회원 관리</h2>
-        <button onClick={startAdd} className="bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">+ 회원 추가</button>
+        <h2 className="text-lg font-bold">{'\uD83D\uDC65 \uD68C\uC6D0 \uAD00\uB9AC'}</h2>
+        <button onClick={openAdd}
+          className="bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+          + {'\uD68C\uC6D0 \uCD94\uAC00'}
+        </button>
       </div>
 
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <div className="bg-accent text-white px-3 py-2 rounded-lg"><p className="text-[10px] opacity-80">전체</p><p className="text-lg font-bold">{members.length}</p></div>
-        <div className="bg-green-50 text-green-700 px-3 py-2 rounded-lg"><p className="text-[10px]">활성</p><p className="text-lg font-bold">{totalActive}</p></div>
-        <div className="bg-yellow-50 text-yellow-700 px-3 py-2 rounded-lg"><p className="text-[10px]">휴면</p><p className="text-lg font-bold">{totalDormant}</p></div>
-        <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg"><p className="text-[10px]">등록비 유효</p><p className="text-lg font-bold">{totalMembershipValid}</p></div>
-      </div>
-
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="이름/ID/클럽 검색..."
-          className="flex-1 min-w-[150px] text-sm border border-line rounded-lg px-3 py-2" />
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="text-sm border border-line rounded-lg px-3 py-2">
-          <option value="">전체 상태</option><option value="활성">활성</option><option value="휴면">휴면</option>
+      {/* \uD544\uD130 */}
+      <div className="flex gap-2 mb-3 flex-wrap">
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder={'\uC774\uB984/\uD074\uB7FD \uAC80\uC0C9...'}
+          className="flex-1 min-w-[120px] text-sm border border-line rounded-lg px-3 py-2" />
+        <select value={filterClub} onChange={e => setFilterClub(e.target.value)}
+          className="text-sm border border-line rounded-lg px-3 py-2">
+          <option value="">{'\uC804\uCCB4 \uD074\uB7FD'}</option>
+          {clubs.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select value={filterMembership} onChange={e => setFilterMembership(e.target.value)} className="text-sm border border-line rounded-lg px-3 py-2">
-          <option value="">전체 등록비</option><option value="valid">등록비 유효</option><option value="expired">등록비 만료/미납</option>
+        <select value={filterDiv} onChange={e => setFilterDiv(e.target.value)}
+          className="text-sm border border-line rounded-lg px-3 py-2">
+          <option value="">{'\uC804\uCCB4 \uBD80\uC11C'}</option>
+          {divisions.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          className="text-sm border border-line rounded-lg px-3 py-2">
+          <option value="">{'\uC804\uCCB4 \uC0C1\uD0DC'}</option>
+          <option value={'\uD65C\uC131'}>{'\uD65C\uC131'}</option>
+          <option value={'\uD734\uBA74'}>{'\uD734\uBA74'}</option>
+          <option value={'\uC0AD\uC81C'}>{'\uC0AD\uC81C'}</option>
         </select>
       </div>
 
-      {showForm && (
-        <div className="bg-white rounded-lg border border-line p-4 mb-4 space-y-3">
-          <h3 className="text-sm font-semibold">{editMember ? '회원 수정' : '회원 추가'}</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div><label className="block text-xs text-sub mb-1">회원 ID</label>
-              <input type="text" value={form.member_id} readOnly={!!editMember} onChange={e => setForm({ ...form, member_id: e.target.value })}
-                className="w-full text-sm border border-line rounded-lg px-3 py-2 bg-soft2" /></div>
-            <div><label className="block text-xs text-sub mb-1">이름 *</label>
-              <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                className="w-full text-sm border border-line rounded-lg px-3 py-2" /></div>
-            <div><label className="block text-xs text-sub mb-1">표시이름</label>
-              <input type="text" value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })}
-                className="w-full text-sm border border-line rounded-lg px-3 py-2" /></div>
-            <div><label className="block text-xs text-sub mb-1">성별</label>
-              <select value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}
-                className="w-full text-sm border border-line rounded-lg px-3 py-2">
-                <option value="">선택</option><option value="남">남</option><option value="여">여</option></select></div>
-            <div><label className="block text-xs text-sub mb-1">연락처</label>
-              <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
-                className="w-full text-sm border border-line rounded-lg px-3 py-2" /></div>
-            <div><label className="block text-xs text-sub mb-1">소속 클럽</label>
-              <input type="text" value={form.club} onChange={e => setForm({ ...form, club: e.target.value })}
-                className="w-full text-sm border border-line rounded-lg px-3 py-2" /></div>
-            <div><label className="block text-xs text-sub mb-1">부서</label>
-              <input type="text" value={form.division} onChange={e => setForm({ ...form, division: e.target.value })}
-                className="w-full text-sm border border-line rounded-lg px-3 py-2" /></div>
-            <div><label className="block text-xs text-sub mb-1">등급</label>
-              <select value={form.grade} onChange={e => setForm({ ...form, grade: e.target.value })}
-                className="w-full text-sm border border-line rounded-lg px-3 py-2">
-                <option value="">선택</option>
-                {grades.map(g => <option key={g} value={g}>{g}</option>)}
-              </select></div>
-            <div><label className="block text-xs text-sub mb-1">상태</label>
-              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
-                className="w-full text-sm border border-line rounded-lg px-3 py-2">
-                <option value="활성">활성</option><option value="휴면">휴면</option></select></div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleSave} className="bg-accent text-white px-4 py-2 rounded-lg text-sm">저장</button>
-            <button onClick={() => setShowForm(false)} className="text-sm text-sub px-4 py-2">취소</button>
-          </div>
+      {/* \uC77C\uAD04 \uCC98\uB9AC \uBC84\uD2BC */}
+      {selected.size > 0 && (
+        <div className="flex gap-2 mb-3 items-center bg-blue-50 p-2 rounded-lg">
+          <span className="text-sm font-medium text-accent">{selected.size}{'\uBA85 \uC120\uD0DD'}</span>
+          <button onClick={() => batchUpdateStatus('\uD65C\uC131')}
+            className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-700">
+            {'\u2705 \uC77C\uAD04 \uD65C\uC131\uD654 (\uB4F1\uB85D\uBE44 \uD655\uC778)'}
+          </button>
+          <button onClick={() => batchUpdateStatus('\uD734\uBA74')}
+            className="bg-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-yellow-600">
+            {'\u23F8\uFE0F \uC77C\uAD04 \uD734\uBA74'}
+          </button>
+          <button onClick={() => setSelected(new Set())}
+            className="text-xs text-sub hover:underline ml-auto">{'\uC120\uD0DD \uD574\uC81C'}</button>
         </div>
       )}
 
+      {/* \uD14C\uC774\uBE14 */}
       <div className="bg-white rounded-lg border border-line overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-soft2">
             <tr>
-              <th className="px-3 py-2 text-left text-sub font-medium">이름</th>
-              <th className="px-3 py-2 text-left text-sub font-medium">클럽</th>
-              <th className="px-3 py-2 text-left text-sub font-medium">부서</th>
-              <th className="px-3 py-2 text-center text-sub font-medium">등급</th>
-              <th className="px-3 py-2 text-center text-sub font-medium">상태</th>
-              <th className="px-3 py-2 text-center text-sub font-medium">등록비</th>
-              <th className="px-3 py-2 text-center text-sub font-medium">액션</th>
+              <th className="px-2 py-2 text-center w-8">
+                <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0}
+                  onChange={toggleSelectAll} className="rounded" />
+              </th>
+              <th className="px-3 py-2 text-left font-medium text-sub">{'\uC774\uB984'}</th>
+              <th className="px-3 py-2 text-left font-medium text-sub">{'\uC18C\uC18D'}</th>
+              <th className="px-3 py-2 text-left font-medium text-sub">{'\uBD80\uC11C'}</th>
+              <th className="px-3 py-2 text-left font-medium text-sub">{'\uB4F1\uAE09'}</th>
+              <th className="px-3 py-2 text-left font-medium text-sub">{'\uC0C1\uD0DC'}</th>
+              <th className="px-3 py-2 text-center font-medium text-sub">{'\uC561\uC158'}</th>
             </tr>
           </thead>
           <tbody>
-            {loading ? <tr><td colSpan={7} className="text-center py-8 text-sub">로딩 중...</td></tr>
-            : list.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-sub">검색 결과 없음</td></tr>
-            : list.map(m => (
-              <tr key={m.member_id} className="border-t border-line hover:bg-soft">
-                <td className="px-3 py-2"><p className="font-medium">{m.display_name || m.name}</p><p className="text-[10px] text-sub">{m.member_id}</p></td>
+            {loading ? (
+              <tr><td colSpan={7} className="text-center py-8 text-sub">{'\uB85C\uB529 \uC911...'}</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={7} className="text-center py-8 text-sub">{'\uACB0\uACFC \uC5C6\uC74C'}</td></tr>
+            ) : filtered.map(m => (
+              <tr key={m.member_id} className={`border-t border-line hover:bg-soft ${selected.has(m.member_id) ? 'bg-blue-50/50' : ''}`}>
+                <td className="px-2 py-2 text-center">
+                  <input type="checkbox" checked={selected.has(m.member_id)}
+                    onChange={() => toggleSelect(m.member_id)} className="rounded" />
+                </td>
+                <td className="px-3 py-2 font-medium">
+                  {m.display_name || m.name}
+                  {m.grade_source === 'manual' && <span className="ml-1 text-[10px] text-orange-500">{'\uC218\uB3D9'}</span>}
+                </td>
                 <td className="px-3 py-2 text-sub">{m.club || '-'}</td>
-                <td className="px-3 py-2 text-sub">{m.division || '-'}</td>
-                <td className="px-3 py-2 text-center font-semibold">{m.grade || '-'}</td>
-                <td className="px-3 py-2 text-center">
-                  <span className={`text-xs px-1.5 py-0.5 rounded ${m.status === '활성' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>{m.status}</span>
+                <td className="px-3 py-2">{m.division || '-'}</td>
+                <td className="px-3 py-2">
+                  <span className="px-1.5 py-0.5 bg-accentSoft text-accent text-xs rounded">{m.grade || '-'}</span>
+                </td>
+                <td className="px-3 py-2">
+                  <span className={`text-xs px-1.5 py-0.5 rounded ${
+                    m.status === '\uD65C\uC131' ? 'bg-green-50 text-green-700' :
+                    m.status === '\uD734\uBA74' ? 'bg-yellow-50 text-yellow-700' :
+                    m.status === '\uC0AD\uC81C' ? 'bg-red-50 text-red-500' :
+                    'bg-gray-100 text-gray-500'
+                  }`}>{m.status}</span>
                 </td>
                 <td className="px-3 py-2 text-center">
-                  {isMembershipValid(m) ? <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">~{m.membership_paid_until}</span>
-                    : <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-600">미납</span>}
-                </td>
-                <td className="px-3 py-2 text-center">
-                  <div className="flex gap-1 justify-center flex-wrap">
-                    <button onClick={() => startEdit(m)} className="text-xs text-accent hover:underline">수정</button>
-                    <button onClick={() => openMembershipModal(m)} className="text-xs text-blue-600 hover:underline">등록비</button>
-                    <button onClick={() => handleDelete(m)} className="text-xs text-red-500 hover:underline">삭제</button>
+                  <div className="flex gap-1 justify-center">
+                    <button onClick={() => openEdit(m)} className="text-xs text-accent hover:underline">{'\uC218\uC815'}</button>
+                    <button onClick={() => openGrade(m)} className="text-xs text-purple-600 hover:underline">{'\uB4F1\uAE09'}</button>
+                    {m.status !== '\uC0AD\uC81C' && (
+                      <button onClick={() => handleDelete(m)} className="text-xs text-red-500 hover:underline">{'\uC0AD\uC81C'}</button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -218,28 +240,101 @@ export default function MemberAdmin() {
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-sub mt-2">검색 결과: {list.length}명</p>
+      <p className="text-xs text-sub mt-2">{'\uCD4C ' + filtered.length + '\uBA85'}</p>
 
-      {membershipModal && (
+      {/* \uCD94\uAC00/\uC218\uC815 \uBAA8\uB2EC */}
+      {(modal === 'add' || modal === 'edit') && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="text-base font-bold mb-4">{modal === 'add' ? '\uD68C\uC6D0 \uCD94\uAC00' : '\uD68C\uC6D0 \uC218\uC815'}</h3>
+            <div className="space-y-3">
+              {[
+                { key: 'member_id', label: '\uD68C\uC6D0 ID', disabled: modal === 'edit' },
+                { key: 'name', label: '\uC774\uB984' },
+                { key: 'display_name', label: '\uD45C\uC2DC\uBA85' },
+                { key: 'phone', label: '\uC804\uD654\uBC88\uD638' },
+                { key: 'club', label: '\uC18C\uC18D' },
+              ].map(({ key, label, disabled }) => (
+                <div key={key}>
+                  <label className="block text-xs font-medium text-sub mb-1">{label}</label>
+                  <input type="text" value={form[key] || ''}
+                    onChange={e => setForm({ ...form, [key]: e.target.value })}
+                    disabled={disabled}
+                    className="w-full text-sm border border-line rounded-lg px-3 py-2 disabled:bg-soft2" />
+                </div>
+              ))}
+              <div>
+                <label className="block text-xs font-medium text-sub mb-1">{'\uBD80\uC11C'}</label>
+                <select value={form.division || ''} onChange={e => setForm({ ...form, division: e.target.value })}
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2">
+                  <option value="">{'\uC120\uD0DD'}</option>
+                  {divisions.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-sub mb-1">{'\uB4F1\uAE09'}</label>
+                <select value={form.grade || ''} onChange={e => setForm({ ...form, grade: e.target.value })}
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2">
+                  <option value="">{'\uC120\uD0DD'}</option>
+                  {grades.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-sub mb-1">{'\uC131\uBCC4'}</label>
+                <select value={form.gender || ''} onChange={e => setForm({ ...form, gender: e.target.value })}
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2">
+                  <option value="">{'\uC120\uD0DD'}</option>
+                  <option value={'\uB0A8'}>{'\uB0A8'}</option>
+                  <option value={'\uC5EC'}>{'\uC5EC'}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-sub mb-1">{'\uC0C1\uD0DC'}</label>
+                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2">
+                  <option value={'\uD65C\uC131'}>{'\uD65C\uC131'}</option>
+                  <option value={'\uD734\uBA74'}>{'\uD734\uBA74'}</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button onClick={() => setModal(null)}
+                className="flex-1 py-2 border border-line rounded-lg text-sm text-sub hover:bg-soft2">{'\uCDE8\uC18C'}</button>
+              <button onClick={handleSave}
+                className="flex-1 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-blue-700">{'\uC800\uC7A5'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* \uB4F1\uAE09 \uBCC0\uACBD \uBAA8\uB2EC */}
+      {modal === 'grade' && editMember && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-sm">
-            <h3 className="text-base font-bold mb-1">등록비 상태 변경</h3>
-            <p className="text-sm text-sub mb-4">{membershipModal.name} ({membershipModal.member_id})</p>
+            <h3 className="text-base font-bold mb-1">{'\uB4F1\uAE09 \uBCC0\uACBD'}</h3>
+            <p className="text-sm text-sub mb-4">{editMember.name} ({'\uD604\uC7AC: ' + (editMember.grade || '\uC5C6\uC74C')})</p>
             <div className="space-y-3">
-              <div><label className="block text-xs text-sub mb-1">회원 상태</label>
-                <select value={membershipForm.status} onChange={e => setMembershipForm({ ...membershipForm, status: e.target.value })}
+              <div>
+                <label className="block text-xs font-medium text-sub mb-1">{'\uC0C8 \uB4F1\uAE09'}</label>
+                <select value={gradeForm.newGrade} onChange={e => setGradeForm({ ...gradeForm, newGrade: e.target.value })}
                   className="w-full text-sm border border-line rounded-lg px-3 py-2">
-                  <option value="활성">활성</option><option value="휴면">휴면</option></select></div>
-              <div><label className="block text-xs text-sub mb-1">등록비 유효기간</label>
-                <input type="date" value={membershipForm.until} onChange={e => setMembershipForm({ ...membershipForm, until: e.target.value })}
-                  className="w-full text-sm border border-line rounded-lg px-3 py-2" /></div>
-              <div><label className="block text-xs text-sub mb-1">변경 사유 *</label>
-                <input type="text" value={membershipForm.reason} onChange={e => setMembershipForm({ ...membershipForm, reason: e.target.value })}
-                  placeholder="예: 현장 납부 확인" className="w-full text-sm border border-line rounded-lg px-3 py-2" /></div>
+                  <option value="">{'\uC120\uD0DD'}</option>
+                  {grades.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-sub mb-1">{'\uBCC0\uACBD \uC0AC\uC720'}</label>
+                <textarea value={gradeForm.reason}
+                  onChange={e => setGradeForm({ ...gradeForm, reason: e.target.value })}
+                  placeholder={'\uC0AC\uC720\uB97C \uC785\uB825\uD558\uC138\uC694'}
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2 h-20 resize-none" />
+              </div>
             </div>
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => setMembershipModal(null)} className="flex-1 py-2 border border-line rounded-lg text-sm text-sub">취소</button>
-              <button onClick={handleMembershipSave} className="flex-1 py-2 bg-accent text-white rounded-lg text-sm font-medium">변경</button>
+            <div className="flex gap-2 mt-6">
+              <button onClick={() => setModal(null)}
+                className="flex-1 py-2 border border-line rounded-lg text-sm text-sub hover:bg-soft2">{'\uCDE8\uC18C'}</button>
+              <button onClick={handleGradeChange}
+                className="flex-1 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700">{'\uB4F1\uAE09 \uBCC0\uACBD'}</button>
             </div>
           </div>
         </div>
