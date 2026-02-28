@@ -33,7 +33,7 @@ export default function RankingPage() {
     if (error) showToast?.('랭킹 조회 실패', 'error')
     else {
       // 포인트가 없는 회원 제외 (0점 이하)
-      setRankings((data || []).filter(p => p.total_points > 0))
+      setRankings((data || []).filter(p => p.total_points > 0).slice(0, 10))
     }
     setLoading(false)
   }
