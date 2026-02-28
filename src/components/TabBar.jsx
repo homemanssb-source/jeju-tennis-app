@@ -12,7 +12,6 @@ const moreTabs = [
   { path: '/entry', label: '참가신청', icon: '✍️' },
   { path: '/apply', label: '신청확인', icon: '📝' },
   { path: '/register', label: '동호인등록', icon: '👤' },
-  { path: '/admin', label: '관리자', icon: '⚙️' },
 ]
 
 export default function TabBar() {
