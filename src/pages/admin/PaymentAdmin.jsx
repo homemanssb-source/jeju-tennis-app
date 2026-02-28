@@ -44,7 +44,7 @@ export default function PaymentAdmin() {
     setUploading(true)
 
     try {
-      const text = await file.text()
+      const text = await new Promise((resolve) => { const reader = new FileReader(); reader.onload = (e) => resolve(e.target.result); reader.readAsText(file, 'EUC-KR'); })
       const lines = text.split('\n').filter(l => l.trim())
       
       // 헤더 제거 (첫 줄)
