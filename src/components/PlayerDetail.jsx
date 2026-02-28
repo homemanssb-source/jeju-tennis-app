@@ -102,7 +102,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
             <span className="text-sm font-medium text-gray-700">{'\uC2DC\uC98C:'}</span>
             <select value={seasonYear} onChange={(e) => setSeasonYear(Number(e.target.value))}
               className="text-sm border border-line rounded-lg px-3 py-1.5 bg-white">
-              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+              {Array.from({ length: 2 }, (_, i) => new Date().getFullYear() + i).map(y => (
                 <option key={y} value={y}>{y + '\uB144'}</option>
               ))}
             </select>
