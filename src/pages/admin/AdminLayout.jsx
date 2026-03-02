@@ -13,12 +13,15 @@ import PaymentAdmin from './PaymentAdmin'
 import EntryAdmin from './EntryAdmin'
 import GradeAdmin from './GradeAdmin'
 import UploadAdmin from './UploadAdmin'
+import AdminBoardPage from './AdminBoardPage'
+import AdminTeamEntryPage from './AdminTeamEntryPage'
 
 const adminTabs = [
   { path: '/admin/members', label: '👥 회원' },
   { path: '/admin/upload', label: '📤 엑셀업로드' },
   { path: '/admin/events', label: '🎫 대회관리' },
   { path: '/admin/entries', label: '📋 참가관리' },
+  { path: '/admin/team-entries', label: '🏟️ 단체전' },
   { path: '/admin/payments', label: '💰 결제관리' },
   { path: '/admin/tournaments', label: '🏆 결과입력' },
   { path: '/admin/adjustments', label: '➕ 조정' },
@@ -27,6 +30,7 @@ const adminTabs = [
   { path: '/admin/promotion-rules', label: '🎖️ 등급룰' },
   { path: '/admin/promotions', label: '⬆️ 승급배치' },
   { path: '/admin/notices', label: '📌 공지' },
+  { path: '/admin/board', label: '💬 게시판' },
 ]
 
 export default function AdminLayout() {
@@ -79,6 +83,7 @@ export default function AdminLayout() {
           <Route path="upload" element={<UploadAdmin />} />
           <Route path="events" element={<EventAdmin />} />
           <Route path="entries" element={<EntryAdmin />} />
+          <Route path="team-entries" element={<AdminTeamEntryPage />} />
           <Route path="payments" element={<PaymentAdmin />} />
           <Route path="tournaments" element={<TourAdmin />} />
           <Route path="adjustments" element={<PointAdjAdmin />} />
@@ -87,6 +92,7 @@ export default function AdminLayout() {
           <Route path="promotion-rules" element={<PromotionRulesAdmin />} />
           <Route path="promotions" element={<PromotionAdmin />} />
           <Route path="notices" element={<NoticeAdmin />} />
+          <Route path="board" element={<AdminBoardPage />} />
         </Routes>
       </div>
     </div>
