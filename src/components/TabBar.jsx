@@ -9,9 +9,11 @@ const mainTabs = [
 ]
 
 const moreTabs = [
-  { path: '/entry', label: '참가신청', icon: '✍️' },
+  { path: '/entry', label: '개인전 참가신청', icon: '✍️' },
+  { path: '/entry/team', label: '단체전 참가신청', icon: '🏟️' },
   { path: '/apply', label: '신청확인', icon: '📝' },
   { path: '/register', label: '동호인등록', icon: '👤' },
+  { path: '/board', label: '건의/문의', icon: '💬' },
 ]
 
 export default function TabBar() {
@@ -23,7 +25,7 @@ export default function TabBar() {
     <>
       {showMore && (
         <div className="fixed inset-0 z-40" onClick={() => setShowMore(false)}>
-          <div className="absolute bottom-[60px] right-2 bg-white border border-line rounded-xl shadow-lg p-2 min-w-[140px]"
+          <div className="absolute bottom-[60px] right-2 bg-white border border-line rounded-xl shadow-lg p-2 min-w-[160px]"
             onClick={e => e.stopPropagation()}>
             {moreTabs.map(tab => (
               <button key={tab.path}
