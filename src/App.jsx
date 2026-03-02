@@ -11,6 +11,7 @@ import RegisterPage from './pages/RegisterPage'
 import EventEntryPage from './pages/EventEntryPage'
 import TeamEntryPage from './pages/TeamEntryPage'
 import BoardPage from './pages/BoardPage'
+import PinChangePage from './pages/PinChangePage'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
 
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/entry" element={<EventEntryPage />} />
           <Route path="/entry/team" element={<TeamEntryPage />} />
           <Route path="/board" element={<BoardPage />} />
+          <Route path="/pin" element={<PinChangePage />} />
           <Route path="/apply" element={<ApplyPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/notice" element={<NoticePage />} />

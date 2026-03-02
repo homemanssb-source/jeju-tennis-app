@@ -224,6 +224,7 @@ export default function TeamEntryPage() {
         {selectedEvent && (
           <div className="bg-soft rounded-lg p-3 space-y-2">
             <p className="text-xs font-medium text-gray-700">대표(주장) 본인확인</p>
+            <p className="text-xs text-sub">※ PIN 초기값은 전화번호 뒷6자리입니다.</p>
             <div className="flex gap-2">
               <input type="text" value={captainName} onChange={e => { setCaptainName(e.target.value); setCaptainVerified(null) }}
                 placeholder="이름" className="flex-1 text-sm border border-line rounded-lg px-3 py-2" />

@@ -106,6 +106,7 @@ export default function EventEntryPage() {
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
           <p className="text-xs text-amber-700">⚠️ 팀원 2명 모두 <b>등록비 납부(활성 회원)</b>여야 참가 신청이 가능합니다.</p>
           <p className="text-xs text-amber-700 mt-1">🔑 신청자(팀원1)의 <b>PIN 6자리</b>를 입력해야 합니다.</p>
+          <p className="text-xs text-amber-700 mt-0.5">※ PIN 초기값은 전화번호 뒷6자리입니다.</p>
         </div>
 
         <div>
