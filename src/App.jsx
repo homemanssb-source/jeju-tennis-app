@@ -9,6 +9,8 @@ import ApplyPage from './pages/ApplyPage'
 import NoticePage from './pages/NoticePage'
 import RegisterPage from './pages/RegisterPage'
 import EventEntryPage from './pages/EventEntryPage'
+import TeamEntryPage from './pages/TeamEntryPage'
+import BoardPage from './pages/BoardPage'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
 
@@ -31,6 +33,8 @@ export default function App() {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/tournament" element={<TournamentPage />} />
           <Route path="/entry" element={<EventEntryPage />} />
+          <Route path="/entry/team" element={<TeamEntryPage />} />
+          <Route path="/board" element={<BoardPage />} />
           <Route path="/apply" element={<ApplyPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/notice" element={<NoticePage />} />
