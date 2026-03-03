@@ -2,12 +2,6 @@ import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 
-const EVENT_TYPE_LABELS = {
-  individual: '🎾 개인전',
-  team: '🏟️ 단체전',
-  both: '🎾+🏟️ 개인+단체 통합',
-}
-
 export default function EventAdmin() {
   const showToast = useContext(ToastContext)
   const [events, setEvents] = useState([])
@@ -16,7 +10,7 @@ export default function EventAdmin() {
   const [form, setForm] = useState({
     event_name: '', event_date: '', entry_fee_team: '',
     entry_open_at: '', entry_close_at: '', description: '', tournament_id: '',
-    event_type: 'individual', team_member_limit: '',
+    event_type: 'individual', team_match_type: '3_doubles', team_division_id: '',
   })
   const [tournaments, setTournaments] = useState([])
 
@@ -25,8 +19,8 @@ export default function EventAdmin() {
   const [eventDivisions, setEventDivisions] = useState([])
   const [divForm, setDivForm] = useState({ division_name: '', has_groups: false })
 
-  // 앱B 연동
-  const [syncing, setSyncing] = useState(false)
+  // 편집 모드
+  const [editingEvent, setEditingEvent] = useState(null)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -45,28 +39,36 @@ export default function EventAdmin() {
     const { data } = await supabase.from('event_divisions')
       .select('*').eq('event_id', eventId).order('division_name')
     setEventDivisions(data || [])
+    return data || []
   }
 
   async function handleAddEvent() {
     if (!form.event_name || !form.event_date) {
       showToast?.('대회명과 날짜는 필수입니다.', 'error'); return
     }
+    // 단체전인데 부서 미선택 체크
+    if ((form.event_type === 'team' || form.event_type === 'both') && !form.team_division_id) {
+      // 부서가 아직 없을 수 있으므로 경고만
+    }
     const insertData = {
-      ...form,
+      event_name: form.event_name,
+      event_date: form.event_date,
       entry_fee_team: form.entry_fee_team ? Number(form.entry_fee_team) : 0,
       entry_open_at: form.entry_open_at || null,
       entry_close_at: form.entry_close_at || null,
       tournament_id: form.tournament_id || null,
-      team_member_limit: form.team_member_limit ? Number(form.team_member_limit) : null,
+      description: form.description || null,
+      event_type: form.event_type,
+      team_match_type: (form.event_type === 'team' || form.event_type === 'both') ? form.team_match_type : null,
+      team_division_id: (form.event_type === 'team' || form.event_type === 'both') ? (form.team_division_id || null) : null,
     }
     const { error } = await supabase.from('events').insert([insertData])
     if (error) { showToast?.(error.message, 'error'); return }
     showToast?.('대회가 생성되었습니다.')
     setShowForm(false)
     setForm({
-      event_name: '', event_date: '', entry_fee_team: '',
-      entry_open_at: '', entry_close_at: '', description: '', tournament_id: '',
-      event_type: 'individual', team_member_limit: '',
+      event_name: '', event_date: '', entry_fee_team: '', entry_open_at: '', entry_close_at: '',
+      description: '', tournament_id: '', event_type: 'individual', team_match_type: '3_doubles', team_division_id: '',
     })
     fetchAll()
   }
@@ -75,6 +77,23 @@ export default function EventAdmin() {
     const newStatus = ev.status === 'OPEN' ? 'CLOSED' : 'OPEN'
     await supabase.from('events').update({ status: newStatus }).eq('event_id', ev.event_id)
     showToast?.(`${ev.event_name} → ${newStatus}`)
+    fetchAll()
+  }
+
+  // 단체전 설정 수정 (선택된 대회)
+  async function handleUpdateTeamSettings() {
+    if (!editingEvent) return
+    const updates = {
+      event_type: editingEvent.event_type,
+      team_match_type: (editingEvent.event_type === 'team' || editingEvent.event_type === 'both')
+        ? editingEvent.team_match_type : null,
+      team_division_id: (editingEvent.event_type === 'team' || editingEvent.event_type === 'both')
+        ? (editingEvent.team_division_id || null) : null,
+    }
+    const { error } = await supabase.from('events').update(updates).eq('event_id', editingEvent.event_id)
+    if (error) { showToast?.(error.message, 'error'); return }
+    showToast?.('단체전 설정이 저장되었습니다.')
+    setEditingEvent(null)
     fetchAll()
   }
 
@@ -106,45 +125,16 @@ export default function EventAdmin() {
     if (selectedEvent) fetchDivisions(selectedEvent.event_id)
   }
 
-  // ── 앱B 연동 ──
-  async function handleSyncToAppB(ev) {
-    if (!confirm(`"${ev.event_name}" 단체전 데이터를 앱B로 전송합니다.\n계속하시겠습니까?`)) return
-    setSyncing(true)
-    try {
-      // 앱B API 호출
-      const APP_B_URL = 'https://jeju-tournament.vercel.app'  // ← 앱B 배포 URL로 변경 필요
-      const res = await fetch(`${APP_B_URL}/api/sync/pull-team`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_id: ev.event_id,        // 앱B에서 사용할 event_id (나중에 매핑)
-          app_a_event_id: ev.event_id,   // 앱A의 event_id
-        }),
-      })
-      const result = await res.json()
-
-      if (result.success) {
-        // 앱A 동기화 상태 업데이트
-        await supabase.from('events').update({
-          app_b_synced: true,
-          app_b_synced_at: new Date().toISOString(),
-        }).eq('event_id', ev.event_id)
-
-        showToast?.(`✅ 앱B 전송 완료! ${result.synced}팀 동기화, ${result.skipped || 0}팀 스킵`)
-        fetchAll()
-      } else {
-        showToast?.('❌ 전송 실패: ' + (result.error || '알 수 없는 오류'), 'error')
-      }
-    } catch (err) {
-      showToast?.('❌ 연결 실패: 앱B 서버에 접근할 수 없습니다.', 'error')
-    } finally {
-      setSyncing(false)
-    }
+  function getEventTypeBadge(ev) {
+    if (ev.event_type === 'team') return { label: '단체', color: 'bg-blue-50 text-blue-700' }
+    if (ev.event_type === 'both') return { label: '개인+단체', color: 'bg-purple-50 text-purple-700' }
+    return { label: '개인', color: 'bg-gray-100 text-gray-600' }
   }
 
-  // 단체전/통합 대회인지 확인
-  function isTeamEvent(ev) {
-    return ev.event_type === 'team' || ev.event_type === 'both'
+  function getMatchTypeLabel(type) {
+    if (type === '5_doubles') return '5복식'
+    if (type === '3_doubles') return '3복식'
+    return '-'
   }
 
   return (
@@ -167,25 +157,6 @@ export default function EventAdmin() {
                 onChange={e => setForm({ ...form, event_name: e.target.value })}
                 className="w-full text-sm border border-line rounded-lg px-3 py-2" />
             </div>
-
-            {/* ★ 대회 유형 선택 (신규) */}
-            <div className="col-span-2">
-              <label className="block text-xs text-sub mb-1">대회 유형 *</label>
-              <div className="flex gap-2">
-                {Object.entries(EVENT_TYPE_LABELS).map(([key, label]) => (
-                  <button key={key}
-                    onClick={() => setForm({ ...form, event_type: key })}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-colors ${
-                      form.event_type === key
-                        ? 'border-accent bg-accentSoft text-accent'
-                        : 'border-line bg-white text-sub hover:border-gray-300'
-                    }`}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div>
               <label className="block text-xs text-sub mb-1">대회일 *</label>
               <input type="date" value={form.event_date}
@@ -199,6 +170,49 @@ export default function EventAdmin() {
                 placeholder="0"
                 className="w-full text-sm border border-line rounded-lg px-3 py-2" />
             </div>
+
+            {/* 대회 유형 선택 */}
+            <div className="col-span-2">
+              <label className="block text-xs text-sub mb-1">대회 유형 *</label>
+              <div className="flex gap-2">
+                {[
+                  { value: 'individual', label: '🏸 개인전', desc: '개인/복식 경기' },
+                  { value: 'team', label: '🏟️ 단체전', desc: '클럽 대항전' },
+                  { value: 'both', label: '🏸+🏟️ 개인+단체', desc: '둘 다 운영' },
+                ].map(opt => (
+                  <button key={opt.value} type="button"
+                    onClick={() => setForm({ ...form, event_type: opt.value })}
+                    className={`flex-1 p-3 rounded-lg border text-left transition-colors ${
+                      form.event_type === opt.value
+                        ? 'border-accent bg-accentSoft'
+                        : 'border-line hover:bg-soft'
+                    }`}>
+                    <div className="text-sm font-medium">{opt.label}</div>
+                    <div className="text-xs text-sub mt-0.5">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 단체전 옵션 */}
+            {(form.event_type === 'team' || form.event_type === 'both') && (
+              <>
+                <div>
+                  <label className="block text-xs text-sub mb-1">경기 방식 *</label>
+                  <select value={form.team_match_type}
+                    onChange={e => setForm({ ...form, team_match_type: e.target.value })}
+                    className="w-full text-sm border border-line rounded-lg px-3 py-2">
+                    <option value="3_doubles">3복식 (2승 선승제)</option>
+                    <option value="5_doubles">5복식 (3승 선승제)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-sub mb-1">단체전 참가부서</label>
+                  <p className="text-xs text-sub py-2">대회 생성 후 부서를 추가하고 연결하세요</p>
+                </div>
+              </>
+            )}
+
             <div>
               <label className="block text-xs text-sub mb-1">신청 시작</label>
               <input type="datetime-local" value={form.entry_open_at}
@@ -211,25 +225,7 @@ export default function EventAdmin() {
                 onChange={e => setForm({ ...form, entry_close_at: e.target.value })}
                 className="w-full text-sm border border-line rounded-lg px-3 py-2" />
             </div>
-
-            {/* ★ 단체전일 때만 인원 제한 표시 */}
-            {(form.event_type === 'team' || form.event_type === 'both') && (
-              <div>
-                <label className="block text-xs text-sub mb-1">클럽 인원 제한</label>
-                <select value={form.team_member_limit}
-                  onChange={e => setForm({ ...form, team_member_limit: e.target.value })}
-                  className="w-full text-sm border border-line rounded-lg px-3 py-2">
-                  <option value="">무제한</option>
-                  <option value="8">8명</option>
-                  <option value="10">10명</option>
-                  <option value="12">12명</option>
-                  <option value="15">15명</option>
-                  <option value="20">20명</option>
-                </select>
-              </div>
-            )}
-
-            <div className={form.event_type === 'team' || form.event_type === 'both' ? '' : 'col-span-2'}>
+            <div className="col-span-2">
               <label className="block text-xs text-sub mb-1">연결 대회 마스터 (선택)</label>
               <select value={form.tournament_id}
                 onChange={e => setForm({ ...form, tournament_id: e.target.value })}
@@ -256,9 +252,9 @@ export default function EventAdmin() {
           <thead className="bg-soft2">
             <tr>
               <th className="px-3 py-2 text-left text-sub font-medium">대회명</th>
-              <th className="px-3 py-2 text-left text-sub font-medium">유형</th>
               <th className="px-3 py-2 text-left text-sub font-medium">날짜</th>
-              <th className="px-3 py-2 text-right text-sub font-medium">참가비</th>
+              <th className="px-3 py-2 text-center text-sub font-medium">유형</th>
+              <th className="px-3 py-2 text-center text-sub font-medium">경기방식</th>
               <th className="px-3 py-2 text-center text-sub font-medium">상태</th>
               <th className="px-3 py-2 text-center text-sub font-medium">액션</th>
             </tr>
@@ -266,137 +262,173 @@ export default function EventAdmin() {
           <tbody>
             {loading ? (
               <tr><td colSpan={6} className="text-center py-8 text-sub">로딩 중...</td></tr>
-            ) : events.map(ev => (
-              <tr key={ev.event_id} className={`border-t border-line hover:bg-soft cursor-pointer
-                ${selectedEvent?.event_id === ev.event_id ? 'bg-accentSoft' : ''}`}
-                onClick={() => { setSelectedEvent(ev); fetchDivisions(ev.event_id) }}>
-                <td className="px-3 py-2 font-medium">{ev.event_name}</td>
-                <td className="px-3 py-2">
-                  <span className={`text-xs px-1.5 py-0.5 rounded ${
-                    ev.event_type === 'team' ? 'bg-green-50 text-green-700' :
-                    ev.event_type === 'both' ? 'bg-purple-50 text-purple-700' :
-                    'bg-blue-50 text-blue-700'
-                  }`}>
-                    {EVENT_TYPE_LABELS[ev.event_type] || '🎾 개인전'}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-sub">{ev.event_date}</td>
-                <td className="px-3 py-2 text-right">{ev.entry_fee_team?.toLocaleString() || 0}원</td>
-                <td className="px-3 py-2 text-center">
-                  <span className={`text-xs px-2 py-0.5 rounded ${
-                    ev.status === 'OPEN' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
-                  }`}>{ev.status}</span>
-                </td>
-                <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
-                  <div className="flex gap-2 justify-center">
-                    <button onClick={() => toggleEventStatus(ev)}
+            ) : events.map(ev => {
+              const badge = getEventTypeBadge(ev)
+              return (
+                <tr key={ev.event_id} className={`border-t border-line hover:bg-soft cursor-pointer
+                  ${selectedEvent?.event_id === ev.event_id ? 'bg-accentSoft' : ''}`}
+                  onClick={() => { setSelectedEvent(ev); fetchDivisions(ev.event_id); setEditingEvent(null) }}>
+                  <td className="px-3 py-2 font-medium">{ev.event_name}</td>
+                  <td className="px-3 py-2 text-sub">{ev.event_date}</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className={`text-xs px-2 py-0.5 rounded ${badge.color}`}>{badge.label}</span>
+                  </td>
+                  <td className="px-3 py-2 text-center text-xs text-sub">
+                    {(ev.event_type === 'team' || ev.event_type === 'both') ? getMatchTypeLabel(ev.team_match_type) : '-'}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      ev.status === 'OPEN' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}>{ev.status}</span>
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <button onClick={(e) => { e.stopPropagation(); toggleEventStatus(ev) }}
                       className="text-xs text-accent hover:underline">
                       {ev.status === 'OPEN' ? '마감' : '오픈'}
                     </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* 선택된 대회의 부서 관리 + 앱B 연동 */}
-      {selectedEvent && (
-        <div className="space-y-4">
-          {/* ★ 앱B 연동 패널 (단체전/통합일 때만) */}
-          {isTeamEvent(selectedEvent) && (
-            <div className={`rounded-r border p-4 ${
-              selectedEvent.app_b_synced
-                ? 'bg-green-50 border-green-200'
-                : 'bg-yellow-50 border-yellow-200'
-            }`}>
-              <div className="flex items-center justify-between">
+      {/* 선택된 대회의 단체전 설정 */}
+      {selectedEvent && (selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') && (
+        <div className="bg-blue-50 rounded-lg border border-blue-200 p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-blue-800">🏟️ 단체전 설정</h3>
+            {!editingEvent ? (
+              <button onClick={() => setEditingEvent({ ...selectedEvent })}
+                className="text-xs text-blue-600 hover:underline">수정</button>
+            ) : (
+              <div className="flex gap-2">
+                <button onClick={handleUpdateTeamSettings}
+                  className="text-xs bg-blue-600 text-white px-3 py-1 rounded">저장</button>
+                <button onClick={() => setEditingEvent(null)}
+                  className="text-xs text-sub">취소</button>
+              </div>
+            )}
+          </div>
+
+          {editingEvent ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <h3 className="text-sm font-bold">
-                    🔗 앱B (대회 운영) 연동
-                  </h3>
-                  {selectedEvent.app_b_synced ? (
-                    <p className="text-xs text-green-700 mt-1">
-                      ✅ 전송됨 · {selectedEvent.app_b_synced_at
-                        ? new Date(selectedEvent.app_b_synced_at).toLocaleString('ko-KR')
-                        : ''}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-yellow-700 mt-1">
-                      아직 앱B로 전송되지 않았습니다.
-                    </p>
+                  <label className="block text-xs text-blue-700 mb-1">대회 유형</label>
+                  <select value={editingEvent.event_type}
+                    onChange={e => setEditingEvent({ ...editingEvent, event_type: e.target.value })}
+                    className="w-full text-sm border border-blue-200 rounded-lg px-3 py-2">
+                    <option value="individual">개인전</option>
+                    <option value="team">단체전</option>
+                    <option value="both">개인+단체</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-blue-700 mb-1">경기 방식</label>
+                  <select value={editingEvent.team_match_type || '3_doubles'}
+                    onChange={e => setEditingEvent({ ...editingEvent, team_match_type: e.target.value })}
+                    className="w-full text-sm border border-blue-200 rounded-lg px-3 py-2">
+                    <option value="3_doubles">3복식 (2승 선승제)</option>
+                    <option value="5_doubles">5복식 (3승 선승제)</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs text-blue-700 mb-1">단체전 참가부서</label>
+                  <select value={editingEvent.team_division_id || ''}
+                    onChange={e => setEditingEvent({ ...editingEvent, team_division_id: e.target.value || null })}
+                    className="w-full text-sm border border-blue-200 rounded-lg px-3 py-2">
+                    <option value="">미지정</option>
+                    {eventDivisions.map(d => (
+                      <option key={d.division_id} value={d.division_id}>{d.division_name}</option>
+                    ))}
+                  </select>
+                  {eventDivisions.length === 0 && (
+                    <p className="text-xs text-blue-600 mt-1">아래에서 부서를 먼저 추가하세요</p>
                   )}
                 </div>
-                <button
-                  onClick={() => handleSyncToAppB(selectedEvent)}
-                  disabled={syncing}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap disabled:opacity-50 ${
-                    selectedEvent.app_b_synced
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-accent text-white hover:bg-blue-700'
-                  }`}>
-                  {syncing ? '전송중...' : selectedEvent.app_b_synced ? '🔄 재전송' : '📤 앱B로 전송'}
-                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <div>
+                <span className="text-xs text-blue-600">유형</span>
+                <p className="font-medium">{getEventTypeBadge(selectedEvent).label}</p>
+              </div>
+              <div>
+                <span className="text-xs text-blue-600">경기방식</span>
+                <p className="font-medium">{getMatchTypeLabel(selectedEvent.team_match_type)}</p>
+              </div>
+              <div>
+                <span className="text-xs text-blue-600">참가부서</span>
+                <p className="font-medium">
+                  {selectedEvent.team_division_id
+                    ? (eventDivisions.find(d => d.division_id === selectedEvent.team_division_id)?.division_name || '연결됨')
+                    : '미지정'}
+                </p>
               </div>
             </div>
           )}
+        </div>
+      )}
 
-          {/* 부서 관리 (개인전/통합일 때) */}
-          {(selectedEvent.event_type !== 'team') && (
-            <div className="bg-white rounded-r border border-line p-4">
-              <h3 className="text-sm font-bold mb-3">📂 {selectedEvent.event_name} - 부서 관리</h3>
+      {/* 선택된 대회의 부서 관리 */}
+      {selectedEvent && (
+        <div className="bg-white rounded-r border border-line p-4">
+          <h3 className="text-sm font-bold mb-3">📂 {selectedEvent.event_name} - 부서 관리</h3>
 
-              {/* 부서 추가 */}
-              <div className="flex gap-2 mb-3">
-                <input type="text" value={divForm.division_name}
-                  onChange={e => setDivForm({ ...divForm, division_name: e.target.value })}
-                  placeholder="부서명 입력..."
-                  className="flex-1 text-sm border border-line rounded-lg px-3 py-2" />
-                <label className="flex items-center gap-1 text-xs text-sub shrink-0">
-                  <input type="checkbox" checked={divForm.has_groups}
-                    onChange={e => setDivForm({ ...divForm, has_groups: e.target.checked })} />
-                  조별예선
-                </label>
-                <button onClick={handleAddDivision}
-                  className="bg-accent text-white px-3 py-2 rounded-lg text-sm shrink-0">추가</button>
-              </div>
+          {/* 부서 추가 */}
+          <div className="flex gap-2 mb-3">
+            <input type="text" value={divForm.division_name}
+              onChange={e => setDivForm({ ...divForm, division_name: e.target.value })}
+              placeholder="부서명 입력..."
+              className="flex-1 text-sm border border-line rounded-lg px-3 py-2" />
+            <label className="flex items-center gap-1 text-xs text-sub shrink-0">
+              <input type="checkbox" checked={divForm.has_groups}
+                onChange={e => setDivForm({ ...divForm, has_groups: e.target.checked })} />
+              조별예선
+            </label>
+            <button onClick={handleAddDivision}
+              className="bg-accent text-white px-3 py-2 rounded-lg text-sm shrink-0">추가</button>
+          </div>
 
-              {/* 부서 목록 */}
-              <div className="space-y-1">
-                {eventDivisions.length === 0 ? (
-                  <p className="text-sm text-sub py-4 text-center">등록된 부서가 없습니다.</p>
-                ) : eventDivisions.map(d => (
-                  <div key={d.division_id} className="flex items-center justify-between py-2 px-3 bg-soft rounded-lg">
-                    <div>
-                      <span className="text-sm font-medium">{d.division_name}</span>
-                      {d.has_groups && (
-                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
-                          d.groups_status === 'COMPLETED' ? 'bg-green-50 text-green-700' :
-                          d.groups_status === 'IN_PROGRESS' ? 'bg-yellow-50 text-yellow-700' :
-                          'bg-gray-100 text-gray-500'
-                        }`}>{d.groups_status}</span>
+          {/* 부서 목록 */}
+          <div className="space-y-1">
+            {eventDivisions.length === 0 ? (
+              <p className="text-sm text-sub py-4 text-center">등록된 부서가 없습니다.</p>
+            ) : eventDivisions.map(d => (
+              <div key={d.division_id} className="flex items-center justify-between py-2 px-3 bg-soft rounded-lg">
+                <div>
+                  <span className="text-sm font-medium">{d.division_name}</span>
+                  {d.has_groups && (
+                    <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
+                      d.groups_status === 'COMPLETED' ? 'bg-green-50 text-green-700' :
+                      d.groups_status === 'IN_PROGRESS' ? 'bg-yellow-50 text-yellow-700' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>{d.groups_status}</span>
+                  )}
+                  {selectedEvent.team_division_id === d.division_id && (
+                    <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">🏟️ 단체전</span>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  {d.has_groups && d.groups_status !== 'COMPLETED' && (
+                    <>
+                      {d.groups_status === 'NONE' && (
+                        <button onClick={() => updateGroupsStatus(d.division_id, 'IN_PROGRESS')}
+                          className="text-xs text-yellow-600 hover:underline">예선시작</button>
                       )}
-                    </div>
-                    <div className="flex gap-1">
-                      {d.has_groups && d.groups_status !== 'COMPLETED' && (
-                        <>
-                          {d.groups_status === 'NONE' && (
-                            <button onClick={() => updateGroupsStatus(d.division_id, 'IN_PROGRESS')}
-                              className="text-xs text-yellow-600 hover:underline">예선시작</button>
-                          )}
-                          <button onClick={() => updateGroupsStatus(d.division_id, 'COMPLETED')}
-                            className="text-xs text-green-600 hover:underline">예선완료</button>
-                        </>
-                      )}
-                      <button onClick={() => deleteDivision(d.division_id)}
-                        className="text-xs text-red-500 hover:underline">삭제</button>
-                    </div>
-                  </div>
-                ))}
+                      <button onClick={() => updateGroupsStatus(d.division_id, 'COMPLETED')}
+                        className="text-xs text-green-600 hover:underline">예선완료</button>
+                    </>
+                  )}
+                  <button onClick={() => deleteDivision(d.division_id)}
+                    className="text-xs text-red-500 hover:underline">삭제</button>
+                </div>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       )}
     </div>
