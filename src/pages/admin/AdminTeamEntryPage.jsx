@@ -119,6 +119,7 @@ export default function AdminTeamEntryPage() {
 
           <div className="space-y-1">
             <p className="text-sm"><span className="text-sub">클럽명:</span> <b>{selectedEntry.club_name}</b></p>
+            <p className="text-sm"><span className="text-sub">부서:</span> <b>{selectedEntry.division_name || '미지정'}</b></p>
             <p className="text-sm"><span className="text-sub">대표:</span> {selectedEntry.captain_name}</p>
             <p className="text-sm"><span className="text-sub">신청일:</span> {formatDate(selectedEntry.created_at)}</p>
           </div>
@@ -191,7 +192,12 @@ export default function AdminTeamEntryPage() {
                 <button key={entry.id} onClick={() => handleSelectEntry(entry)}
                   className="w-full text-left bg-white border border-line rounded-lg p-3 hover:bg-soft transition-colors">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-bold">{entry.club_name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold">{entry.club_name}</span>
+                      {entry.division_name && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">{entry.division_name}</span>
+                      )}
+                    </div>
                     <span className={`text-xs px-2 py-0.5 rounded ${STATUS_MAP[entry.status]?.color || ''}`}>
                       {STATUS_MAP[entry.status]?.label || entry.status}
                     </span>
