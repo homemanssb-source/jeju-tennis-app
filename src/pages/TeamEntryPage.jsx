@@ -10,6 +10,10 @@ export default function TeamEntryPage() {
   const [events, setEvents] = useState([])
   const [selectedEvent, setSelectedEvent] = useState(null)
 
+  // 부서
+  const [divisions, setDivisions] = useState([])
+  const [selectedDivision, setSelectedDivision] = useState(null)
+
   // 대표 인증
   const [captainName, setCaptainName] = useState('')
   const [captainPin, setCaptainPin] = useState('')
@@ -78,6 +82,17 @@ export default function TeamEntryPage() {
   function handleEventChange(eventId) {
     const ev = events.find(e => e.event_id === eventId)
     setSelectedEvent(ev || null)
+    setSelectedDivision(null)
+    setDivisions([])
+    if (ev) fetchDivisions(ev.event_id)
+  }
+
+  async function fetchDivisions(eventId) {
+    const { data } = await supabase.from('event_divisions')
+      .select('division_id, division_name')
+      .eq('event_id', eventId)
+      .order('created_at')
+    setDivisions(data || [])
   }
 
   async function handleVerifyCaptain() {
@@ -167,6 +182,7 @@ export default function TeamEntryPage() {
 
   async function handleSubmit() {
     if (!selectedEvent) { showToast?.('대회를 선택해주세요.', 'error'); return }
+    if (divisions.length > 0 && !selectedDivision) { showToast?.('부서를 선택해주세요.', 'error'); return }
     if (!captainVerified) { showToast?.('대표자 본인확인을 해주세요.', 'error'); return }
     if (!clubName.trim()) { showToast?.('클럽명을 입력해주세요.', 'error'); return }
     if (roster.length === 0) { showToast?.('선수를 1명 이상 추가해주세요.', 'error'); return }
@@ -180,12 +196,15 @@ export default function TeamEntryPage() {
       p_event_id: selectedEvent.event_id,
       p_captain_name: captainName.trim(), p_captain_pin: captainPin,
       p_club_name: clubName.trim(), p_members: membersPayload,
+      p_division_id: selectedDivision?.division_id || null,
+      p_division_name: selectedDivision?.division_name || null,
     })
     if (error) { showToast?.('신청 실패: ' + error.message, 'error') }
     else if (data && !data.ok) { showToast?.('⚠️ ' + data.message, 'error') }
     else if (data && data.ok) {
       showToast?.('🎉 단체전 참가 신청 완료!')
       setRoster([]); setClubName(''); setCaptainVerified(null); setCaptainName(''); setCaptainPin('')
+      setSelectedDivision(null)
     }
     setSubmitting(false)
   }
@@ -220,8 +239,25 @@ export default function TeamEntryPage() {
           )}
         </div>
 
+        {/* 부서 선택 */}
+        {selectedEvent && divisions.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">부서 선택</label>
+            <select value={selectedDivision?.division_id || ''} onChange={e => {
+              const div = divisions.find(d => d.division_id === e.target.value)
+              setSelectedDivision(div || null)
+            }}
+              className="w-full text-sm border border-line rounded-lg px-3 py-2.5">
+              <option value="">부서를 선택하세요</option>
+              {divisions.map(d => (
+                <option key={d.division_id} value={d.division_id}>{d.division_name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* 대표자 본인확인 */}
-        {selectedEvent && (
+        {selectedEvent && (divisions.length === 0 || selectedDivision) && (
           <div className="bg-soft rounded-lg p-3 space-y-2">
             <p className="text-xs font-medium text-gray-700">대표(주장) 본인확인</p>
             <p className="text-xs text-sub">※ PIN 초기값은 전화번호 뒷6자리입니다.</p>
