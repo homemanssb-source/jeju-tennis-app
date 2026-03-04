@@ -17,6 +17,9 @@ export default function PaymentAdmin() {
   const [matchMemberId, setMatchMemberId] = useState('')
   const [memberSearch, setMemberSearch] = useState('')
 
+  // 일괄 선택/삭제
+  const [selectedIds, setSelectedIds] = useState(new Set())
+
   // 업로드 폼
   const [uploadPurpose, setUploadPurpose] = useState('MEMBERSHIP_FEE')
   const [uploadEventId, setUploadEventId] = useState('')
@@ -147,21 +150,40 @@ export default function PaymentAdmin() {
     fetchAll()
   }
 
-  // 결제 삭제
-  async function handleDeletePayment(p) {
-    if (!confirm(`"${p.sender_name}" ${p.amount?.toLocaleString()}원 결제를 삭제하시겠습니까?`)) return
-    const { error } = await supabase.from('payments').delete().eq('payment_id', p.payment_id)
-    if (error) { showToast?.(error.message, 'error'); return }
-    showToast?.('삭제 완료')
-    fetchAll()
-  }
-
   const filtered = payments.filter(p => {
     if (filterMatched === 'matched' && !p.matched) return false
     if (filterMatched === 'unmatched' && p.matched) return false
     if (filterPurpose && p.purpose !== filterPurpose) return false
     return true
   })
+
+  // 전체 선택/해제
+  function toggleSelectAll() {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filtered.map(p => p.payment_id)))
+    }
+  }
+
+  function toggleSelect(id) {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    setSelectedIds(next)
+  }
+
+  // 일괄 삭제
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) { showToast?.('삭제할 항목을 선택하세요.', 'error'); return }
+    if (!confirm(`선택한 ${selectedIds.size}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return
+
+    const ids = [...selectedIds]
+    const { error } = await supabase.from('payments').delete().in('payment_id', ids)
+    if (error) { showToast?.('삭제 실패: ' + error.message, 'error'); return }
+    showToast?.(`${ids.length}건 삭제 완료`)
+    setSelectedIds(new Set())
+    fetchAll()
+  }
 
   const filteredMembers = memberSearch.trim()
     ? members.filter(m =>
@@ -218,7 +240,7 @@ export default function PaymentAdmin() {
       </div>
 
       {/* 필터 */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
         <select value={filterMatched} onChange={e => setFilterMatched(e.target.value)}
           className="text-sm border border-line rounded-lg px-3 py-2">
           <option value="">전체</option>
@@ -231,6 +253,12 @@ export default function PaymentAdmin() {
           <option value="MEMBERSHIP_FEE">등록비</option>
           <option value="EVENT_ENTRY_FEE">참가비</option>
         </select>
+        {selectedIds.size > 0 && (
+          <button onClick={handleBulkDelete}
+            className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600">
+            🗑 선택 삭제 ({selectedIds.size}건)
+          </button>
+        )}
       </div>
 
       {/* 목록 */}
@@ -238,6 +266,12 @@ export default function PaymentAdmin() {
         <table className="w-full text-sm">
           <thead className="bg-soft2">
             <tr>
+              <th className="px-2 py-2 text-center w-10">
+                <input type="checkbox"
+                  checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                  onChange={toggleSelectAll}
+                  className="rounded" />
+              </th>
               <th className="px-3 py-2 text-left text-sub font-medium">입금일</th>
               <th className="px-3 py-2 text-left text-sub font-medium">입금자명</th>
               <th className="px-3 py-2 text-right text-sub font-medium">금액</th>
@@ -249,12 +283,18 @@ export default function PaymentAdmin() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="text-center py-8 text-sub">로딩 중...</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-sub">로딩 중...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-8 text-sub">데이터 없음</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-sub">데이터 없음</td></tr>
             ) : filtered.map(p => (
               <tr key={p.payment_id} className={`border-t border-line hover:bg-soft
-                ${!p.matched ? 'bg-red-50/30' : ''}`}>
+                ${!p.matched ? 'bg-red-50/30' : ''} ${selectedIds.has(p.payment_id) ? 'bg-blue-50/50' : ''}`}>
+                <td className="px-2 py-2 text-center">
+                  <input type="checkbox"
+                    checked={selectedIds.has(p.payment_id)}
+                    onChange={() => toggleSelect(p.payment_id)}
+                    className="rounded" />
+                </td>
                 <td className="px-3 py-2 text-xs text-sub">
                   {p.paid_at ? new Date(p.paid_at).toLocaleDateString('ko-KR') : '-'}
                 </td>
@@ -275,14 +315,10 @@ export default function PaymentAdmin() {
                   {p.match_method && <span className="text-[10px] ml-1">({p.match_method})</span>}
                 </td>
                 <td className="px-3 py-2 text-center">
-                  <div className="flex gap-1 justify-center">
-                    {!p.matched && (
-                      <button onClick={() => { setMatchModal(p); setMatchMemberId(''); setMemberSearch('') }}
-                        className="text-xs text-accent hover:underline">수동매칭</button>
-                    )}
-                    <button onClick={() => handleDeletePayment(p)}
-                      className="text-xs text-red-500 hover:underline">삭제</button>
-                  </div>
+                  {!p.matched && (
+                    <button onClick={() => { setMatchModal(p); setMatchMemberId(''); setMemberSearch('') }}
+                      className="text-xs text-accent hover:underline">수동매칭</button>
+                  )}
                 </td>
               </tr>
             ))}
