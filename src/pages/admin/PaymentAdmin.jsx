@@ -147,6 +147,15 @@ export default function PaymentAdmin() {
     fetchAll()
   }
 
+  // 결제 삭제
+  async function handleDeletePayment(p) {
+    if (!confirm(`"${p.sender_name}" ${p.amount?.toLocaleString()}원 결제를 삭제하시겠습니까?`)) return
+    const { error } = await supabase.from('payments').delete().eq('payment_id', p.payment_id)
+    if (error) { showToast?.(error.message, 'error'); return }
+    showToast?.('삭제 완료')
+    fetchAll()
+  }
+
   const filtered = payments.filter(p => {
     if (filterMatched === 'matched' && !p.matched) return false
     if (filterMatched === 'unmatched' && p.matched) return false
@@ -266,10 +275,14 @@ export default function PaymentAdmin() {
                   {p.match_method && <span className="text-[10px] ml-1">({p.match_method})</span>}
                 </td>
                 <td className="px-3 py-2 text-center">
-                  {!p.matched && (
-                    <button onClick={() => { setMatchModal(p); setMatchMemberId(''); setMemberSearch('') }}
-                      className="text-xs text-accent hover:underline">수동매칭</button>
-                  )}
+                  <div className="flex gap-1 justify-center">
+                    {!p.matched && (
+                      <button onClick={() => { setMatchModal(p); setMatchMemberId(''); setMemberSearch('') }}
+                        className="text-xs text-accent hover:underline">수동매칭</button>
+                    )}
+                    <button onClick={() => handleDeletePayment(p)}
+                      className="text-xs text-red-500 hover:underline">삭제</button>
+                  </div>
                 </td>
               </tr>
             ))}
