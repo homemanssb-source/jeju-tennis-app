@@ -85,7 +85,7 @@ export default function EventEntryPage() {
       <PageHeader title="✍️ 참가신청" subtitle="복식 팀 대회 참가 신청" />
       <div className="max-w-lg mx-auto px-5 py-4 space-y-4">
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-          <p className="text-xs text-amber-700">⚠️ 팀원 2명 모두 <b>등록비 납부(활성 회원)</b>여야 참가 신청이 가능합니다.</p>
+          <p className="text-xs text-amber-700">⚠️ 팀원 2명 모두 <b>등록비 납부(활성 회원)</b>하여야 참가 신청이 가능합니다.</p>
         </div>
 
         <div>
