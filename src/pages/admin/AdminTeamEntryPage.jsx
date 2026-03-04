@@ -7,6 +7,13 @@ const STATUS_MAP = {
   cancelled: { label: '취소', color: 'text-red-600 bg-red-50' },
 }
 
+// ★ 경기방식 라벨
+function getMatchTypeLabel(type) {
+  if (type === '5_doubles') return '5복식 (3승 선승)'
+  if (type === '3_doubles') return '3복식 (2승 선승)'
+  return '-'
+}
+
 export default function AdminTeamEntryPage() {
   const [entries, setEntries] = useState([])
   const [events, setEvents] = useState([])
@@ -18,7 +25,9 @@ export default function AdminTeamEntryPage() {
   useEffect(() => { fetchEvents() }, [])
 
   async function fetchEvents() {
-    const { data } = await supabase.from('events').select('event_id, event_name, event_date, status')
+    // ★ 수정: team_match_type, event_type 추가 조회
+    const { data } = await supabase.from('events')
+      .select('event_id, event_name, event_date, status, event_type, team_match_type')
       .order('event_date', { ascending: false })
     setEvents(data || [])
   }
@@ -71,6 +80,9 @@ export default function AdminTeamEntryPage() {
     confirmed: entries.filter(e => e.status === 'confirmed').length,
   }
 
+  // ★ 선택된 대회 객체
+  const selectedEvent = events.find(ev => ev.event_id === selectedEventId)
+
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-bold">🏟️ 단체전 신청관리</h2>
@@ -87,6 +99,16 @@ export default function AdminTeamEntryPage() {
           ))}
         </select>
       </div>
+
+      {/* ★ 신규: 선택된 대회의 경기방식 표시 */}
+      {selectedEvent && (selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center gap-2">
+          <span className="text-xs text-blue-600">경기방식:</span>
+          <span className="text-sm font-bold text-blue-800">
+            {getMatchTypeLabel(selectedEvent.team_match_type)}
+          </span>
+        </div>
+      )}
 
       {/* 현황 요약 */}
       {selectedEventId && (
@@ -121,6 +143,10 @@ export default function AdminTeamEntryPage() {
             <p className="text-sm"><span className="text-sub">클럽명:</span> <b>{selectedEntry.club_name}</b></p>
             <p className="text-sm"><span className="text-sub">부서:</span> <b>{selectedEntry.division_name || '미지정'}</b></p>
             <p className="text-sm"><span className="text-sub">대표:</span> {selectedEntry.captain_name}</p>
+            {/* ★ 신규: 경기방식 표시 */}
+            {selectedEvent && (
+              <p className="text-sm"><span className="text-sub">경기방식:</span> <b>{getMatchTypeLabel(selectedEvent.team_match_type)}</b></p>
+            )}
             <p className="text-sm"><span className="text-sub">신청일:</span> {formatDate(selectedEntry.created_at)}</p>
           </div>
 
