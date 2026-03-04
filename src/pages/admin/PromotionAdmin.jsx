@@ -15,6 +15,11 @@ export default function PromotionAdmin() {
   const currentMonth = now.getMonth() + 1
   const currentRunId = `${currentYear}-${String(currentMonth).padStart(2, '0')}`
 
+  // 실행 대상 월 선택 (과거 월도 가능)
+  const [targetYear, setTargetYear] = useState(currentYear)
+  const [targetMonth, setTargetMonth] = useState(currentMonth)
+  const targetRunId = `${targetYear}-${String(targetMonth).padStart(2, '0')}`
+
   useEffect(() => { fetchRuns() }, [])
 
   async function fetchRuns() {
@@ -37,19 +42,20 @@ export default function PromotionAdmin() {
     setLogs(data || [])
   }
 
-  const alreadyRun = runs.some(r => r.run_id === currentRunId)
+  const alreadyRun = runs.some(r => r.run_id === targetRunId)
+  const targetRun = runs.find(r => r.run_id === targetRunId)
 
   async function handleExecute() {
     if (alreadyRun) {
-      showToast?.(`${currentRunId} 배치는 이미 실행되었습니다.`, 'warning')
+      showToast?.(`${targetRunId} 배치는 이미 실행되었습니다.`, 'warning')
       return
     }
-    if (!confirm(`${currentRunId} 승급 배치를 실행하시겠습니까?`)) return
+    if (!confirm(`${targetRunId} 승급 배치를 실행하시겠습니까?`)) return
 
     setExecuting(true)
     const { data, error } = await supabase.rpc('run_monthly_promotions', {
-      p_year: currentYear,
-      p_month: currentMonth,
+      p_year: targetYear,
+      p_month: targetMonth,
       p_entered_by: 'admin',
     })
 
@@ -65,36 +71,77 @@ export default function PromotionAdmin() {
     setExecuting(false)
   }
 
+  // 배치 기록 삭제 (승급자 0명인 경우만)
+  async function handleDeleteRun() {
+    if (!targetRun) return
+    if (targetRun.affected > 0) {
+      showToast?.('승급자가 있는 배치는 삭제할 수 없습니다.', 'error')
+      return
+    }
+    if (!confirm(`${targetRunId} 배치 기록을 삭제하시겠습니까?\n삭제 후 다시 실행할 수 있습니다.`)) return
+
+    // 로그도 함께 삭제
+    await supabase.from('promotion_log').delete().eq('run_id', targetRunId)
+    const { error } = await supabase.from('promotion_runs').delete().eq('run_id', targetRunId)
+    if (error) { showToast?.(error.message, 'error'); return }
+    showToast?.(`${targetRunId} 배치 기록이 삭제되었습니다.`)
+    fetchRuns()
+  }
+
   return (
     <div>
       <h2 className="text-lg font-bold mb-4">🎖️ 승급 배치 관리</h2>
 
-      {/* 이번 달 실행 */}
+      {/* 배치 실행 */}
       <div className="bg-white rounded-r border border-line p-4 mb-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <p className="text-sm font-semibold">이번 달 배치: {currentRunId}</p>
-            <p className="text-xs text-sub mt-1">
-              {alreadyRun ? '✅ 이미 실행됨' : '⏳ 미실행'}
-            </p>
+            <p className="text-sm font-semibold">승급 배치 실행</p>
+            <div className="flex items-center gap-2 mt-2">
+              <select value={targetYear} onChange={e => setTargetYear(Number(e.target.value))}
+                className="text-sm border border-line rounded-lg px-3 py-2">
+                {[currentYear - 1, currentYear].map(y => (
+                  <option key={y} value={y}>{y}년</option>
+                ))}
+              </select>
+              <select value={targetMonth} onChange={e => setTargetMonth(Number(e.target.value))}
+                className="text-sm border border-line rounded-lg px-3 py-2">
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                  <option key={m} value={m}>{m}월</option>
+                ))}
+              </select>
+              <span className={`text-xs px-2 py-1 rounded ${
+                alreadyRun ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
+              }`}>
+                {alreadyRun ? `✅ 실행됨 (${targetRun?.affected || 0}명)` : '⏳ 미실행'}
+              </span>
+            </div>
           </div>
-          <button
-            onClick={handleExecute}
-            disabled={executing || alreadyRun}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
-              ${alreadyRun
-                ? 'bg-gray-200 text-sub cursor-not-allowed'
-                : 'bg-accent text-white hover:bg-blue-700'
-              } disabled:opacity-50`}
-          >
-            {executing ? '실행 중...' : alreadyRun ? '실행 완료' : '배치 실행'}
-          </button>
+          <div className="flex gap-2">
+            {alreadyRun && targetRun?.affected === 0 && (
+              <button onClick={handleDeleteRun}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100">
+                🗑 기록 삭제
+              </button>
+            )}
+            <button
+              onClick={handleExecute}
+              disabled={executing || alreadyRun}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                ${alreadyRun
+                  ? 'bg-gray-200 text-sub cursor-not-allowed'
+                  : 'bg-accent text-white hover:bg-blue-700'
+                } disabled:opacity-50`}
+            >
+              {executing ? '실행 중...' : alreadyRun ? '실행 완료' : `${targetRunId} 배치 실행`}
+            </button>
+          </div>
         </div>
 
-        {alreadyRun && (
-          <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-3">
-            <p className="text-xs text-green-700">
-              {currentRunId} 배치가 이미 실행되었습니다. 동일 월에 중복 실행은 불가합니다.
+        {alreadyRun && targetRun?.affected === 0 && (
+          <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p className="text-xs text-amber-700">
+              ⚠️ {targetRunId} 배치가 실행되었으나 승급자가 0명입니다. "기록 삭제" 후 다시 실행할 수 있습니다.
             </p>
           </div>
         )}
