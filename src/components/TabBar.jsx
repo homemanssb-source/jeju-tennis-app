@@ -1,27 +1,24 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-
 const mainTabs = [
-  { path: '/', label: '랭킹', icon: '🏆' },
-  { path: '/search', label: '검색', icon: '🔎' },
-  { path: '/tournament', label: '대회', icon: '📅' },
-  { path: '/notice', label: '공지', icon: '📌' },
+  { path: '/', label: '홈', icon: '🏠' },
+  { path: '/ranking', label: '랭킹', icon: '🏆' },
+  { path: '/search', label: '검색', icon: '🔍' },
+  { path: '/tournament', label: '대회', icon: '🎾' },
+  { path: '/notice', label: '공지', icon: '📢' },
 ]
-
 const moreTabs = [
-  { path: '/entry', label: '개인전 참가신청', icon: '✍️' },
+  { path: '/entry', label: '개인전 참가신청', icon: '📝' },
   { path: '/entry/team', label: '단체전 참가신청', icon: '🏟️' },
-  { path: '/apply', label: '신청확인', icon: '📝' },
-  { path: '/register', label: '동호인등록', icon: '👤' },
+  { path: '/apply', label: '신청확인', icon: '📋' },
+  { path: '/register', label: '회원/팀등록', icon: '👤' },
   { path: '/board', label: '건의/문의', icon: '💬' },
   { path: '/pin', label: 'PIN 변경', icon: '🔑' },
 ]
-
 export default function TabBar() {
   const location = useLocation()
   const navigate = useNavigate()
   const [showMore, setShowMore] = useState(false)
-
   return (
     <>
       {showMore && (
@@ -39,7 +36,6 @@ export default function TabBar() {
           </div>
         </div>
       )}
-
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-line z-10"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="flex justify-around items-center h-[56px] max-w-lg mx-auto">
@@ -47,7 +43,7 @@ export default function TabBar() {
             const active = location.pathname === tab.path
             return (
               <button key={tab.path} onClick={() => navigate(tab.path)}
-                className={`flex flex-col items-center justify-center gap-0.5 min-w-[56px] py-1 transition-colors
+                className={`flex flex-col items-center justify-center gap-0.5 min-w-[48px] py-1 transition-colors
                   ${active ? 'text-accent' : 'text-sub'}`}>
                 <span className="text-[18px] leading-none">{tab.icon}</span>
                 <span className={`text-[10px] leading-none font-medium
@@ -56,9 +52,9 @@ export default function TabBar() {
             )
           })}
           <button onClick={() => setShowMore(!showMore)}
-            className={`flex flex-col items-center justify-center gap-0.5 min-w-[56px] py-1 transition-colors
+            className={`flex flex-col items-center justify-center gap-0.5 min-w-[48px] py-1 transition-colors
               ${showMore ? 'text-accent' : 'text-sub'}`}>
-            <span className="text-[18px] leading-none">≡</span>
+            <span className="text-[18px] leading-none">⋯</span>
             <span className={`text-[10px] leading-none font-medium
               ${showMore ? 'text-accent' : 'text-sub'}`}>더보기</span>
           </button>

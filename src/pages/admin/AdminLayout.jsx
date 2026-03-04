@@ -15,22 +15,24 @@ import GradeAdmin from './GradeAdmin'
 import UploadAdmin from './UploadAdmin'
 import AdminBoardPage from './AdminBoardPage'
 import AdminTeamEntryPage from './AdminTeamEntryPage'
+import SponsorAdmin from './SponsorAdmin'
 
 const adminTabs = [
-  { path: '/admin/members', label: '👥 회원' },
-  { path: '/admin/upload', label: '📤 엑셀업로드' },
+  { path: '/admin/members', label: '👤 회원' },
+  { path: '/admin/upload', label: '📁 엑셀업로드' },
   { path: '/admin/events', label: '🎫 대회관리' },
   { path: '/admin/entries', label: '📋 참가관리' },
   { path: '/admin/team-entries', label: '🏟️ 단체전' },
-  { path: '/admin/payments', label: '💰 결제관리' },
+  { path: '/admin/payments', label: '💳 결제관리' },
   { path: '/admin/tournaments', label: '🏆 결과입력' },
-  { path: '/admin/adjustments', label: '➕ 조정' },
-  { path: '/admin/rules', label: '📊 포인트규정' },
-  { path: '/admin/grades', label: '🎯 등급관리' },
-  { path: '/admin/promotion-rules', label: '🎖️ 등급룰' },
-  { path: '/admin/promotions', label: '⬆️ 승급배치' },
-  { path: '/admin/notices', label: '📌 공지' },
+  { path: '/admin/adjustments', label: '±조정' },
+  { path: '/admin/rules', label: '📐 포인트룰' },
+  { path: '/admin/grades', label: '🎖 등급관리' },
+  { path: '/admin/promotion-rules', label: '📊 등급룰' },
+  { path: '/admin/promotions', label: '🔄 등급배치' },
+  { path: '/admin/notices', label: '📢 공지' },
   { path: '/admin/board', label: '💬 게시판' },
+  { path: '/admin/sponsors', label: '🏢 홍보배너' },
 ]
 
 export default function AdminLayout() {
@@ -93,6 +95,7 @@ export default function AdminLayout() {
           <Route path="promotions" element={<PromotionAdmin />} />
           <Route path="notices" element={<NoticeAdmin />} />
           <Route path="board" element={<AdminBoardPage />} />
+          <Route path="sponsors" element={<SponsorAdmin />} />
         </Routes>
       </div>
     </div>

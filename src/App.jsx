@@ -2,6 +2,7 @@ import React, { useState, createContext } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import TabBar from './components/TabBar'
 import Toast from './components/Toast'
+import HomePage from './pages/HomePage'
 import RankingPage from './pages/RankingPage'
 import SearchPage from './pages/SearchPage'
 import TournamentPage from './pages/TournamentPage'
@@ -14,23 +15,21 @@ import BoardPage from './pages/BoardPage'
 import PinChangePage from './pages/PinChangePage'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
-
 export const ToastContext = createContext()
-
 export default function App() {
   const location = useLocation()
   const isAdmin = location.pathname.startsWith('/admin')
+  const isHome = location.pathname === '/'
   const [toast, setToast] = useState(null)
-
   const showToast = (message, type = 'success') => {
     setToast({ message, type })
   }
-
   return (
     <ToastContext.Provider value={showToast}>
       <div className="min-h-screen bg-white">
         <Routes>
-          <Route path="/" element={<RankingPage />} />
+          <Route path="/" element={<HomePage />} />
+          <Route path="/ranking" element={<RankingPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/tournament" element={<TournamentPage />} />
           <Route path="/entry" element={<EventEntryPage />} />
@@ -43,7 +42,7 @@ export default function App() {
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/*" element={<AdminLayout />} />
         </Routes>
-        {!isAdmin && <TabBar />}
+        {!isAdmin && !isHome && <TabBar />}
         <Toast toast={toast} onClose={() => setToast(null)} />
       </div>
     </ToastContext.Provider>
