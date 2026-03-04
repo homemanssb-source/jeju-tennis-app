@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react'
+ï»¿import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
@@ -29,7 +29,7 @@ export default function EventEntryPage() {
   async function fetchMembers() {
     const { data } = await supabase.from('members_public')
       .select('member_id, name, display_name, club, division, grade, status')
-      .neq('status', '?? œ').order('name')
+      .neq('status', '??ï¿½ï¿½').order('name')
     setMembers(data || [])
   }
 
@@ -57,39 +57,40 @@ export default function EventEntryPage() {
   function getMemberInfo(memberId) {
     const m = members.find(m => m.member_id === memberId)
     if (!m) return null
-    return { ...m, isActive: m.status === '?œì„±' }
+    return { ...m, isActive: m.status === '?ï¿½ì„±' }
   }
 
   async function handleSubmit() {
     if (!selectedEvent || !selectedDivision || !member1Id || !member2Id) {
-      showToast?.('?€?? ë¶€?? ?€??2ëª…ì„ ëª¨ë‘ ? íƒ?´ì£¼?¸ìš”.', 'error'); return
+      showToast?.('?ï¿½?? ë¶€?? ?ï¿½??2ëª…ì„ ëª¨ë‘ ?ï¿½íƒ?ï¿½ì£¼?ï¿½ìš”.', 'error'); return
     }
     if (!member1Pin || member1Pin.length !== 6) {
-      showToast?.('PIN 6?ë¦¬ë¥??…ë ¥?´ì£¼?¸ìš”.', 'error'); return
+      showToast?.('PIN 6?ï¿½ë¦¬ï¿½??ï¿½ë ¥?ï¿½ì£¼?ï¿½ìš”.', 'error'); return
     }
 
     setSubmitting(true)
 
-    // 1?¨ê³„: PIN ê²€ì¦?    const { data: pinData, error: pinError } = await supabase.rpc('rpc_verify_member_pin', {
+    // 1ë‹¨ê³„: PIN ê²€ì¦
+    const { data: pinData, error: pinError } = await supabase.rpc('rpc_verify_member_pin', {
       p_name: members.find(m => m.member_id === member1Id)?.name || '',
       p_pin: member1Pin,
     })
-    if (pinError) { showToast?.('PIN ?•ì¸ ?¤íŒ¨: ' + pinError.message, 'error'); setSubmitting(false); return }
-    if (pinData && !pinData.ok) { showToast?.('? ï¸ ' + pinData.message, 'error'); setSubmitting(false); return }
-    // PIN?¼ë¡œ ì°¾ì? member_id?€ ? íƒ??member1Idê°€ ?¼ì¹˜?˜ëŠ”ì§€ ?•ì¸
+    if (pinError) { showToast?.('PIN ?ï¿½ì¸ ?ï¿½íŒ¨: ' + pinError.message, 'error'); setSubmitting(false); return }
+    if (pinData && !pinData.ok) { showToast?.('?ï¿½ï¸ ' + pinData.message, 'error'); setSubmitting(false); return }
+    // PIN?ï¿½ë¡œ ì°¾ï¿½? member_id?ï¿½ ?ï¿½íƒ??member1Idê°€ ?ï¿½ì¹˜?ï¿½ëŠ”ì§€ ?ï¿½ì¸
     if (pinData && pinData.ok && pinData.member_id !== member1Id) {
-      showToast?.('? ï¸ PIN??? íƒ??? ìˆ˜?€ ?¼ì¹˜?˜ì? ?ŠìŠµ?ˆë‹¤.', 'error'); setSubmitting(false); return
+      showToast?.('?ï¿½ï¸ PIN???ï¿½íƒ???ï¿½ìˆ˜?ï¿½ ?ï¿½ì¹˜?ï¿½ï¿½? ?ï¿½ìŠµ?ï¿½ë‹¤.', 'error'); setSubmitting(false); return
     }
 
-    // 2?¨ê³„: ê¸°ì¡´ RPC ê·¸ë?ë¡??¸ì¶œ (ë³€ê²??†ìŒ)
+    // 2?ï¿½ê³„: ê¸°ì¡´ RPC ê·¸ï¿½?ï¿½??ï¿½ì¶œ (ë³€ï¿½??ï¿½ìŒ)
     const { data, error } = await supabase.rpc('rpc_apply_team_to_event', {
       p_event_id: selectedEvent.event_id, p_division_id: selectedDivision,
       p_member1_id: member1Id, p_member2_id: member2Id,
     })
-    if (error) { showToast?.('? ì²­ ?¤íŒ¨: ' + error.message, 'error') }
-    else if (data && !data.ok) { showToast?.('? ï¸ ' + (data.message || '? ì²­?????†ìŠµ?ˆë‹¤.'), 'error') }
+    if (error) { showToast?.('?ï¿½ì²­ ?ï¿½íŒ¨: ' + error.message, 'error') }
+    else if (data && !data.ok) { showToast?.('?ï¿½ï¸ ' + (data.message || '?ï¿½ì²­?????ï¿½ìŠµ?ï¿½ë‹¤.'), 'error') }
     else if (data && data.ok) {
-      showToast?.('?‰ ì°¸ê? ? ì²­ ?„ë£Œ!')
+      showToast?.('?ï¿½ï¿½ ì°¸ï¿½? ?ï¿½ì²­ ?ï¿½ë£Œ!')
       setMember1Id(''); setMember2Id(''); setMember1Search(''); setMember2Search(''); setMember1Pin('')
     }
     setSubmitting(false)
@@ -100,42 +101,42 @@ export default function EventEntryPage() {
 
   return (
     <div className="pb-20">
-      <PageHeader title="?ï¸ ì°¸ê?? ì²­" subtitle="ë³µì‹ ?€ ?€??ì°¸ê? ? ì²­" />
+      <PageHeader title="?ï¿½ï¸ ì°¸ï¿½??ï¿½ì²­" subtitle="ë³µì‹ ?ï¿½ ?ï¿½??ì°¸ï¿½? ?ï¿½ì²­" />
       <div className="max-w-lg mx-auto px-5 py-4 space-y-4">
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-          <p className="text-xs text-amber-700">? ï¸ ?€??2ëª?ëª¨ë‘ <b>?±ë¡ë¹??©ë?(?œì„± ?Œì›)</b>?¬ì•¼ ì°¸ê? ? ì²­??ê°€?¥í•©?ˆë‹¤.</p>
-          <p className="text-xs text-amber-700 mt-1">?”‘ ? ì²­???€??)??<b>PIN 6?ë¦¬</b>ë¥??…ë ¥?´ì•¼ ?©ë‹ˆ??</p>
-          <p className="text-xs text-amber-700 mt-0.5">??PIN ì´ˆê¸°ê°’ì? ?„í™”ë²ˆí˜¸ ???ë¦¬?…ë‹ˆ??</p>
+          <p className="text-xs text-amber-700">?ï¿½ï¸ ?ï¿½??2ï¿½?ëª¨ë‘ <b>?ï¿½ë¡ï¿½??ï¿½ï¿½?(?ï¿½ì„± ?ï¿½ì›)</b>?ï¿½ì•¼ ì°¸ï¿½? ?ï¿½ì²­??ê°€?ï¿½í•©?ï¿½ë‹¤.</p>
+          <p className="text-xs text-amber-700 mt-1">?ï¿½ï¿½ ?ï¿½ì²­???ï¿½??)??<b>PIN 6?ï¿½ë¦¬</b>ï¿½??ï¿½ë ¥?ï¿½ì•¼ ?ï¿½ë‹ˆ??</p>
+          <p className="text-xs text-amber-700 mt-0.5">??PIN ì´ˆê¸°ê°’ï¿½? ?ï¿½í™”ë²ˆí˜¸ ???ï¿½ë¦¬?ï¿½ë‹ˆ??</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">?€??? íƒ</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">?ï¿½???ï¿½íƒ</label>
           <select value={selectedEvent?.event_id || ''} onChange={e => handleEventChange(e.target.value)}
             className="w-full text-sm border border-line rounded-lg px-3 py-2.5">
-            <option value="">?€?Œë? ? íƒ?˜ì„¸??/option>
+            <option value="">?ï¿½?ï¿½ï¿½? ?ï¿½íƒ?ï¿½ì„¸??/option>
             {events.map(ev => (
               <option key={ev.event_id} value={ev.event_id}>
                 {ev.event_name} ({ev.event_date}){ev.entry_fee_team ? ` - ${ev.entry_fee_team.toLocaleString()}?? : ''}
               </option>
             ))}
           </select>
-          {events.length === 0 && <p className="text-xs text-sub mt-1">?„ì¬ ? ì²­ ê°€?¥í•œ ?€?Œê? ?†ìŠµ?ˆë‹¤.</p>}
+          {events.length === 0 && <p className="text-xs text-sub mt-1">?ï¿½ì¬ ?ï¿½ì²­ ê°€?ï¿½í•œ ?ï¿½?ï¿½ï¿½? ?ï¿½ìŠµ?ï¿½ë‹¤.</p>}
         </div>
 
         {selectedEvent && (
           <div className="bg-soft rounded-lg p-3">
             <p className="text-sm font-semibold">{selectedEvent.event_name}</p>
-            <p className="text-xs text-sub mt-1">?“… {selectedEvent.event_date}
-              {selectedEvent.entry_fee_team > 0 && ` Â· ?’° ${selectedEvent.entry_fee_team.toLocaleString()}???€`}</p>
+            <p className="text-xs text-sub mt-1">?ï¿½ï¿½ {selectedEvent.event_date}
+              {selectedEvent.entry_fee_team > 0 && ` Â· ?ï¿½ï¿½ ${selectedEvent.entry_fee_team.toLocaleString()}???ï¿½`}</p>
           </div>
         )}
 
         {selectedEvent && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ë¶€??? íƒ</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">ë¶€???ï¿½íƒ</label>
             <select value={selectedDivision} onChange={e => setSelectedDivision(e.target.value)}
               className="w-full text-sm border border-line rounded-lg px-3 py-2.5">
-              <option value="">ë¶€?œë? ? íƒ?˜ì„¸??/option>
+              <option value="">ë¶€?ï¿½ï¿½? ?ï¿½íƒ?ï¿½ì„¸??/option>
               {divisions.map(d => <option key={d.division_id} value={d.division_id}>{d.division_name}</option>)}
             </select>
           </div>
@@ -143,16 +144,16 @@ export default function EventEntryPage() {
 
         {selectedDivision && (
           <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">?€??1 (? ì²­??</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">?ï¿½??1 (?ï¿½ì²­??</label>
             <input type="text" value={member1Search}
               onChange={e => { setMember1Search(e.target.value); setMember1Id(''); setMember1Pin(''); setShowDropdown1(true) }}
               onFocus={() => setShowDropdown1(true)}
-              placeholder="?´ë¦„ ê²€??.."
+              placeholder="?ï¿½ë¦„ ê²€??.."
               className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
             {member1Info && (
               <div className={`mt-1 px-3 py-1.5 rounded-lg text-xs ${member1Info.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
                 {member1Info.name} Â· {member1Info.club || '-'} Â· {member1Info.grade || '-'}
-                {member1Info.isActive ? ' ???œì„±' : ' ???±ë¡ë¹?ë¯¸ë‚©'}
+                {member1Info.isActive ? ' ???ï¿½ì„±' : ' ???ï¿½ë¡ï¿½?ë¯¸ë‚©'}
               </div>
             )}
             {showDropdown1 && filterMembers(member1Search).length > 0 && (
@@ -163,8 +164,8 @@ export default function EventEntryPage() {
                     className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30">
                     <span className="font-medium">{m.display_name || m.name}</span>
                     <span className="text-sub text-xs ml-2">{m.club || ''} Â· {m.grade || ''}</span>
-                    <span className={`text-xs ml-2 ${m.status === '?œì„±' ? 'text-green-600' : 'text-red-500'}`}>
-                      {m.status === '?œì„±' ? '?? : '?Œë???}
+                    <span className={`text-xs ml-2 ${m.status === '?ï¿½ì„±' ? 'text-green-600' : 'text-red-500'}`}>
+                      {m.status === '?ï¿½ì„±' ? '?? : '?ï¿½ï¿½???}
                     </span>
                   </button>
                 ))}
@@ -175,29 +176,29 @@ export default function EventEntryPage() {
 
         {member1Id && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">?”‘ PIN (6?ë¦¬)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">?ï¿½ï¿½ PIN (6?ï¿½ë¦¬)</label>
             <input type="password" inputMode="numeric" maxLength={6} value={member1Pin}
               onChange={e => setMember1Pin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="PIN 6?ë¦¬ ?…ë ¥"
+              placeholder="PIN 6?ï¿½ë¦¬ ?ï¿½ë ¥"
               className="w-full text-sm border border-line rounded-lg px-3 py-2.5 tracking-widest" />
             {member1Pin.length > 0 && member1Pin.length < 6 && (
-              <p className="text-xs text-red-500 mt-1">{6 - member1Pin.length}?ë¦¬ ???…ë ¥?´ì£¼?¸ìš”</p>
+              <p className="text-xs text-red-500 mt-1">{6 - member1Pin.length}?ï¿½ë¦¬ ???ï¿½ë ¥?ï¿½ì£¼?ï¿½ìš”</p>
             )}
           </div>
         )}
 
         {selectedDivision && (
           <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">?€??2</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">?ï¿½??2</label>
             <input type="text" value={member2Search}
               onChange={e => { setMember2Search(e.target.value); setMember2Id(''); setShowDropdown2(true) }}
               onFocus={() => setShowDropdown2(true)}
-              placeholder="?´ë¦„ ê²€??.."
+              placeholder="?ï¿½ë¦„ ê²€??.."
               className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
             {member2Info && (
               <div className={`mt-1 px-3 py-1.5 rounded-lg text-xs ${member2Info.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
                 {member2Info.name} Â· {member2Info.club || '-'} Â· {member2Info.grade || '-'}
-                {member2Info.isActive ? ' ???œì„±' : ' ???±ë¡ë¹?ë¯¸ë‚©'}
+                {member2Info.isActive ? ' ???ï¿½ì„±' : ' ???ï¿½ë¡ï¿½?ë¯¸ë‚©'}
               </div>
             )}
             {showDropdown2 && filterMembers(member2Search).length > 0 && (
@@ -208,8 +209,8 @@ export default function EventEntryPage() {
                     className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30">
                     <span className="font-medium">{m.display_name || m.name}</span>
                     <span className="text-sub text-xs ml-2">{m.club || ''} Â· {m.grade || ''}</span>
-                    <span className={`text-xs ml-2 ${m.status === '?œì„±' ? 'text-green-600' : 'text-red-500'}`}>
-                      {m.status === '?œì„±' ? '?? : '?Œë???}
+                    <span className={`text-xs ml-2 ${m.status === '?ï¿½ì„±' ? 'text-green-600' : 'text-red-500'}`}>
+                      {m.status === '?ï¿½ì„±' ? '?? : '?ï¿½ï¿½???}
                     </span>
                   </button>
                 ))}
@@ -222,11 +223,14 @@ export default function EventEntryPage() {
           <button onClick={handleSubmit} disabled={submitting || !member1Id || !member2Id || member1Pin.length !== 6}
             className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm
               hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {submitting ? '? ì²­ ì¤?..' : '?¾ ì°¸ê? ? ì²­?˜ê¸°'}
+            {submitting ? '?ï¿½ì²­ ï¿½?..' : '?ï¿½ï¿½ ì°¸ï¿½? ?ï¿½ì²­?ï¿½ê¸°'}
           </button>
         )}
       </div>
     </div>
   )
 }
+
+
+
 
