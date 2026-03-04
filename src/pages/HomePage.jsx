@@ -176,7 +176,7 @@ export default function HomePage() {
       {/* 푸터 */}
       <div className="max-w-lg mx-auto px-5 pb-24">
         <div className="text-center py-6 border-t border-white/10">
-          <p className="text-gray-600 text-xs">© 2025 J.T.A랭킹 · 제주 테니스 협회</p>
+          <p className="text-gray-600 text-xs">© 2025 J.T.A랭킹 · 제주시 테니스 협회</p>
         </div>
       </div>
     </div>
