@@ -80,6 +80,55 @@ export default function EventAdmin() {
     fetchAll()
   }
 
+  // ★ 대회 삭제 (연관 데이터 모두 삭제)
+  async function handleDeleteEvent(ev) {
+    const confirmMsg = `⚠️ "${ev.event_name}" 대회를 삭제하시겠습니까?\n\n` +
+      `다음 데이터가 모두 삭제됩니다:\n` +
+      `- 개인전 참가신청 및 결제내역\n` +
+      `- 단체전 참가신청 및 선수명단\n` +
+      `- 부서 정보\n` +
+      `- 앱B 경기결과\n\n` +
+      `이 작업은 되돌릴 수 없습니다.`
+    if (!confirm(confirmMsg)) return
+
+    try {
+      const eid = ev.event_id
+
+      // 1. team_event_members (team_event_entries의 하위)
+      const { data: teamEntries } = await supabase.from('team_event_entries').select('id').eq('event_id', eid)
+      if (teamEntries?.length > 0) {
+        const entryIds = teamEntries.map(e => e.id)
+        await supabase.from('team_event_members').delete().in('entry_id', entryIds)
+      }
+
+      // 2. team_event_entries
+      await supabase.from('team_event_entries').delete().eq('event_id', eid)
+
+      // 3. payments (target_event_id 또는 matched_entry_id)
+      await supabase.from('payments').delete().eq('target_event_id', eid)
+
+      // 4. event_entries
+      await supabase.from('event_entries').delete().eq('event_id', eid)
+
+      // 5. app_b_match_results
+      await supabase.from('app_b_match_results').delete().eq('event_id', eid)
+
+      // 6. event_divisions
+      await supabase.from('event_divisions').delete().eq('event_id', eid)
+
+      // 7. events
+      const { error } = await supabase.from('events').delete().eq('event_id', eid)
+      if (error) throw error
+
+      showToast?.(`"${ev.event_name}" 대회가 삭제되었습니다.`)
+      setSelectedEvent(null)
+      setEventDivisions([])
+      fetchAll()
+    } catch (err) {
+      showToast?.('삭제 실패: ' + (err.message || '알 수 없는 오류'), 'error')
+    }
+  }
+
   // 단체전 설정 수정 (선택된 대회)
   async function handleUpdateTeamSettings() {
     if (!editingEvent) return
@@ -282,10 +331,16 @@ export default function EventAdmin() {
                     }`}>{ev.status}</span>
                   </td>
                   <td className="px-3 py-2 text-center">
-                    <button onClick={(e) => { e.stopPropagation(); toggleEventStatus(ev) }}
-                      className="text-xs text-accent hover:underline">
-                      {ev.status === 'OPEN' ? '마감' : '오픈'}
-                    </button>
+                    <div className="flex gap-2 justify-center">
+                      <button onClick={(e) => { e.stopPropagation(); toggleEventStatus(ev) }}
+                        className="text-xs text-accent hover:underline">
+                        {ev.status === 'OPEN' ? '마감' : '오픈'}
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteEvent(ev) }}
+                        className="text-xs text-red-500 hover:underline">
+                        삭제
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )
