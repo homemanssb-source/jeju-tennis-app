@@ -50,7 +50,7 @@ export default function HomePage() {
             J.T.A<span className="text-gray-900">랭킹</span>
           </h1>
           <p className="text-xs tracking-widest uppercase" style={{ color: '#92400e' }}>
-            Jeju Tennis Association
+            Jejusi Tennis Association
           </p>
         </div>
       </div>
@@ -150,7 +150,7 @@ export default function HomePage() {
 
         {/* 푸터 */}
         <div className="text-center py-6 pb-20" style={{ borderTop: '1px solid #fde68a' }}>
-          <p className="text-xs text-gray-300">© 2025 J.T.A랭킹 · 제주 테니스 협회</p>
+          <p className="text-xs text-gray-300">© 2025 J.T.A랭킹 · 제주시 테니스 협회</p>
         </div>
       </div>
     </div>
