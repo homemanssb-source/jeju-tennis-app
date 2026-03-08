@@ -4,8 +4,8 @@
   "description": "제주시테니스협회 랭킹 & 대회 앱",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ff5520",
-  "theme_color": "#ff5520",
+  "background_color": "#1a2744",
+  "theme_color": "#1a2744",
   "orientation": "portrait",
   "lang": "ko",
   "icons": [
