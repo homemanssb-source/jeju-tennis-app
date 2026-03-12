@@ -198,8 +198,12 @@ export default function AdminManagerPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold">⚙️ 관리자 계정 관리</h2>
         <button
-          onClick={() => { setForm({ email: '', name: '', is_super: false, permissions: { ...DEFAULT_PERMISSIONS } }); setNewPassword(''); setModal('add') }}
-          className="bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium"
+          onClick={() => {
+            setForm({ email: '', name: '', is_super: false, permissions: { ...DEFAULT_PERMISSIONS } })
+            setNewPassword('')
+            setModal('add')
+          }}
+          style={{ backgroundColor: '#2563eb', color: 'white', padding: '8px 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '500', border: 'none', cursor: 'pointer' }}
         >
           + 관리자 추가
         </button>
