@@ -38,7 +38,8 @@ export default function AdminManagerPage() {
 
   async function fetchAdmins() {
     setLoading(true)
-    const { data } = await supabase.from('admin_users').select('*').order('created_at')
+    const { data, error } = await supabase.from('admin_users').select('*')
+    if (error) console.error('admin_users 조회 실패:', error)
     setAdmins(data || [])
     setLoading(false)
   }
