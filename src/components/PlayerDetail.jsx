@@ -51,15 +51,20 @@ export default function PlayerDetail({ memberId, open, onClose }) {
   const member = data?.member
   const history = data?.history || []
 
+  // ✅ 시즌 선택 수정: 과거 3년 + 올해 + 내년 (총 5개)
+  const currentYear = new Date().getFullYear()
+  const seasonOptions = Array.from({ length: 5 }, (_, i) => currentYear + 1 - i)
+  // 결과: [내년, 올해, 작년, 2년전, 3년전]
+
   return (
-    <BottomSheet open={open} onClose={handleClose} title={'\uD68C\uC6D0 \uC0C1\uC138'}>
+    <BottomSheet open={open} onClose={handleClose} title="회원 상세">
       {loading ? (
         <div className="space-y-4">
           <SkeletonLine className="w-1/3 h-6" />
           <SkeletonLine className="w-2/3 h-4" />
           <SkeletonLine className="w-1/2 h-4" />
           <div className="mt-6 space-y-3">
-            {[1,2,3].map(i => <SkeletonLine key={i} className="w-full h-10" />)}
+            {[1, 2, 3].map(i => <SkeletonLine key={i} className="w-full h-10" />)}
           </div>
         </div>
       ) : member ? (
@@ -76,20 +81,20 @@ export default function PlayerDetail({ memberId, open, onClose }) {
               )}
             </div>
             <div className="text-sm text-sub space-y-1">
-              {member.club && <p>{'\uC18C\uC18D: ' + member.club}</p>}
-              {member.division && <p>{'\uB7AD\uD0B9\uBD80\uC11C: ' + member.division}</p>}
-              <p>{'\uC0C1\uD0DC: ' + member.status}</p>
+              {member.club && <p>소속: {member.club}</p>}
+              {member.division && <p>랭킹부서: {member.division}</p>}
+              <p>상태: {member.status}</p>
             </div>
             {data.total_points !== undefined && (
               <div className="mt-3 flex gap-3">
                 <div className="flex-1 bg-soft rounded-lg px-4 py-3">
-                  <span className="text-xs text-sub">{data.season_year + '\uC2DC\uC98C \uCD1D \uD3EC\uC778\uD2B8'}</span>
+                  <span className="text-xs text-sub">{data.season_year}시즌 총 포인트</span>
                   <p className="text-2xl font-bold text-accent">{data.total_points.toLocaleString()}</p>
                 </div>
                 <div className="bg-soft rounded-lg px-4 py-3 text-center min-w-[90px]">
-                  <span className="text-xs text-sub">{'\uD604\uC7AC \uB7AD\uD0B9'}</span>
+                  <span className="text-xs text-sub">현재 랭킹</span>
                   {currentRank ? (
-                    <p className="text-2xl font-bold text-gray-900">{currentRank}<span className="text-sm font-medium text-sub">{'\uC704'}</span></p>
+                    <p className="text-2xl font-bold text-gray-900">{currentRank}<span className="text-sm font-medium text-sub">위</span></p>
                   ) : (
                     <p className="text-lg font-bold text-sub">-</p>
                   )}
@@ -98,31 +103,35 @@ export default function PlayerDetail({ memberId, open, onClose }) {
             )}
           </div>
 
+          {/* ✅ 시즌 선택 - 과거 연도 포함 */}
           <div className="flex items-center gap-2 mb-4">
-            <span className="text-sm font-medium text-gray-700">{'\uC2DC\uC98C:'}</span>
-            <select value={seasonYear} onChange={(e) => setSeasonYear(Number(e.target.value))}
-              className="text-sm border border-line rounded-lg px-3 py-1.5 bg-white">
-              {Array.from({ length: 2 }, (_, i) => new Date().getFullYear() + i).map(y => (
-                <option key={y} value={y}>{y + '\uB144'}</option>
+            <span className="text-sm font-medium text-gray-700">시즌:</span>
+            <select
+              value={seasonYear}
+              onChange={e => setSeasonYear(Number(e.target.value))}
+              className="text-sm border border-line rounded-lg px-3 py-1.5 bg-white"
+            >
+              {seasonOptions.map(y => (
+                <option key={y} value={y}>{y}년</option>
               ))}
             </select>
           </div>
 
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-3">{'\uB300\uD68C \uC774\uB825'}</h4>
+            <h4 className="text-sm font-semibold text-gray-700 mb-3">대회 이력</h4>
             {history.length === 0 ? (
-              <p className="text-sm text-sub py-4 text-center">{'\uD574\uB2F9 \uC2DC\uC98C \uB300\uD68C \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'}</p>
+              <p className="text-sm text-sub py-4 text-center">해당 시즌 대회 기록이 없습니다.</p>
             ) : (
               <div className="space-y-2">
                 {history.map((h, i) => (
                   <div key={i} className="flex items-center justify-between py-2.5 px-3 bg-soft rounded-lg">
                     <div>
                       <p className="text-sm font-medium text-gray-900">{h.tournament_name}</p>
-                      <p className="text-xs text-sub mt-0.5">{h.date + ' \u00B7 ' + h.division}</p>
+                      <p className="text-xs text-sub mt-0.5">{h.date} · {h.division}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-semibold text-gray-900">{h.rank}</p>
-                      <p className="text-xs text-accent font-medium">{'+' + h.points}</p>
+                      <p className="text-xs text-accent font-medium">+{h.points}</p>
                     </div>
                   </div>
                 ))}
@@ -131,7 +140,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
           </div>
         </div>
       ) : (
-        <p className="text-sm text-sub text-center py-8">{'\uD68C\uC6D0 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.'}</p>
+        <p className="text-sm text-sub text-center py-8">회원 정보를 불러올 수 없습니다.</p>
       )}
     </BottomSheet>
   )
