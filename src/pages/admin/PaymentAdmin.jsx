@@ -23,6 +23,9 @@ export default function PaymentAdmin() {
   const [uploadEventId, setUploadEventId] = useState('')
   const [uploadYear, setUploadYear] = useState(new Date().getFullYear())
 
+  // 삭제 확인 모달 (브라우저 confirm() 대체)
+  const [confirmModal, setConfirmModal] = useState(null) // { message, onConfirm }
+
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
@@ -143,43 +146,51 @@ export default function PaymentAdmin() {
 
   // ✅ 개별 삭제
   async function handleSingleDelete(payment) {
-    if (!confirm(`"${payment.sender_name}" ${payment.amount?.toLocaleString()}원 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return
-    const { error } = await supabase.from('payments').delete().eq('payment_id', payment.payment_id)
-    if (error) { showToast?.('삭제 실패: ' + error.message, 'error'); return }
+    setConfirmModal({
+      message: `"${payment.sender_name}" ${payment.amount?.toLocaleString()}원 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`,
+      onConfirm: async () => {
+        const { error } = await supabase.from('payments').delete().eq('payment_id', payment.payment_id)
+        if (error) { showToast?.('삭제 실패: ' + error.message, 'error'); return }
 
-    await writeLog({
-      adminEmail: adminUser?.email,
-      adminName: adminUser?.name,
-      action: 'DELETE',
-      targetTable: 'payments',
-      targetId: payment.payment_id,
-      targetLabel: `결제 삭제: ${payment.sender_name} ${payment.amount?.toLocaleString()}원`,
-      beforeData: payment,
+        await writeLog({
+          adminEmail: adminUser?.email,
+          adminName: adminUser?.name,
+          action: 'DELETE',
+          targetTable: 'payments',
+          targetId: payment.payment_id,
+          targetLabel: `결제 삭제: ${payment.sender_name} ${payment.amount?.toLocaleString()}원`,
+          beforeData: payment,
+        })
+
+        showToast?.('삭제되었습니다.')
+        fetchAll()
+      }
     })
-
-    showToast?.('삭제되었습니다.')
-    fetchAll()
   }
 
   // 일괄 삭제
   async function handleBulkDelete() {
     if (selectedIds.size === 0) { showToast?.('삭제할 항목을 선택해주세요.', 'error'); return }
-    if (!confirm(`선택한 ${selectedIds.size}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return
-    const ids = [...selectedIds]
-    const { error } = await supabase.from('payments').delete().in('payment_id', ids)
-    if (error) { showToast?.('삭제 실패: ' + error.message, 'error'); return }
+    setConfirmModal({
+      message: `선택한 ${selectedIds.size}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`,
+      onConfirm: async () => {
+        const ids = [...selectedIds]
+        const { error } = await supabase.from('payments').delete().in('payment_id', ids)
+        if (error) { showToast?.('삭제 실패: ' + error.message, 'error'); return }
 
-    await writeLog({
-      adminEmail: adminUser?.email,
-      adminName: adminUser?.name,
-      action: 'DELETE',
-      targetTable: 'payments',
-      targetLabel: `결제 일괄삭제 ${ids.length}건`,
+        await writeLog({
+          adminEmail: adminUser?.email,
+          adminName: adminUser?.name,
+          action: 'DELETE',
+          targetTable: 'payments',
+          targetLabel: `결제 일괄삭제 ${ids.length}건`,
+        })
+
+        showToast?.(`${ids.length}건 삭제 완료`)
+        setSelectedIds(new Set())
+        fetchAll()
+      }
     })
-
-    showToast?.(`${ids.length}건 삭제 완료`)
-    setSelectedIds(new Set())
-    fetchAll()
   }
 
   const filtered = payments.filter(p => {
@@ -381,6 +392,34 @@ export default function PaymentAdmin() {
                 className="flex-1 py-2 border border-line rounded-lg text-sm text-sub">취소</button>
               <button onClick={handleManualMatch}
                 className="flex-1 py-2 bg-accent text-white rounded-lg text-sm font-medium">매칭</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 삭제 확인 모달 (브라우저 confirm 대체) */}
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="text-base font-bold text-red-600">⚠️ 삭제 확인</h3>
+            <p className="text-sm text-gray-700 whitespace-pre-line">{confirmModal.message}</p>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft"
+              >
+                취소
+              </button>
+              <button
+                onClick={async () => {
+                  const fn = confirmModal.onConfirm
+                  setConfirmModal(null)
+                  await fn()
+                }}
+                className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600"
+              >
+                삭제
+              </button>
             </div>
           </div>
         </div>
