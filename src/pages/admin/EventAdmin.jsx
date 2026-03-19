@@ -82,14 +82,21 @@ export default function EventAdmin() {
   }
 
   // ── 대회 수정 열기 ──────────────────────────────
+  // UTC → KST datetime-local 변환 (입력창 표시용)
+  function toKSTLocal(utcStr) {
+    if (!utcStr) return ''
+    const kst = new Date(new Date(utcStr).getTime() + 9 * 60 * 60 * 1000)
+    return kst.toISOString().slice(0, 16)
+  }
+
   function openEditModal(ev) {
     setEditingEvent(ev)
     setEditForm({
       event_name: ev.event_name || '',
       event_date: ev.event_date || '',
       entry_fee_team: ev.entry_fee_team || '',
-      entry_open_at: ev.entry_open_at ? ev.entry_open_at.slice(0, 16) : '',
-      entry_close_at: ev.entry_close_at ? ev.entry_close_at.slice(0, 16) : '',
+      entry_open_at: toKSTLocal(ev.entry_open_at),
+      entry_close_at: toKSTLocal(ev.entry_close_at),
       description: ev.description || '',
       tournament_id: ev.tournament_id || '',
     })
@@ -217,8 +224,15 @@ export default function EventAdmin() {
 
   function formatDateTime(str) {
     if (!str) return '-'
-    const d = new Date(str)
-    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    // KST(한국시간) 기준으로 표시 (UTC+9)
+    return new Date(str).toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
   }
 
   return (
