@@ -47,10 +47,20 @@ export default function EventAdmin() {
   }
 
   async function fetchDivisions(eventId) {
-    const { data } = await supabase.from('event_divisions')
-      .select('*').eq('event_id', eventId).order('division_name')
-    setEventDivisions(data || [])
-    return data || []
+    // event_divisions를 가져온 뒤 point_rules의 sort_order 순서에 맞게 정렬
+    const [{ data: divs }, { data: prules }] = await Promise.all([
+      supabase.from('event_divisions').select('*').eq('event_id', eventId),
+      supabase.from('point_rules').select('division, sort_order').order('sort_order', { ascending: true, nullsFirst: false }),
+    ])
+    const sorted = (divs || []).sort((a, b) => {
+      const ai = (prules || []).findIndex(r => r.division === a.division_name)
+      const bi = (prules || []).findIndex(r => r.division === b.division_name)
+      const aOrder = ai === -1 ? 9999 : ai
+      const bOrder = bi === -1 ? 9999 : bi
+      return aOrder - bOrder
+    })
+    setEventDivisions(sorted)
+    return sorted
   }
 
   // ── 대회 생성 ──────────────────────────────────
