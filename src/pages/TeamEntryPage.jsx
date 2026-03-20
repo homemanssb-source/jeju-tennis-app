@@ -303,7 +303,7 @@ export default function TeamEntryPage() {
         {/* ?�럽�?*/}
         {captainVerified && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">?�럽�?/label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">클럽명</label>
             <input type="text" value={clubName} onChange={e => setClubName(e.target.value)}
               placeholder="클럽명을 입력하세요"
               className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
@@ -393,7 +393,7 @@ export default function TeamEntryPage() {
                 <input type="text" value={searchQuery}
                   onChange={e => { setSearchQuery(e.target.value); setShowSearchDropdown(true) }}
                   onFocus={() => setShowSearchDropdown(true)}
-                  placeholder="이름으로 검색 (활성 회원)""
+                  placeholder="이름으로 검색 (활성 회원)"
                   className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
                 {showSearchDropdown && searchResults.length > 0 && (
                   <div className="absolute left-0 right-0 top-full bg-white border border-line rounded-lg shadow-lg mt-1 z-20 max-h-48 overflow-y-auto">
