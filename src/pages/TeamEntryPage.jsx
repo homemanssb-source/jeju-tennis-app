@@ -231,13 +231,13 @@ export default function TeamEntryPage() {
           <label className="block text-sm font-medium text-gray-700 mb-1">대회 선택</label>
           <select value={selectedEvent?.event_id || ''} onChange={e => handleEventChange(e.target.value)}
             className="w-full text-sm border border-line rounded-lg px-3 py-2.5">
-            <option value="">대회를 선택하세요/option>
+            <option value="">대회를 선택하세요</option>
             {events.map(ev => (
               <option key={ev.event_id} value={ev.event_id}>{ev.event_name} ({ev.event_date})</option>
             ))}
           </select>
           {selectedEvent && memberLimit && (
-            <p className="text-xs text-accent mt-1">?�� 클럽당 인원 한도: {memberLimit}명/p>
+            <p className="text-xs text-accent mt-1">🏆 클럽당 인원 한도: {memberLimit}명</p>
           )}
         </div>
 
@@ -268,7 +268,7 @@ export default function TeamEntryPage() {
               setSelectedDivision(div || null)
             }}
               className="w-full text-sm border border-line rounded-lg px-3 py-2.5">
-              <option value="">부서를 선택하세요/option>
+              <option value="">부서를 선택하세요</option>
               {divisions.map(d => (
                 <option key={d.division_id} value={d.division_id}>{d.division_name}</option>
               ))}
@@ -368,14 +368,14 @@ export default function TeamEntryPage() {
                               <span className="text-xs text-sub ml-2">{m.gender === 'M' ? '남' : m.gender === 'F' ? '여' : ''}</span>
                               <span className="text-xs text-accent ml-2">{m.grade || ''}</span>
                             </div>
-                            {inRoster && <span className="text-xs text-blue-500">등록됨/span>}
+                            {inRoster && <span className="text-xs text-blue-500">등록됨</span>}
                           </label>
                         )
                       })}
                     </div>
                     {checkedNewCount > 0 && (
                       <div className="px-3 py-2 bg-soft border-t border-line flex justify-between items-center">
-                        <span className="text-xs text-gray-700">?�로 추�?: {checkedNewCount}�?/span>
+                        <span className="text-xs text-gray-700">새로 추가: {checkedNewCount}명</span>
                         <button onClick={handleAddFromClub}
                           className="px-3 py-1.5 bg-accent text-white text-xs rounded-lg">
                           선택 완료 → 명단 추가
@@ -418,7 +418,7 @@ export default function TeamEntryPage() {
           <div className="border border-line rounded-lg overflow-hidden">
             <div className="px-3 py-2 bg-soft border-b border-line flex justify-between items-center">
               <span className="text-xs font-medium text-gray-700">
-                ?�수 명단: {roster.length}명                {memberLimit && <span className="text-accent ml-1">/ ?�한 {memberLimit}�?/span>}
+                선수 명단: {roster.length}명 {memberLimit && <span className="text-accent ml-1">/ 한도 {memberLimit}명</span>}
               </span>
             </div>
             <table className="w-full text-sm">
