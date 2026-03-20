@@ -493,20 +493,38 @@ export default function EventAdmin() {
       {/* 선택된 대회의 부서 관리 */}
       {selectedEvent && (
         <div className="bg-white rounded-r border border-line p-4">
-          <h3 className="text-sm font-bold mb-3">📋 {selectedEvent.event_name} - 부서 관리</h3>
+          <h3 className="text-sm font-bold mb-1">📋 {selectedEvent.event_name} - 부서 관리</h3>
 
-          {/* 부서 추가 — 포인트 규정 드롭다운 */}
+          {/* 팀전/개인전 안내 */}
+          {(selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') ? (
+            <p className="text-xs text-blue-600 mb-3">👥 클럽대항전 부서 — 직접 입력하세요. (예: 남성부, 여성부, 혼성부)</p>
+          ) : (
+            <p className="text-xs text-sub mb-3">📊 개인전 부서 — 포인트 규정 목록에서 선택하세요.</p>
+          )}
+
+          {/* 부서 추가 */}
           <div className="flex gap-2 mb-3">
             <div className="flex-1">
-              <select
-                value={divForm.division_name}
-                onChange={e => setDivForm({ ...divForm, division_name: e.target.value })}
-                className="w-full text-sm border border-line rounded-lg px-3 py-2">
-                <option value="">부서 선택 (포인트 규정 기준)</option>
-                {pointRuleDivisions.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+              {/* 팀전: 직접 입력 */}
+              {(selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') ? (
+                <input
+                  type="text"
+                  value={divForm.division_name}
+                  onChange={e => setDivForm({ ...divForm, division_name: e.target.value })}
+                  placeholder="부서명 직접 입력 (예: 남성부, 여성부)"
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+              ) : (
+                /* 개인전: 포인트 규정 드롭다운 */
+                <select
+                  value={divForm.division_name}
+                  onChange={e => setDivForm({ ...divForm, division_name: e.target.value })}
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2">
+                  <option value="">부서 선택 (포인트 규정 기준)</option>
+                  {pointRuleDivisions.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              )}
             </div>
             <label className="flex items-center gap-1 text-xs text-sub shrink-0">
               <input type="checkbox" checked={divForm.has_groups}
@@ -517,7 +535,7 @@ export default function EventAdmin() {
               className="bg-accent text-white px-3 py-2 rounded-lg text-sm shrink-0">추가</button>
           </div>
 
-          {pointRuleDivisions.length === 0 && (
+          {selectedEvent.event_type === 'individual' && pointRuleDivisions.length === 0 && (
             <p className="text-xs text-amber-600 mb-3">⚠️ 포인트 규정에 부서가 없습니다. 먼저 포인트 규정에서 부서를 추가해주세요.</p>
           )}
 
