@@ -1,5 +1,5 @@
 // JTA 제주시테니스 Service Worker
-const CACHE_NAME = 'jta-ranking-v1';
+const CACHE_NAME = 'jta-ranking-v3';
 const ASSETS = ['/', '/index.html', '/manifest.json', '/icon-192x192.png', '/icon-512x512.png'];
 
 self.addEventListener('install', e => {
@@ -19,13 +19,24 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (new URL(e.request.url).hostname.includes('supabase')) return;
+
+  // ✅ 페이지 네비게이션은 항상 network-first
+  // Android Chrome이 SW 재시작 후 캐시 불일치로 백지가 되는 문제 방지
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // 정적 assets은 cache-first (빠른 로딩)
   e.respondWith(
     caches.match(e.request).then(cached =>
       cached || fetch(e.request).then(res => {
         if (!res || res.status !== 200 || res.type !== 'basic') return res;
         caches.open(CACHE_NAME).then(c => c.put(e.request, res.clone()));
         return res;
-      }).catch(() => caches.match('/index.html'))
+      })
     )
   );
 });
