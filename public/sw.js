@@ -1,5 +1,5 @@
-// JTA 제주시테니스 Service Worker
-const CACHE_NAME = 'jta-ranking-v3';
+// JTA 테니스 Service Worker
+const CACHE_NAME = 'jta-ranking-v4';
 const ASSETS = ['/', '/index.html', '/manifest.json', '/icon-192x192.png', '/icon-512x512.png'];
 
 self.addEventListener('install', e => {
@@ -20,31 +20,28 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (new URL(e.request.url).hostname.includes('supabase')) return;
 
-  // ✅ 페이지 네비게이션은 항상 network-first
-  // Android Chrome이 SW 재시작 후 캐시 불일치로 백지가 되는 문제 방지
-  if (e.request.mode === 'navigate') {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match('/index.html'))
-    );
-    return;
-  }
-
-  // 정적 assets은 cache-first (빠른 로딩)
+  // 모든 요청 network-first
+  // iOS Safari는 cache-first 시 구버전을 계속 보여주는 문제 있음
   e.respondWith(
-    caches.match(e.request).then(cached =>
-      cached || fetch(e.request).then(res => {
-        if (!res || res.status !== 200 || res.type !== 'basic') return res;
-        caches.open(CACHE_NAME).then(c => c.put(e.request, res.clone()));
+    fetch(e.request)
+      .then(res => {
+        // 네트워크 성공 시 캐시 갱신
+        if (res && res.status === 200 && res.type === 'basic') {
+          caches.open(CACHE_NAME).then(c => c.put(e.request, res.clone()));
+        }
         return res;
       })
-    )
+      .catch(() => {
+        // 오프라인 시 캐시 폴백
+        return caches.match(e.request).then(cached => cached || caches.match('/index.html'));
+      })
   );
 });
 
 self.addEventListener('push', e => {
   const d = e.data?.json() || {};
   e.waitUntil(
-    self.registration.showNotification(d.title || '🎾 JTA 제주시테니스', {
+    self.registration.showNotification(d.title || '🎾 JTA 테니스', {
       body: d.body || '새로운 알림이 있습니다.',
       icon: '/icon-192x192.png',
       badge: '/icon-72x72.png',
@@ -53,7 +50,7 @@ self.addEventListener('push', e => {
       renotify: true,
       data: { url: d.url || '/' },
       actions: [
-        { action: 'open',  title: '확인하기' },
+        { action: 'open', title: '확인하기' },
         { action: 'close', title: '닫기' }
       ]
     })
