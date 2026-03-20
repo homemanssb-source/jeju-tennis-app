@@ -23,7 +23,7 @@ export default function HomePage() {
   async function fetchUpcomingEvents() {
     const today = new Date().toISOString().split('T')[0]
     const { data } = await supabase.from('events')
-      .select('event_name, event_date, status, event_type, entry_open_at, entry_close_at')
+      .select('event_name, event_date, event_date_end, status, event_type, entry_open_at, entry_close_at')
       .gte('event_date', today)
       .eq('status', 'OPEN')
       .order('event_date')
@@ -42,6 +42,16 @@ export default function HomePage() {
     if (type === 'team') return '팀전'
     if (type === 'both') return '개인+팀'
     return '개인전'
+  }
+
+  // KST 기준 날짜 포맷 (M/D)
+  function formatDateMD(utcStr) {
+    if (!utcStr) return ''
+    return new Date(utcStr).toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      month: 'numeric',
+      day: 'numeric',
+    })
   }
 
   function getEntryStatus(ev) {
@@ -137,17 +147,34 @@ export default function HomePage() {
                         fontWeight: isFirst ? 700 : 600,
                         color: isFirst ? '#2d1a0e' : '#7a6a62',
                       }}>{ev.event_name}</p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                        <p style={{ margin: 0, fontSize: 10, color: '#c8a898' }}>{ev.event_date}</p>
-                        <span style={{
-                          fontSize: 9, fontWeight: 600,
-                          color: isFirst ? getEntryStatusColor(ev) : '#c8a898',
-                          background: isFirst ? (getEntryStatus(ev) === '신청 중' ? '#f0fdf4' : getEntryStatus(ev) === '신청 예정' ? '#fffbeb' : '#f8fafc') : 'transparent',
-                          padding: isFirst ? '1px 5px' : '0',
-                          borderRadius: 4,
-                        }}>
-                          {isFirst ? getEntryStatus(ev) : getEventTypeLabel(ev.event_type)}
+                      {/* 대회일 + 접수기간 가로 배치 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
+                        {/* 대회일 */}
+                        <span style={{ fontSize: 10, color: '#c8a898' }}>
+                          🗓 {ev.event_date}{ev.event_date_end ? ` ~ ${ev.event_date_end.slice(5).replace('-', '/')}` : ''}
                         </span>
+                        {/* 구분선 */}
+                        {(ev.entry_open_at || ev.entry_close_at) && (
+                          <span style={{ fontSize: 10, color: '#e0d8d0' }}>|</span>
+                        )}
+                        {/* 접수기간 */}
+                        {(ev.entry_open_at || ev.entry_close_at) && (
+                          <span style={{ fontSize: 10, color: '#c8a898' }}>
+                            📝 {formatDateMD(ev.entry_open_at)} ~ {formatDateMD(ev.entry_close_at)}
+                          </span>
+                        )}
+                        {/* 신청 상태 뱃지 (첫번째 대회만) */}
+                        {isFirst && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 600,
+                            color: getEntryStatusColor(ev),
+                            background: getEntryStatus(ev) === '신청 중' ? '#f0fdf4'
+                              : getEntryStatus(ev) === '신청 예정' ? '#fffbeb' : '#f8fafc',
+                            padding: '1px 5px', borderRadius: 4,
+                          }}>
+                            {getEntryStatus(ev)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

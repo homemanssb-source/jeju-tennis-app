@@ -11,7 +11,7 @@ export default function EventAdmin() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
-    event_name: '', event_date: '', entry_fee_team: '',
+    event_name: '', event_date: '', event_date_end: '', entry_fee_team: '',
     entry_open_at: '', entry_close_at: '', description: '', tournament_id: '',
     event_type: 'individual', team_match_type: '3_doubles', team_division_id: '',
   })
@@ -61,6 +61,7 @@ export default function EventAdmin() {
     const insertData = {
       event_name: form.event_name,
       event_date: form.event_date,
+      event_date_end: form.event_date_end || null,
       entry_fee_team: form.entry_fee_team ? Number(form.entry_fee_team) : 0,
       entry_open_at: form.entry_open_at || null,
       entry_close_at: form.entry_close_at || null,
@@ -75,7 +76,7 @@ export default function EventAdmin() {
     showToast?.('대회가 생성되었습니다.')
     setShowForm(false)
     setForm({
-      event_name: '', event_date: '', entry_fee_team: '', entry_open_at: '', entry_close_at: '',
+      event_name: '', event_date: '', event_date_end: '', entry_fee_team: '', entry_open_at: '', entry_close_at: '',
       description: '', tournament_id: '', event_type: 'individual', team_match_type: '3_doubles', team_division_id: '',
     })
     fetchAll()
@@ -94,6 +95,7 @@ export default function EventAdmin() {
     setEditForm({
       event_name: ev.event_name || '',
       event_date: ev.event_date || '',
+      event_date_end: ev.event_date_end || '',
       entry_fee_team: ev.entry_fee_team || '',
       entry_open_at: toKSTLocal(ev.entry_open_at),
       entry_close_at: toKSTLocal(ev.entry_close_at),
@@ -111,6 +113,7 @@ export default function EventAdmin() {
     const updates = {
       event_name: editForm.event_name,
       event_date: editForm.event_date,
+      event_date_end: editForm.event_date_end || null,
       entry_fee_team: editForm.entry_fee_team ? Number(editForm.entry_fee_team) : 0,
       entry_open_at: editForm.entry_open_at || null,
       entry_close_at: editForm.entry_close_at || null,
@@ -258,16 +261,16 @@ export default function EventAdmin() {
                 className="w-full text-sm border border-line rounded-lg px-3 py-2" />
             </div>
             <div>
-              <label className="block text-xs text-sub mb-1">대회일 *</label>
+              <label className="block text-xs text-sub mb-1">대회 시작일 *</label>
               <input type="date" value={form.event_date}
                 onChange={e => setForm({ ...form, event_date: e.target.value })}
                 className="w-full text-sm border border-line rounded-lg px-3 py-2" />
             </div>
             <div>
-              <label className="block text-xs text-sub mb-1">참가비 (팀/원)</label>
-              <input type="number" value={form.entry_fee_team}
-                onChange={e => setForm({ ...form, entry_fee_team: e.target.value })}
-                placeholder="0"
+              <label className="block text-xs text-sub mb-1">대회 종료일 <span className="text-gray-400">(2일이상)</span></label>
+              <input type="date" value={form.event_date_end}
+                min={form.event_date}
+                onChange={e => setForm({ ...form, event_date_end: e.target.value })}
                 className="w-full text-sm border border-line rounded-lg px-3 py-2" />
             </div>
 
@@ -303,6 +306,14 @@ export default function EventAdmin() {
                 </select>
               </div>
             )}
+
+            <div>
+              <label className="block text-xs text-sub mb-1">참가비 (팀/원)</label>
+              <input type="number" value={form.entry_fee_team}
+                onChange={e => setForm({ ...form, entry_fee_team: e.target.value })}
+                placeholder="0"
+                className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+            </div>
 
             <div>
               <label className="block text-xs text-sub mb-1">신청 시작</label>
@@ -553,11 +564,20 @@ export default function EventAdmin() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-sub mb-1">대회일 *</label>
+                  <label className="block text-xs text-sub mb-1">대회 시작일 *</label>
                   <input type="date" value={editForm.event_date}
                     onChange={e => setEditForm({ ...editForm, event_date: e.target.value })}
                     className="w-full text-sm border border-line rounded-lg px-3 py-2" />
                 </div>
+                <div>
+                  <label className="block text-xs text-sub mb-1">대회 종료일 <span className="text-gray-400">(2일이상)</span></label>
+                  <input type="date" value={editForm.event_date_end}
+                    min={editForm.event_date}
+                    onChange={e => setEditForm({ ...editForm, event_date_end: e.target.value })}
+                    className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-sub mb-1">참가비 (원)</label>
                   <input type="number" value={editForm.entry_fee_team}
