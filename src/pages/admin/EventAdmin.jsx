@@ -38,7 +38,7 @@ export default function EventAdmin() {
     const [{ data: evts }, { data: tours }, { data: rules }] = await Promise.all([
       supabase.from('events').select('*').order('event_date', { ascending: false }),
       supabase.from('tournaments_master').select('*').order('date', { ascending: false }),
-      supabase.from('point_rules').select('division').order('id'),
+      supabase.from('point_rules').select('division').order('sort_order', { ascending: true, nullsFirst: false }),
     ])
     setEvents(evts || [])
     setTournaments(tours || [])
