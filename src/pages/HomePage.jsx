@@ -254,53 +254,60 @@ export default function HomePage() {
 
         {/* 업체 정보 배너 */}
         {banners.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <div style={{ height: 1, flex: 1, background: '#f0e8e0' }} />
-              <span style={{ fontSize: 10, color: '#e0cfc7', letterSpacing: 3, fontWeight: 700 }}>SPONSORS</span>
+              <span style={{ fontSize: 9, color: '#d4c4bc', letterSpacing: 3, fontWeight: 700 }}>SPONSORS</span>
               <div style={{ height: 1, flex: 1, background: '#f0e8e0' }} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
               {banners.map(b => (
                 <a
                   key={b.id}
                   href={b.link_url || '#'}
                   target="_blank" rel="noopener noreferrer"
                   style={{
-                    background: '#fff', borderRadius: 20, overflow: 'hidden',
-                    textDecoration: 'none', display: 'block',
-                    boxShadow: '0 2px 0 rgba(192,97,43,0.05), 0 6px 18px rgba(192,97,43,0.05)',
-                    transition: 'transform 0.15s'
+                    flex: 1,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                    textDecoration: 'none',
+                    padding: '8px 4px',
+                    borderRadius: 12,
+                    background: '#fff',
+                    transition: 'opacity 0.15s',
+                  }}
+                  onTouchStart={e => e.currentTarget.style.opacity = '0.7'}
+                  onTouchEnd={e => e.currentTarget.style.opacity = '1'}>
+                  {/* 로고 이미지 or 이니셜 */}
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: b.image_url ? 'transparent' : '#f0f0f0',
+                    overflow: 'hidden',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
                   }}>
-                  {b.image_url ? (
-                    <div style={{ aspectRatio: '16/9', overflow: 'hidden' }}>
+                    {b.image_url ? (
                       <img
                         src={b.image_url} alt={b.company_name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s' }}
-                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
-                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       />
-                    </div>
-                  ) : (
-                    <div style={{
-                      aspectRatio: '16/9', background: '#faf6f1',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <div style={{
-                        width: 40, height: 40, borderRadius: 12, background: '#c0612b',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: '#fff', fontSize: 16, fontWeight: 900,
+                    ) : (
+                      <span style={{
+                        fontSize: 15, fontWeight: 900, color: '#c0612b',
                       }}>
-                        {b.company_name?.charAt(0) || '🎾'}
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ padding: '10px 12px' }}>
-                    <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#2d1a0e' }} className="truncate">{b.company_name}</p>
-                    {b.description && (
-                      <p style={{ margin: '2px 0 0', fontSize: 10, color: '#c8a898' }} className="truncate">{b.description}</p>
+                        {b.company_name?.charAt(0) || '?'}
+                      </span>
                     )}
                   </div>
+                  {/* 업체명 */}
+                  <p style={{
+                    margin: 0, fontSize: 9, fontWeight: 600,
+                    color: '#b0a8a0', textAlign: 'center', lineHeight: 1.3,
+                    wordBreak: 'keep-all',
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                  }}>{b.company_name}</p>
                 </a>
               ))}
             </div>

@@ -1,5 +1,5 @@
 // JTA 테니스 Service Worker
-const CACHE_NAME = 'jta-ranking-v4';
+const CACHE_NAME = 'jta-ranking-v5';
 const ASSETS = ['/', '/index.html', '/manifest.json', '/icon-192x192.png', '/icon-512x512.png'];
 
 self.addEventListener('install', e => {
