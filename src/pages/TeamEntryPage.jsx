@@ -6,30 +6,28 @@ import { ToastContext } from '../App'
 export default function TeamEntryPage() {
   const showToast = useContext(ToastContext)
 
-  // 대회
-  const [events, setEvents] = useState([])
+  // 대회  const [events, setEvents] = useState([])
   const [selectedEvent, setSelectedEvent] = useState(null)
 
-  // 부서
-  const [divisions, setDivisions] = useState([])
+  // 부서  const [divisions, setDivisions] = useState([])
   const [selectedDivision, setSelectedDivision] = useState(null)
 
-  // 대표 인증
+  // 대회?�증
   const [captainName, setCaptainName] = useState('')
   const [captainPin, setCaptainPin] = useState('')
   const [captainVerified, setCaptainVerified] = useState(null) // null | { member_id, name, club, ... }
   const [verifying, setVerifying] = useState(false)
 
-  // 클럽
+  // ?�럽
   const [clubName, setClubName] = useState('')
 
   // 회원 데이터 (active만)
   const [allMembers, setAllMembers] = useState([])
 
-  // 선수 명단
+  // ?�수 명단
   const [roster, setRoster] = useState([]) // [{ member_id, name, gender, grade }]
 
-  // 선수 추가 모드
+  // ?�수 추�? 모드
   const [addMode, setAddMode] = useState('club') // 'club' | 'search'
   const [selectedClub, setSelectedClub] = useState('')
   const [clubChecked, setClubChecked] = useState({}) // { member_id: true/false }
@@ -42,24 +40,28 @@ export default function TeamEntryPage() {
   useEffect(() => { fetchEvents(); fetchActiveMembers() }, [])
 
   async function fetchEvents() {
-    const { data } = await supabase.from('events').select('*').eq('status', 'OPEN').order('event_date', { ascending: false })
+    const { data } = await supabase.from('events')
+      .select('*')
+      .eq('status', 'OPEN')
+      .in('event_type', ['team', 'both'])
+      .order('event_date', { ascending: true })
     setEvents(data || [])
   }
 
   async function fetchActiveMembers() {
     const { data } = await supabase.from('members_public')
       .select('member_id, name, display_name, club, grade, gender, status')
-      .eq('status', '활성').order('name')
+      .eq('status', '?�성').order('name')
     setAllMembers(data || [])
   }
 
-  // 클럽 목록 (중복 제거)
+  // ?�럽 목록 (중복 ?�거)
   const clubList = useMemo(() => {
     const clubs = [...new Set(allMembers.map(m => m.club).filter(Boolean))].sort()
     return clubs
   }, [allMembers])
 
-  // 선택된 클럽의 회원들 (이미 명단에 있는 사람 표시)
+  // 선택된 클럽의 회원 (이미 명단에 있는 사람 표시)
   const clubMembers = useMemo(() => {
     if (!selectedClub) return []
     return allMembers.filter(m => m.club === selectedClub)
@@ -76,7 +78,7 @@ export default function TeamEntryPage() {
     ).slice(0, 10)
   }, [allMembers, searchQuery, roster])
 
-  // 인원 제한
+  // ?�원 ?�한
   const memberLimit = selectedEvent?.team_member_limit || null
 
   function handleEventChange(eventId) {
@@ -103,19 +105,19 @@ export default function TeamEntryPage() {
     const { data, error } = await supabase.rpc('rpc_verify_member_pin', {
       p_name: captainName.trim(), p_pin: captainPin,
     })
-    if (error) { showToast?.('확인 실패: ' + error.message, 'error') }
-    else if (data && !data.ok) { showToast?.('⚠️ ' + data.message, 'error') }
+    if (error) { showToast?.('?�인 ?�패: ' + error.message, 'error') }
+    else if (data && !data.ok) { showToast?.('?�️ ' + data.message, 'error') }
     else if (data && data.ok) {
       setCaptainVerified(data)
       setClubName(data.club || '')
-      showToast?.('✅ 본인 확인 완료')
+      showToast?.('✅ 본인 인증 완료')
     }
     setVerifying(false)
   }
 
   function handleClubSelect(club) {
     setSelectedClub(club)
-    // 체크 초기화: 이미 명단에 있는 사람은 체크
+    // 체크 초기화, 이미 명단에 있는 사람은 체크
     const rosterIds = new Set(roster.map(r => r.member_id))
     const initial = {}
     allMembers.filter(m => m.club === club).forEach(m => {
@@ -133,10 +135,10 @@ export default function TeamEntryPage() {
     const rosterIds = new Set(roster.map(r => r.member_id))
     const newChecked = {}
     clubMembers.forEach(m => { newChecked[m.member_id] = true })
-    // 인원 제한 체크
+    // ?�원 ?�한 체크
     const wouldAdd = clubMembers.filter(m => !rosterIds.has(m.member_id)).length
     if (memberLimit && (roster.length + wouldAdd) > memberLimit) {
-      showToast?.(`인원 제한(${memberLimit}명)을 초과합니다.`, 'error'); return
+      showToast?.(`인원 한도(${memberLimit}명)를 초과합니다.`, 'error'); return
     }
     setClubChecked(newChecked)
   }
@@ -153,7 +155,7 @@ export default function TeamEntryPage() {
     const toAdd = clubMembers.filter(m => clubChecked[m.member_id] && !rosterIds.has(m.member_id))
 
     if (memberLimit && (roster.length + toAdd.length) > memberLimit) {
-      showToast?.(`인원 제한(${memberLimit}명)을 초과합니다.`, 'error'); return
+      showToast?.(`인원 한도(${memberLimit}명)를 초과합니다.`, 'error'); return
     }
 
     const newMembers = toAdd.map(m => ({
@@ -168,7 +170,7 @@ export default function TeamEntryPage() {
   function handleAddFromSearch(m) {
     const rosterIds = new Set(roster.map(r => r.member_id))
     if (rosterIds.has(m.member_id)) { showToast?.('이미 명단에 있습니다.', 'error'); return }
-    if (memberLimit && roster.length >= memberLimit) { showToast?.(`인원 제한(${memberLimit}명)입니다.`, 'error'); return }
+    if (memberLimit && roster.length >= memberLimit) { showToast?.(`인원 한도(${memberLimit}명)입니다.`, 'error'); return }
     setRoster(prev => [...prev, {
       member_id: m.member_id, name: m.display_name || m.name,
       gender: m.gender || '', grade: m.grade || '',
@@ -181,10 +183,10 @@ export default function TeamEntryPage() {
   }
 
   async function handleSubmit() {
-    if (!selectedEvent) { showToast?.('대회를 선택해주세요.', 'error'); return }
-    if (divisions.length > 0 && !selectedDivision) { showToast?.('부서를 선택해주세요.', 'error'); return }
-    if (!captainVerified) { showToast?.('대표자 본인확인을 해주세요.', 'error'); return }
-    if (!clubName.trim()) { showToast?.('클럽명을 입력해주세요.', 'error'); return }
+    if (!selectedEvent) { showToast?.('?�?��? ?�택?�주?�요.', 'error'); return }
+    if (divisions.length > 0 && !selectedDivision) { showToast?.('부?��? ?�택?�주?�요.', 'error'); return }
+    if (!captainVerified) { showToast?.('주장 본인인증을 해주세요.', 'error'); return }
+    if (!clubName.trim()) { showToast?.('?�럽명을 ?�력?�주?�요.', 'error'); return }
     if (roster.length === 0) { showToast?.('선수를 1명 이상 추가해주세요.', 'error'); return }
 
     setSubmitting(true)
@@ -199,10 +201,10 @@ export default function TeamEntryPage() {
       p_division_id: selectedDivision?.division_id || null,
       p_division_name: selectedDivision?.division_name || null,
     })
-    if (error) { showToast?.('신청 실패: ' + error.message, 'error') }
-    else if (data && !data.ok) { showToast?.('⚠️ ' + data.message, 'error') }
+    if (error) { showToast?.('?�청 ?�패: ' + error.message, 'error') }
+    else if (data && !data.ok) { showToast?.('?�️ ' + data.message, 'error') }
     else if (data && data.ok) {
-      showToast?.('🎉 단체전 참가 신청 완료!')
+      showToast?.('🎾 팀전 참가 신청 완료!')
       setRoster([]); setClubName(''); setCaptainVerified(null); setCaptainName(''); setCaptainPin('')
       setSelectedDivision(null)
     }
@@ -215,13 +217,13 @@ export default function TeamEntryPage() {
 
   return (
     <div className="pb-20">
-      <PageHeader title="🏟️ 단체전 참가신청" subtitle="클럽 단위 단체전 참가 신청" />
+      <PageHeader title="👥 팀전 참가신청" subtitle="클럽 단위 팀전 참가 신청" />
       <div className="max-w-lg mx-auto px-5 py-4 space-y-4">
 
-        {/* 안내 */}
+        {/* ?�내 */}
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-          <p className="text-xs text-amber-700">🏟️ 클럽 대표(주장)가 신청합니다.</p>
-          <p className="text-xs text-amber-700 mt-0.5">👥 <b>동호인등록(활성) 회원만</b> 선수로 등록 가능합니다.</p>
+          <p className="text-xs text-amber-700">👥 클럽 대표(주장)가 신청합니다.</p>
+          <p className="text-xs text-amber-700 mt-0.5">🏆 <b>상호등록(활성) 회원만</b> 선수로 등록 가능합니다.</p>
         </div>
 
         {/* 대회 선택 */}
@@ -229,15 +231,33 @@ export default function TeamEntryPage() {
           <label className="block text-sm font-medium text-gray-700 mb-1">대회 선택</label>
           <select value={selectedEvent?.event_id || ''} onChange={e => handleEventChange(e.target.value)}
             className="w-full text-sm border border-line rounded-lg px-3 py-2.5">
-            <option value="">대회를 선택하세요</option>
+            <option value="">대회를 선택하세요/option>
             {events.map(ev => (
               <option key={ev.event_id} value={ev.event_id}>{ev.event_name} ({ev.event_date})</option>
             ))}
           </select>
           {selectedEvent && memberLimit && (
-            <p className="text-xs text-accent mt-1">👥 클럽당 인원 제한: {memberLimit}명</p>
+            <p className="text-xs text-accent mt-1">?�� 클럽당 인원 한도: {memberLimit}명/p>
           )}
         </div>
+
+
+        {/* 계좌번호 자동 표시 */}
+        {selectedEvent && selectedEvent.account_number && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+            <p className="text-xs font-medium text-blue-700 mb-1">💳 참가비 입금 계좌</p>
+            <p className="text-base font-bold text-blue-900">
+              {selectedEvent.account_bank && selectedEvent.account_bank + ' '}
+              {selectedEvent.account_number}
+            </p>
+            {selectedEvent.account_holder && (
+              <p className="text-xs text-blue-600 mt-0.5">예금주: {selectedEvent.account_holder}</p>
+            )}
+            {selectedEvent.entry_fee_team > 0 && (
+              <p className="text-xs text-blue-600 mt-0.5">입금액: {selectedEvent.entry_fee_team.toLocaleString()}원</p>
+            )}
+          </div>
+        )}
 
         {/* 부서 선택 */}
         {selectedEvent && divisions.length > 0 && (
@@ -248,7 +268,7 @@ export default function TeamEntryPage() {
               setSelectedDivision(div || null)
             }}
               className="w-full text-sm border border-line rounded-lg px-3 py-2.5">
-              <option value="">부서를 선택하세요</option>
+              <option value="">부서를 선택하세요/option>
               {divisions.map(d => (
                 <option key={d.division_id} value={d.division_id}>{d.division_name}</option>
               ))}
@@ -256,20 +276,20 @@ export default function TeamEntryPage() {
           </div>
         )}
 
-        {/* 대표자 본인확인 */}
+        {/* ?�?�자 본인?�인 */}
         {selectedEvent && (divisions.length === 0 || selectedDivision) && (
           <div className="bg-soft rounded-lg p-3 space-y-2">
-            <p className="text-xs font-medium text-gray-700">대표(주장) 본인확인</p>
-            <p className="text-xs text-sub">※ PIN 초기값은 전화번호 뒷6자리입니다.</p>
+            <p className="text-xs font-medium text-gray-700">대표(주장) 본인인증</p>
+            <p className="text-xs text-sub">🔐 PIN 초기값은 전화번호 뒷 6자리입니다.</p>
             <div className="flex gap-2">
               <input type="text" value={captainName} onChange={e => { setCaptainName(e.target.value); setCaptainVerified(null) }}
-                placeholder="이름" className="flex-1 text-sm border border-line rounded-lg px-3 py-2" />
+                placeholder="?�름" className="flex-1 text-sm border border-line rounded-lg px-3 py-2" />
               <input type="password" inputMode="numeric" maxLength={6} value={captainPin}
                 onChange={e => { setCaptainPin(e.target.value.replace(/\D/g, '').slice(0, 6)); setCaptainVerified(null) }}
-                placeholder="PIN 6자리" className="w-28 text-sm border border-line rounded-lg px-3 py-2 tracking-widest" />
+                placeholder="PIN 6?�리" className="w-28 text-sm border border-line rounded-lg px-3 py-2 tracking-widest" />
               <button onClick={handleVerifyCaptain} disabled={verifying || !captainName.trim() || captainPin.length !== 6}
                 className="px-3 py-2 bg-accent text-white text-sm rounded-lg disabled:opacity-50 whitespace-nowrap">
-                {verifying ? '...' : '확인'}
+                {verifying ? '...' : '?�인'}
               </button>
             </div>
             {captainVerified && (
@@ -280,37 +300,36 @@ export default function TeamEntryPage() {
           </div>
         )}
 
-        {/* 클럽명 */}
+        {/* ?�럽�?*/}
         {captainVerified && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">클럽명</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">?�럽�?/label>
             <input type="text" value={clubName} onChange={e => setClubName(e.target.value)}
               placeholder="클럽명을 입력하세요"
               className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
           </div>
         )}
 
-        {/* 선수 추가 */}
+        {/* ?�수 추�? */}
         {captainVerified && clubName.trim() && (
           <>
             <div className="flex border border-line rounded-lg overflow-hidden">
               <button onClick={() => setAddMode('club')}
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${addMode === 'club' ? 'bg-accent text-white' : 'bg-white text-sub'}`}>
-                🏢 클럽별 선택
+                ?�� 클럽별 선택
               </button>
               <button onClick={() => setAddMode('search')}
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${addMode === 'search' ? 'bg-accent text-white' : 'bg-white text-sub'}`}>
-                🔍 이름 검색
-              </button>
+                ?�� 이름 검색              </button>
             </div>
 
-            {/* 클럽별 멀티셀렉트 */}
+            {/* 클럽별 멀티선택 */}
             {addMode === 'club' && (
               <div className="space-y-2">
                 <div className="relative">
                   <button onClick={() => setShowClubPicker(!showClubPicker)}
                     className="w-full text-left text-sm border border-line rounded-lg px-3 py-2.5 bg-white">
-                    {selectedClub || '클럽을 선택하세요 ▼'}
+                    {selectedClub || '클럽을 선택하세요'}
                   </button>
                   {showClubPicker && (
                     <div className="absolute left-0 right-0 top-full bg-white border border-line rounded-lg shadow-lg mt-1 z-20 max-h-48 overflow-y-auto">
@@ -328,10 +347,10 @@ export default function TeamEntryPage() {
                 {selectedClub && (
                   <div className="border border-line rounded-lg overflow-hidden">
                     <div className="flex justify-between items-center px-3 py-2 bg-soft border-b border-line">
-                      <span className="text-xs font-medium text-gray-700">{selectedClub} ({clubMembers.length}명)</span>
+                      <span className="text-xs font-medium text-gray-700">{selectedClub} ({clubMembers.length}�?</span>
                       <div className="flex gap-2">
-                        <button onClick={handleSelectAll} className="text-xs text-accent">전체 선택</button>
-                        <button onClick={handleDeselectAll} className="text-xs text-sub">선택 해제</button>
+                        <button onClick={handleSelectAll} className="text-xs text-accent">?�체 ?�택</button>
+                        <button onClick={handleDeselectAll} className="text-xs text-sub">?�택 ?�제</button>
                       </div>
                     </div>
                     <div className="max-h-60 overflow-y-auto">
@@ -349,14 +368,14 @@ export default function TeamEntryPage() {
                               <span className="text-xs text-sub ml-2">{m.gender === 'M' ? '남' : m.gender === 'F' ? '여' : ''}</span>
                               <span className="text-xs text-accent ml-2">{m.grade || ''}</span>
                             </div>
-                            {inRoster && <span className="text-xs text-blue-500">등록됨</span>}
+                            {inRoster && <span className="text-xs text-blue-500">등록됨/span>}
                           </label>
                         )
                       })}
                     </div>
                     {checkedNewCount > 0 && (
                       <div className="px-3 py-2 bg-soft border-t border-line flex justify-between items-center">
-                        <span className="text-xs text-gray-700">새로 추가: {checkedNewCount}명</span>
+                        <span className="text-xs text-gray-700">?�로 추�?: {checkedNewCount}�?/span>
                         <button onClick={handleAddFromClub}
                           className="px-3 py-1.5 bg-accent text-white text-xs rounded-lg">
                           선택 완료 → 명단 추가
@@ -368,13 +387,13 @@ export default function TeamEntryPage() {
               </div>
             )}
 
-            {/* 이름 검색 */}
+            {/* 이름 검색*/}
             {addMode === 'search' && (
               <div className="relative">
                 <input type="text" value={searchQuery}
                   onChange={e => { setSearchQuery(e.target.value); setShowSearchDropdown(true) }}
                   onFocus={() => setShowSearchDropdown(true)}
-                  placeholder="이름으로 검색 (활성 회원만)"
+                  placeholder="이름으로 검색 (활성 회원)""
                   className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
                 {showSearchDropdown && searchResults.length > 0 && (
                   <div className="absolute left-0 right-0 top-full bg-white border border-line rounded-lg shadow-lg mt-1 z-20 max-h-48 overflow-y-auto">
@@ -394,22 +413,21 @@ export default function TeamEntryPage() {
           </>
         )}
 
-        {/* 선수 명단 */}
+        {/* ?�수 명단 */}
         {roster.length > 0 && (
           <div className="border border-line rounded-lg overflow-hidden">
             <div className="px-3 py-2 bg-soft border-b border-line flex justify-between items-center">
               <span className="text-xs font-medium text-gray-700">
-                선수 명단: {roster.length}명
-                {memberLimit && <span className="text-accent ml-1">/ 제한 {memberLimit}명</span>}
+                ?�수 명단: {roster.length}명                {memberLimit && <span className="text-accent ml-1">/ ?�한 {memberLimit}�?/span>}
               </span>
             </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-xs text-sub">
                   <th className="text-left px-3 py-2 w-8">#</th>
-                  <th className="text-left px-3 py-2">이름</th>
-                  <th className="text-left px-3 py-2 w-12">성별</th>
-                  <th className="text-left px-3 py-2 w-16">등급</th>
+                  <th className="text-left px-3 py-2">?�름</th>
+                  <th className="text-left px-3 py-2 w-12">?�별</th>
+                  <th className="text-left px-3 py-2 w-16">?�급</th>
                   <th className="text-center px-3 py-2 w-10"></th>
                 </tr>
               </thead>
@@ -431,16 +449,18 @@ export default function TeamEntryPage() {
           </div>
         )}
 
-        {/* 신청 버튼 */}
+        {/* ?�청 버튼 */}
         {captainVerified && clubName.trim() && (
           <button onClick={handleSubmit}
             disabled={submitting || roster.length === 0}
             className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm
               hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {submitting ? '신청 중...' : `🏟️ 단체전 참가 신청 (${roster.length}명)`}
+            {submitting ? '신청 중..' : `🎾 팀전 참가 신청 (${roster.length}명`}
           </button>
         )}
       </div>
     </div>
   )
 }
+
+========================================

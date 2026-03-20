@@ -14,6 +14,7 @@ export default function EventAdmin() {
     event_name: '', event_date: '', event_date_end: '', entry_fee_team: '',
     entry_open_at: '', entry_close_at: '', description: '', tournament_id: '',
     event_type: 'individual', team_match_type: '3_doubles', team_division_id: '',
+    account_number: '', account_holder: '', account_bank: '',
   })
   const [tournaments, setTournaments] = useState([])
   const [pointRuleDivisions, setPointRuleDivisions] = useState([]) // 포인트 규정 부서 목록
@@ -80,6 +81,9 @@ export default function EventAdmin() {
       event_type: form.event_type,
       team_match_type: (form.event_type === 'team' || form.event_type === 'both') ? form.team_match_type : null,
       team_division_id: (form.event_type === 'team' || form.event_type === 'both') ? (form.team_division_id || null) : null,
+      account_number: form.account_number || null,
+      account_holder: form.account_holder || null,
+      account_bank: form.account_bank || null,
     }
     const { error } = await supabase.from('events').insert([insertData])
     if (error) { showToast?.(error.message, 'error'); return }
@@ -88,6 +92,7 @@ export default function EventAdmin() {
     setForm({
       event_name: '', event_date: '', event_date_end: '', entry_fee_team: '', entry_open_at: '', entry_close_at: '',
       description: '', tournament_id: '', event_type: 'individual', team_match_type: '3_doubles', team_division_id: '',
+      account_number: '', account_holder: '', account_bank: '',
     })
     fetchAll()
   }
@@ -111,6 +116,9 @@ export default function EventAdmin() {
       entry_close_at: toKSTLocal(ev.entry_close_at),
       description: ev.description || '',
       tournament_id: ev.tournament_id || '',
+      account_number: ev.account_number || '',
+      account_holder: ev.account_holder || '',
+      account_bank: ev.account_bank || '',
     })
     setShowEditModal(true)
   }
@@ -129,6 +137,9 @@ export default function EventAdmin() {
       entry_close_at: editForm.entry_close_at || null,
       description: editForm.description || null,
       tournament_id: editForm.tournament_id || null,
+      account_number: editForm.account_number || null,
+      account_holder: editForm.account_holder || null,
+      account_bank: editForm.account_bank || null,
     }
     const { error } = await supabase.from('events').update(updates).eq('event_id', editingEvent.event_id)
     if (error) { showToast?.(error.message, 'error'); return }
@@ -323,6 +334,25 @@ export default function EventAdmin() {
                 onChange={e => setForm({ ...form, entry_fee_team: e.target.value })}
                 placeholder="0"
                 className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+            </div>
+
+            {/* 계좌 정보 */}
+            <div className="col-span-2">
+              <label className="block text-xs text-sub mb-1">💳 입금 계좌</label>
+              <div className="grid grid-cols-3 gap-2">
+                <input type="text" value={form.account_bank}
+                  onChange={e => setForm({ ...form, account_bank: e.target.value })}
+                  placeholder="은행명"
+                  className="text-sm border border-line rounded-lg px-3 py-2" />
+                <input type="text" value={form.account_number}
+                  onChange={e => setForm({ ...form, account_number: e.target.value })}
+                  placeholder="계좌번호"
+                  className="text-sm border border-line rounded-lg px-3 py-2" />
+                <input type="text" value={form.account_holder}
+                  onChange={e => setForm({ ...form, account_holder: e.target.value })}
+                  placeholder="예금주"
+                  className="text-sm border border-line rounded-lg px-3 py-2" />
+              </div>
             </div>
 
             <div>
@@ -611,6 +641,25 @@ export default function EventAdmin() {
                   <input type="number" value={editForm.entry_fee_team}
                     onChange={e => setEditForm({ ...editForm, entry_fee_team: e.target.value })}
                     className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+                </div>
+              </div>
+
+              {/* 계좌 정보 */}
+              <div>
+                <label className="block text-xs text-sub mb-1">💳 입금 계좌</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <input type="text" value={editForm.account_bank}
+                    onChange={e => setEditForm({ ...editForm, account_bank: e.target.value })}
+                    placeholder="은행명"
+                    className="text-sm border border-line rounded-lg px-3 py-2" />
+                  <input type="text" value={editForm.account_number}
+                    onChange={e => setEditForm({ ...editForm, account_number: e.target.value })}
+                    placeholder="계좌번호"
+                    className="text-sm border border-line rounded-lg px-3 py-2" />
+                  <input type="text" value={editForm.account_holder}
+                    onChange={e => setEditForm({ ...editForm, account_holder: e.target.value })}
+                    placeholder="예금주"
+                    className="text-sm border border-line rounded-lg px-3 py-2" />
                 </div>
               </div>
               <div>
