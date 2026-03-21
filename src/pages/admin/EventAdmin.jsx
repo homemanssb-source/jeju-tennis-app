@@ -65,11 +65,10 @@ export default function EventAdmin() {
   }
 
   // ── 대회 생성 ──────────────────────────────────
-  // datetime-local (KST) → UTC ISO 변환 (DB 저장용)
-  function toUTC(kstLocalStr) {
-    if (!kstLocalStr) return null
-    // datetime-local 값은 로컬 시간(KST) → UTC로 9시간 빼기
-    return new Date(new Date(kstLocalStr).getTime() - 9 * 60 * 60 * 1000).toISOString()
+  // datetime-local → ISO UTC 변환 (브라우저가 로컬→UTC 자동 변환)
+  function toUTC(localStr) {
+    if (!localStr) return null
+    return new Date(localStr).toISOString()
   }
 
   async function handleAddEvent() {
@@ -105,11 +104,13 @@ export default function EventAdmin() {
   }
 
   // ── 대회 수정 열기 ──────────────────────────────
-  // UTC → KST datetime-local 변환 (입력창 표시용)
+  // UTC → datetime-local 변환 (브라우저가 자동으로 로컬시간=KST로 표시)
   function toKSTLocal(utcStr) {
     if (!utcStr) return ''
-    const kst = new Date(new Date(utcStr).getTime() + 9 * 60 * 60 * 1000)
-    return kst.toISOString().slice(0, 16)
+    const d = new Date(utcStr)
+    // datetime-local 형식: YYYY-MM-DDTHH:MM (로컬시간 기준)
+    const pad = n => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
   }
 
   function openEditModal(ev) {
