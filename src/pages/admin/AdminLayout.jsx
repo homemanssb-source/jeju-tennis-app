@@ -19,6 +19,7 @@ import AdminTeamEntryPage from './AdminTeamEntryPage'
 import SponsorAdmin from './SponsorAdmin'
 import AdminManagerPage from './AdminManagerPage'
 import AdminLogsPage from './AdminLogsPage'
+import AccessLogAdmin from './AccessLogAdmin'
 
 // ─── 관리자 정보 Context ─────────────────────────
 export const AdminContext = createContext(null)
@@ -72,6 +73,14 @@ const TAB_GROUPS = [
     ],
   },
   {
+    key: 'stats',
+    label: '📈 통계',
+    superOnly: true,
+    subs: [
+      { path: '/admin/access-log', label: '접속통계' },
+    ],
+  },
+  {
     key: 'settings',
     label: '⚙️ 설정',
     superOnly: true,
@@ -121,7 +130,7 @@ export default function AdminLayout() {
   function canAccess(groupKey) {
     if (!adminUser) return false
     if (adminUser.is_super) return true
-    if (groupKey === 'settings') return false
+    if (groupKey === 'settings' || groupKey === 'stats') return false
     return adminUser.permissions?.[groupKey] === true
   }
 
@@ -153,7 +162,7 @@ export default function AdminLayout() {
             </div>
           </div>
 
-          {/* ── 메인 탭 (6개) ── */}
+          {/* ── 메인 탭 ── */}
           <div className="flex px-4 gap-1 max-w-5xl mx-auto overflow-x-auto hide-scrollbar pb-1">
             {TAB_GROUPS.map(group => {
               const accessible = canAccess(group.key)
@@ -216,6 +225,7 @@ export default function AdminLayout() {
             <Route path="sponsors" element={<SponsorAdmin />} />
             <Route path="managers" element={<AdminManagerPage />} />
             <Route path="logs" element={<AdminLogsPage />} />
+            <Route path="access-log" element={<AccessLogAdmin />} />
           </Routes>
         </div>
       </div>
