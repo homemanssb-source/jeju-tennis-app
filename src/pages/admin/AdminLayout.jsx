@@ -235,6 +235,3 @@ export default function AdminLayout() {
     </AdminContext.Provider>
   )
 }
-
-========================================
-FILE: C:\Users\homem\OneDrive\바탕 화면\jeju-tennis-app\src\pages\admin\AdminLogin.jsx
