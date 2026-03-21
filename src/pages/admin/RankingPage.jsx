@@ -1,24 +1,37 @@
 import { useState, useEffect, useContext } from 'react'
-import { supabase } from '../lib/supabase'
-import PageHeader from '../components/PageHeader'
-import PlayerDetail from '../components/PlayerDetail'
-import { SkeletonList } from '../components/Skeleton'
-import { ToastContext } from '../App'
+import { supabase } from '../../lib/supabase'
+import PageHeader from '../../components/PageHeader'
+import PlayerDetail from '../../components/PlayerDetail'
+import { SkeletonList } from '../../components/Skeleton'
+import { ToastContext } from '../../App'
 
-const DIVISIONS = ['지도자부','마스터부','베테랑부','신인부','여자마스터부','여자베테랑부','여자신인부']
 const medals = ['🥇', '🥈', '🥉']
 
 export default function RankingPage() {
   const showToast = useContext(ToastContext)
-  const [division, setDivision] = useState(DIVISIONS[0])
+  const [divisions, setDivisions] = useState([])
+  const [division, setDivision] = useState('')
   const [seasonYear, setSeasonYear] = useState(new Date().getFullYear())
   const [seasons, setSeasons] = useState([])
   const [rankings, setRankings] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedMember, setSelectedMember] = useState(null)
 
-  useEffect(() => { fetchSeasons() }, [])
+  useEffect(() => { fetchSeasons(); fetchDivisions() }, [])
   useEffect(() => { if (division) fetchRankings() }, [division, seasonYear])
+
+  async function fetchDivisions() {
+    const { data } = await supabase
+      .from('members')
+      .select('division')
+      .not('division', 'is', null)
+      .neq('division', '')
+    if (data) {
+      const unique = [...new Set(data.map(m => m.division).filter(Boolean))].sort()
+      setDivisions(unique)
+      if (unique.length > 0) setDivision(unique[0])
+    }
+  }
 
   async function fetchSeasons() {
     const { data } = await supabase.rpc('get_available_seasons')
@@ -37,12 +50,12 @@ export default function RankingPage() {
 
   return (
     <div className="pb-20">
-      <PageHeader title="🏆 랭킹" subtitle="제주시 테니스 동호인회" />
+      <PageHeader title="🏆 랭킹" subtitle="제주시테니스협회" />
       <div className="px-5 py-3 space-y-2 max-w-lg mx-auto">
         <div className="flex gap-2">
           <select value={division} onChange={e => setDivision(e.target.value)}
             className="flex-1 text-sm border border-line rounded-lg px-3 py-2 bg-white font-medium">
-            {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
+            {divisions.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
           <select value={seasonYear} onChange={e => setSeasonYear(Number(e.target.value))}
             className="text-sm border border-line rounded-lg px-3 py-2 bg-white font-medium">
