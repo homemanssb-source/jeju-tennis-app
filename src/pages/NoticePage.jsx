@@ -59,13 +59,24 @@ export default function NoticePage() {
             </div>
           </div>
 
-          {/* 참가신청 링크 */}
-          {selected.link && (
+          {/* 참가신청 버튼 — 대회 연동 시 앱 내부로, 아니면 외부 링크 */}
+          {selected.event_id ? (
+            <div className="space-y-2">
+              <a href="/entry"
+                className="block w-full bg-accent text-white text-center py-3.5 rounded-2xl font-bold text-sm">
+                🎾 개인전 참가신청
+              </a>
+              <a href="/entry/team"
+                className="block w-full bg-orange-500 text-white text-center py-3.5 rounded-2xl font-bold text-sm">
+                👥 팀전 참가신청
+              </a>
+            </div>
+          ) : selected.link ? (
             <a href={selected.link} target="_blank" rel="noopener noreferrer"
               className="block w-full bg-accent text-white text-center py-3.5 rounded-2xl font-bold text-sm">
               📝 참가신청 하기
             </a>
-          )}
+          ) : null}
 
           {/* 부서별 참가자격 */}
           {m.divisions?.length > 0 && (
@@ -104,8 +115,38 @@ export default function NoticePage() {
               <div className="bg-gray-50 px-4 py-2.5 border-b border-line">
                 <p className="text-xs font-bold text-gray-600">📋 경기방법 및 주의사항</p>
               </div>
-              <div className="px-4 py-3">
-                <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{m.rules}</p>
+              <div className="divide-y divide-line/40">
+                {m.rules
+                  .split('\n')
+                  .filter(line => line.trim())
+                  .map((line, idx) => {
+                    // ※ 로 시작하는 보조 설명
+                    if (line.trim().startsWith('※')) {
+                      return (
+                        <div key={idx} className="px-4 py-2 bg-amber-50">
+                          <p className="text-xs text-amber-700 leading-relaxed">{line.trim()}</p>
+                        </div>
+                      )
+                    }
+                    // 숫자. 로 시작하는 항목
+                    const match = line.trim().match(/^(\d+)\.\s*(.+)/)
+                    if (match) {
+                      return (
+                        <div key={idx} className="flex gap-3 px-4 py-3">
+                          <span className="flex-shrink-0 w-6 h-6 bg-orange-100 text-orange-600 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">
+                            {match[1]}
+                          </span>
+                          <p className="text-sm text-gray-700 leading-relaxed flex-1">{match[2]}</p>
+                        </div>
+                      )
+                    }
+                    // 그 외 텍스트
+                    return (
+                      <div key={idx} className="px-4 py-2">
+                        <p className="text-sm text-gray-600 leading-relaxed">{line.trim()}</p>
+                      </div>
+                    )
+                  })}
               </div>
             </div>
           )}

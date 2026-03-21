@@ -2,26 +2,31 @@ import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 
+const EMPTY_META = {
+  date: '', venue: '', host: '제주시테니스협회',
+  fee: '', account: '', deadline: '', contact: '',
+  divisions: [{ name: '', desc: '' }],
+  prizes: '', rules: '',
+}
+
 const EMPTY_FORM = {
   title: '', content: '', link: '', pinned: false,
   notice_type: 'general',
-  meta: {
-    date: '', venue: '', host: '제주시테니스협회',
-    fee: '', account: '', deadline: '', contact: '',
-    divisions: [{ name: '', desc: '' }],
-    prizes: '', rules: '',
-  }
+  event_id: null,
+  meta: EMPTY_META,
 }
 
 export default function NoticeAdmin() {
   const showToast = useContext(ToastContext)
   const [notices, setNotices] = useState([])
+  const [events, setEvents] = useState([]) // 연동할 대회 목록
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [editId, setEditId] = useState(null)
+  const [loadingEvent, setLoadingEvent] = useState(false)
 
-  useEffect(() => { fetchNotices() }, [])
+  useEffect(() => { fetchNotices(); fetchEvents() }, [])
 
   async function fetchNotices() {
     setLoading(true)
@@ -30,6 +35,83 @@ export default function NoticeAdmin() {
       .order('created_at', { ascending: false })
     setNotices(data || [])
     setLoading(false)
+  }
+
+  async function fetchEvents() {
+    // OPEN 대회 목록 가져오기 (공지 연동용)
+    const { data } = await supabase.from('events')
+      .select('event_id, event_name, event_date, event_date_end, entry_fee_team, entry_close_at, account_number, account_holder, account_bank, description')
+      .order('event_date', { ascending: false })
+    setEvents(data || [])
+  }
+
+  // 대회 선택 시 기본정보 자동 채우기
+  async function handleEventSelect(eventId) {
+    if (!eventId) {
+      setForm(f => ({ ...f, event_id: null, title: '', meta: { ...EMPTY_META } }))
+      return
+    }
+
+    setLoadingEvent(true)
+    const ev = events.find(e => e.event_id === eventId)
+    if (!ev) { setLoadingEvent(false); return }
+
+    // 부서 목록 가져오기
+    const { data: divData } = await supabase.from('event_divisions')
+      .select('division_name').eq('event_id', eventId).order('created_at')
+
+    const divisions = divData && divData.length > 0
+      ? divData.map(d => ({ name: d.division_name, desc: '' }))
+      : [{ name: '', desc: '' }]
+
+    // 날짜 포맷
+    const startDate = ev.event_date ? new Date(ev.event_date) : null
+    const endDate = ev.event_date_end ? new Date(ev.event_date_end) : null
+    const formatMD = (d) => d ? `${d.getMonth() + 1}.${d.getDate()}` : ''
+    const dayKor = (d) => d ? ['일', '월', '화', '수', '목', '금', '토'][d.getDay()] : ''
+
+    let dateStr = ''
+    if (startDate && endDate) {
+      dateStr = `2026.${formatMD(startDate)}(${dayKor(startDate)}) ~ ${formatMD(endDate)}(${dayKor(endDate)})`
+    } else if (startDate) {
+      dateStr = `2026.${formatMD(startDate)}(${dayKor(startDate)})`
+    }
+
+    // 마감일 포맷
+    let deadlineStr = ''
+    if (ev.entry_close_at) {
+      const d = new Date(new Date(ev.entry_close_at).getTime() + 9 * 60 * 60 * 1000)
+      deadlineStr = `${d.getMonth() + 1}월 ${d.getDate()}일 ${d.getHours()}시까지`
+    }
+
+    // 계좌 포맷
+    let accountStr = ''
+    if (ev.account_number) {
+      accountStr = `${ev.account_bank ? ev.account_bank + ' ' : ''}${ev.account_number}${ev.account_holder ? ' (' + ev.account_holder + ')' : ''}`
+    }
+
+    // 참가비 포맷
+    let feeStr = ev.entry_fee_team > 0 ? `팀당 ${ev.entry_fee_team.toLocaleString()}원` : ''
+
+    setForm(f => ({
+      ...f,
+      event_id: eventId,
+      title: ev.event_name || f.title,
+      meta: {
+        ...f.meta,
+        date: dateStr,
+        venue: '',
+        host: '제주시테니스협회',
+        fee: feeStr,
+        account: accountStr,
+        deadline: deadlineStr,
+        contact: '',
+        divisions,
+        prizes: f.meta.prizes,
+        rules: f.meta.rules,
+      }
+    }))
+    setLoadingEvent(false)
   }
 
   function openAdd() {
@@ -45,7 +127,8 @@ export default function NoticeAdmin() {
       link: n.link || '',
       pinned: n.pinned || false,
       notice_type: n.notice_type || 'general',
-      meta: n.meta || EMPTY_FORM.meta,
+      event_id: n.event_id || null,
+      meta: n.meta || EMPTY_META,
     })
     setEditId(n.id)
     setModal('edit')
@@ -59,6 +142,7 @@ export default function NoticeAdmin() {
       link: form.link || null,
       pinned: form.pinned,
       notice_type: form.notice_type,
+      event_id: form.notice_type === 'tournament' ? (form.event_id || null) : null,
       meta: form.notice_type === 'tournament' ? form.meta : null,
     }
     if (modal === 'add') {
@@ -92,7 +176,6 @@ export default function NoticeAdmin() {
     return new Date(dateStr).toLocaleDateString('ko-KR')
   }
 
-  // meta 헬퍼
   function setMeta(key, val) {
     setForm(f => ({ ...f, meta: { ...f.meta, [key]: val } }))
   }
@@ -133,12 +216,11 @@ export default function NoticeAdmin() {
                 <div className="flex items-center gap-2 flex-wrap">
                   {n.pinned && <span className="text-xs">📌</span>}
                   <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                    n.notice_type === 'tournament'
-                      ? 'bg-orange-100 text-orange-700'
-                      : 'bg-gray-100 text-gray-600'
+                    n.notice_type === 'tournament' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'
                   }`}>
                     {n.notice_type === 'tournament' ? '🏆 대회공지' : '📋 일반'}
                   </span>
+                  {n.event_id && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">🔗 대회연동</span>}
                   <h3 className="text-sm font-semibold truncate">{n.title}</h3>
                 </div>
                 {n.notice_type === 'tournament' && n.meta && (
@@ -175,12 +257,12 @@ export default function NoticeAdmin() {
               </h3>
 
               <div className="space-y-4">
-                {/* 공지 타입 선택 */}
+                {/* 공지 타입 */}
                 <div>
                   <label className="block text-xs font-medium text-sub mb-2">공지 유형</label>
                   <div className="flex gap-2">
                     <button type="button"
-                      onClick={() => setForm(f => ({ ...f, notice_type: 'general' }))}
+                      onClick={() => setForm(f => ({ ...f, notice_type: 'general', event_id: null }))}
                       className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
                         form.notice_type === 'general' ? 'border-accent bg-accentSoft text-accent' : 'border-line text-sub'
                       }`}>
@@ -196,7 +278,30 @@ export default function NoticeAdmin() {
                   </div>
                 </div>
 
-                {/* 공통: 제목 */}
+                {/* 대회공지 - 대회 연동 드롭다운 */}
+                {form.notice_type === 'tournament' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                    <p className="text-xs font-medium text-blue-700">🔗 대회 연동 (선택)</p>
+                    <p className="text-xs text-blue-500">대회를 선택하면 기본 정보가 자동으로 채워집니다.</p>
+                    <select
+                      value={form.event_id || ''}
+                      onChange={e => handleEventSelect(e.target.value || null)}
+                      className="w-full text-sm border border-blue-200 rounded-lg px-3 py-2 bg-white">
+                      <option value="">직접 입력 (연동 안 함)</option>
+                      {events.map(ev => (
+                        <option key={ev.event_id} value={ev.event_id}>
+                          {ev.event_name} ({ev.event_date})
+                        </option>
+                      ))}
+                    </select>
+                    {loadingEvent && <p className="text-xs text-blue-500">대회 정보 불러오는 중...</p>}
+                    {form.event_id && !loadingEvent && (
+                      <p className="text-xs text-green-600 font-medium">✅ 연동됨 — 앱에서 참가신청 버튼이 해당 대회로 연결됩니다.</p>
+                    )}
+                  </div>
+                )}
+
+                {/* 제목 */}
                 <div>
                   <label className="block text-xs font-medium text-sub mb-1">제목 *</label>
                   <input type="text" value={form.title}
@@ -224,11 +329,12 @@ export default function NoticeAdmin() {
                   </>
                 )}
 
-                {/* 대회 공지 */}
+                {/* 대회 공지 상세 */}
                 {form.notice_type === 'tournament' && (
                   <div className="space-y-3">
-                    <div className="bg-orange-50 rounded-lg p-3">
+                    <div className="bg-orange-50 rounded-lg p-3 flex items-center justify-between">
                       <p className="text-xs text-orange-700 font-medium">🏆 대회 기본 정보</p>
+                      {form.event_id && <span className="text-xs text-orange-500">자동입력됨 · 수정 가능</span>}
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -280,19 +386,26 @@ export default function NoticeAdmin() {
                           placeholder="예: 김종현 010-8712-9173"
                           className="w-full text-sm border border-line rounded-lg px-3 py-2" />
                       </div>
-                      <div>
-                        <label className="block text-xs text-sub mb-1">참가신청 링크</label>
-                        <input type="url" value={form.link}
-                          onChange={e => setForm(f => ({ ...f, link: e.target.value }))}
-                          placeholder="https://docs.google.com/..."
-                          className="w-full text-sm border border-line rounded-lg px-3 py-2" />
-                      </div>
+
+                      {/* 대회 미연동 시에만 외부링크 입력 */}
+                      {!form.event_id && (
+                        <div className="col-span-2">
+                          <label className="block text-xs text-sub mb-1">외부 참가신청 링크 (선택)</label>
+                          <input type="url" value={form.link}
+                            onChange={e => setForm(f => ({ ...f, link: e.target.value }))}
+                            placeholder="https://docs.google.com/..."
+                            className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+                        </div>
+                      )}
                     </div>
 
                     {/* 부서 */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="text-xs font-medium text-sub">부서별 참가자격</label>
+                        <label className="text-xs font-medium text-sub">
+                          부서별 참가자격
+                          {form.event_id && <span className="text-blue-500 ml-1">(자동입력 · 수정가능)</span>}
+                        </label>
                         <button type="button" onClick={addDivision}
                           className="text-xs text-accent hover:underline">+ 부서 추가</button>
                       </div>
@@ -314,7 +427,7 @@ export default function NoticeAdmin() {
                       </div>
                     </div>
 
-                    {/* 시상/경기방법 */}
+                    {/* 시상 */}
                     <div>
                       <label className="block text-xs text-sub mb-1">시상</label>
                       <input type="text" value={form.meta.prizes}
@@ -322,18 +435,20 @@ export default function NoticeAdmin() {
                         placeholder="예: 우승 50만원, 준우승 30만원, 공동3위 15만원"
                         className="w-full text-sm border border-line rounded-lg px-3 py-2" />
                     </div>
+
+                    {/* 경기방법 */}
                     <div>
                       <label className="block text-xs text-sub mb-1">경기방법 / 기타</label>
                       <textarea value={form.meta.rules}
                         onChange={e => setMeta('rules', e.target.value)}
-                        placeholder="예: 예선 및 본선 5:5 타이브레이크 No-Ad&#10;경기진행 상황에 따라 변동될 수 있음"
-                        rows={3}
+                        placeholder="예: 1. 예선 및 본선 5:5 타이브레이크 No-Ad&#10;※ 경기진행 상황에 따라 변동될 수 있음"
+                        rows={5}
                         className="w-full text-sm border border-line rounded-lg px-3 py-2 resize-none" />
                     </div>
                   </div>
                 )}
 
-                {/* 공통: 고정 */}
+                {/* 고정 */}
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={form.pinned}
                     onChange={e => setForm(f => ({ ...f, pinned: e.target.checked }))}
