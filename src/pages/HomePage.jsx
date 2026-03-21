@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import NotificationBell from '../components/NotificationBell'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -32,7 +33,9 @@ export default function HomePage() {
   }
 
   function getDday(dateStr) {
-    const diff = Math.ceil((new Date(dateStr) - new Date().setHours(0, 0, 0, 0)) / 86400000)
+    const eventDay = new Date(dateStr + 'T00:00:00')
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const diff = Math.ceil((eventDay - today) / 86400000)
     if (diff === 0) return 'D-DAY'
     if (diff > 0) return `D-${diff}`
     return `D+${Math.abs(diff)}`
@@ -93,6 +96,10 @@ export default function HomePage() {
               JEJUSI TENNIS ASSOCIATION
             </p>
           </div>
+
+          {/* 🔔 알림 벨 */}
+          <NotificationBell />
+
           <div style={{ background: '#c0612b', borderRadius: 12, padding: '5px 14px', textAlign: 'center', flexShrink: 0 }}>
             <p style={{ margin: 0, fontSize: 9, color: 'rgba(255,255,255,0.7)', letterSpacing: 1.5, fontWeight: 700 }}>SEASON</p>
             <p style={{ margin: 0, fontSize: 18, color: '#fff', fontWeight: 900, lineHeight: 1.1 }}>2026</p>
@@ -322,3 +329,6 @@ export default function HomePage() {
     </div>
   )
 }
+
+========================================
+FILE: C:\Users\homem\OneDrive\바탕 화면\jeju-tennis-app\src\pages\NoticePage.jsx

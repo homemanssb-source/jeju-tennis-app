@@ -20,6 +20,7 @@ import SponsorAdmin from './SponsorAdmin'
 import AdminManagerPage from './AdminManagerPage'
 import AdminLogsPage from './AdminLogsPage'
 import AccessLogAdmin from './AccessLogAdmin'
+import PushAdmin from './PushAdmin'
 
 // ─── 관리자 정보 Context ─────────────────────────
 export const AdminContext = createContext(null)
@@ -41,7 +42,7 @@ const TAB_GROUPS = [
     subs: [
       { path: '/admin/events', label: '대회 관리' },
       { path: '/admin/entries', label: '참가 관리' },
-      { path: '/admin/team-entries', label: '팀체전' },
+      { path: '/admin/team-entries', label: '팀 단체전' },
       { path: '/admin/tournaments', label: '결과 입력' },
     ],
   },
@@ -70,6 +71,7 @@ const TAB_GROUPS = [
       { path: '/admin/notices', label: '공지 관리' },
       { path: '/admin/board', label: '게시판' },
       { path: '/admin/sponsors', label: '스폰서 배너' },
+      { path: '/admin/push', label: '🔔 푸시 알림' },
     ],
   },
   {
@@ -226,9 +228,13 @@ export default function AdminLayout() {
             <Route path="managers" element={<AdminManagerPage />} />
             <Route path="logs" element={<AdminLogsPage />} />
             <Route path="access-log" element={<AccessLogAdmin />} />
+            <Route path="push" element={<PushAdmin />} />
           </Routes>
         </div>
       </div>
     </AdminContext.Provider>
   )
 }
+
+========================================
+FILE: C:\Users\homem\OneDrive\바탕 화면\jeju-tennis-app\src\pages\admin\AdminLogin.jsx
