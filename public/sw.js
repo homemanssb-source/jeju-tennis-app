@@ -1,5 +1,5 @@
 // public/sw.js — JTA 테니스 v6
-const CACHE_NAME = 'jta-ranking-v6';
+const CACHE_NAME = 'jta-ranking-v7';
 const ASSETS = ['/', '/index.html', '/manifest.json', '/icon-192x192.png', '/icon-512x512.png'];
 
 self.addEventListener('install', e => {
@@ -24,7 +24,8 @@ self.addEventListener('fetch', e => {
     fetch(e.request)
       .then(res => {
         if (res && res.status === 200 && res.type === 'basic') {
-          caches.open(CACHE_NAME).then(c => c.put(e.request, res.clone()));
+          const resClone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(e.request, resClone));
         }
         return res;
       })
