@@ -6,10 +6,12 @@ import { ToastContext } from '../App'
 export default function TeamEntryPage() {
   const showToast = useContext(ToastContext)
 
-  // 대회  const [events, setEvents] = useState([])
+  // 대회
+  const [events, setEvents] = useState([])
   const [selectedEvent, setSelectedEvent] = useState(null)
 
-  // 부서  const [divisions, setDivisions] = useState([])
+  // 부서
+  const [divisions, setDivisions] = useState([])
   const [selectedDivision, setSelectedDivision] = useState(null)
 
   // 대회?�증
