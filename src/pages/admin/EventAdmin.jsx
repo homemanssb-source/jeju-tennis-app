@@ -65,6 +65,13 @@ export default function EventAdmin() {
   }
 
   // ── 대회 생성 ──────────────────────────────────
+  // datetime-local (KST) → UTC ISO 변환 (DB 저장용)
+  function toUTC(kstLocalStr) {
+    if (!kstLocalStr) return null
+    // datetime-local 값은 로컬 시간(KST) → UTC로 9시간 빼기
+    return new Date(new Date(kstLocalStr).getTime() - 9 * 60 * 60 * 1000).toISOString()
+  }
+
   async function handleAddEvent() {
     if (!form.event_name || !form.event_date) {
       showToast?.('대회명과 날짜는 필수입니다.', 'error'); return
@@ -74,8 +81,8 @@ export default function EventAdmin() {
       event_date: form.event_date,
       event_date_end: form.event_date_end || null,
       entry_fee_team: form.entry_fee_team ? Number(form.entry_fee_team) : 0,
-      entry_open_at: form.entry_open_at || null,
-      entry_close_at: form.entry_close_at || null,
+      entry_open_at: toUTC(form.entry_open_at),
+      entry_close_at: toUTC(form.entry_close_at),
       tournament_id: form.tournament_id || null,
       description: form.description || null,
       event_type: form.event_type,
@@ -133,8 +140,8 @@ export default function EventAdmin() {
       event_date: editForm.event_date,
       event_date_end: editForm.event_date_end || null,
       entry_fee_team: editForm.entry_fee_team ? Number(editForm.entry_fee_team) : 0,
-      entry_open_at: editForm.entry_open_at || null,
-      entry_close_at: editForm.entry_close_at || null,
+      entry_open_at: toUTC(editForm.entry_open_at),
+      entry_close_at: toUTC(editForm.entry_close_at),
       description: editForm.description || null,
       tournament_id: editForm.tournament_id || null,
       account_number: editForm.account_number || null,
