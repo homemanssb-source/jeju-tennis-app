@@ -1,3 +1,4 @@
+// src/pages/admin/PaymentAdmin.jsx
 import { useState, useEffect, useContext } from 'react'
 import { supabase, writeLog } from '../../lib/supabase'
 import { ToastContext } from '../../App'
@@ -6,25 +7,23 @@ import { useAdmin } from './AdminLayout'
 export default function PaymentAdmin() {
   const showToast = useContext(ToastContext)
   const adminUser = useAdmin()
-  const [payments, setPayments] = useState([])
-  const [members, setMembers] = useState([])
-  const [events, setEvents] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [payments, setPayments]       = useState([])
+  const [members, setMembers]         = useState([])
+  const [events, setEvents]           = useState([])
+  const [loading, setLoading]         = useState(true)
   const [filterMatched, setFilterMatched] = useState('')
   const [filterPurpose, setFilterPurpose] = useState('')
-  const [uploading, setUploading] = useState(false)
+  const [uploading, setUploading]     = useState(false)
 
-  const [matchModal, setMatchModal] = useState(null)
+  const [matchModal, setMatchModal]       = useState(null)
   const [matchMemberId, setMatchMemberId] = useState('')
-  const [memberSearch, setMemberSearch] = useState('')
-  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [memberSearch, setMemberSearch]   = useState('')
+  const [selectedIds, setSelectedIds]     = useState(new Set())
 
   const [uploadPurpose, setUploadPurpose] = useState('MEMBERSHIP_FEE')
   const [uploadEventId, setUploadEventId] = useState('')
-  const [uploadYear, setUploadYear] = useState(new Date().getFullYear())
-
-  // 삭제 확인 모달 (브라우저 confirm() 대체)
-  const [confirmModal, setConfirmModal] = useState(null) // { message, onConfirm }
+  const [uploadYear, setUploadYear]       = useState(new Date().getFullYear())
+  const [confirmModal, setConfirmModal]   = useState(null)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -46,7 +45,6 @@ export default function PaymentAdmin() {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-
     try {
       const text = await new Promise((resolve) => {
         const reader = new FileReader()
@@ -55,10 +53,9 @@ export default function PaymentAdmin() {
       })
       const lines = text.split('\n').filter(l => l.trim())
       const rows = lines.slice(1)
-
       const newPayments = []
       for (const row of rows) {
-        const cols = row.match(/(".*?"|[^,]*)/g)?.map(c => c.replace(/^"|"$/g, '').trim()) || []
+        const cols = row.match(/(\".*?\"|[^,]*)/g)?.map(c => c.replace(/^\"|\"$/g, '').trim()) || []
         if (cols.length < 3) continue
         const paidAt = cols[0] || null
         const amount = parseInt((cols[1] || '0').replace(/[^0-9-]/g, '')) || 0
@@ -75,21 +72,17 @@ export default function PaymentAdmin() {
           raw_data: row,
         })
       }
-
       if (newPayments.length === 0) {
-        showToast?.('파싱된 데이터가 없습니다.', 'error')
+        showToast?.('유효한 데이터가 없습니다.', 'error')
         setUploading(false)
         return
       }
-
       const { error } = await supabase.from('payments')
         .upsert(newPayments, { onConflict: 'dedupe_key', ignoreDuplicates: true })
-
       if (error) {
         showToast?.('업로드 실패: ' + error.message, 'error')
       } else {
         showToast?.(`${newPayments.length}건 업로드 완료! 자동매칭 시작...`)
-        // ✅ fetchAll 완료 후 DB에서 직접 미매칭 건 가져와서 매칭
         const freshPayments = await fetchAll()
         await runAutoMatchWithData(freshPayments)
       }
@@ -100,19 +93,21 @@ export default function PaymentAdmin() {
     e.target.value = ''
   }
 
-  // ✅ 자동매칭 버그 수정 - 인자로 최신 데이터 받음
   async function runAutoMatchWithData(data) {
     const unmatched = (data || payments).filter(p => !p.matched)
     let matchedCount = 0
+    let candidateCount = 0
     for (const pay of unmatched) {
       const { data: result } = await supabase.rpc('match_payment', { p_payment_id: pay.payment_id })
       if (result?.ok) matchedCount++
+      else if (result?.candidates?.length > 0) candidateCount++
     }
-    if (matchedCount > 0) showToast?.(`자동매칭: ${matchedCount}건 성공`)
+    let msg = `자동매칭: ${matchedCount}건 성공`
+    if (candidateCount > 0) msg += ` · 후보 있음: ${candidateCount}건 (수동 매칭 필요)`
+    if (matchedCount > 0 || candidateCount > 0) showToast?.(msg)
     fetchAll()
   }
 
-  // 버튼으로 수동 자동매칭 실행 시
   async function runAutoMatch() {
     const freshPayments = await fetchAll()
     await runAutoMatchWithData(freshPayments)
@@ -144,31 +139,25 @@ export default function PaymentAdmin() {
     fetchAll()
   }
 
-  // ✅ 개별 삭제
   async function handleSingleDelete(payment) {
     setConfirmModal({
       message: `"${payment.sender_name}" ${payment.amount?.toLocaleString()}원 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`,
       onConfirm: async () => {
         const { error } = await supabase.from('payments').delete().eq('payment_id', payment.payment_id)
         if (error) { showToast?.('삭제 실패: ' + error.message, 'error'); return }
-
         await writeLog({
-          adminEmail: adminUser?.email,
-          adminName: adminUser?.name,
-          action: 'DELETE',
-          targetTable: 'payments',
+          adminEmail: adminUser?.email, adminName: adminUser?.name,
+          action: 'DELETE', targetTable: 'payments',
           targetId: payment.payment_id,
           targetLabel: `결제 삭제: ${payment.sender_name} ${payment.amount?.toLocaleString()}원`,
           beforeData: payment,
         })
-
         showToast?.('삭제되었습니다.')
         fetchAll()
       }
     })
   }
 
-  // 일괄 삭제
   async function handleBulkDelete() {
     if (selectedIds.size === 0) { showToast?.('삭제할 항목을 선택해주세요.', 'error'); return }
     setConfirmModal({
@@ -177,15 +166,11 @@ export default function PaymentAdmin() {
         const ids = [...selectedIds]
         const { error } = await supabase.from('payments').delete().in('payment_id', ids)
         if (error) { showToast?.('삭제 실패: ' + error.message, 'error'); return }
-
         await writeLog({
-          adminEmail: adminUser?.email,
-          adminName: adminUser?.name,
-          action: 'DELETE',
-          targetTable: 'payments',
+          adminEmail: adminUser?.email, adminName: adminUser?.name,
+          action: 'DELETE', targetTable: 'payments',
           targetLabel: `결제 일괄삭제 ${ids.length}건`,
         })
-
         showToast?.(`${ids.length}건 삭제 완료`)
         setSelectedIds(new Set())
         fetchAll()
@@ -196,6 +181,7 @@ export default function PaymentAdmin() {
   const filtered = payments.filter(p => {
     if (filterMatched === 'matched' && !p.matched) return false
     if (filterMatched === 'unmatched' && p.matched) return false
+    if (filterMatched === 'candidate' && !(p.candidates?.length > 0 && !p.matched)) return false
     if (filterPurpose && p.purpose !== filterPurpose) return false
     return true
   })
@@ -219,19 +205,49 @@ export default function PaymentAdmin() {
       ).slice(0, 10)
     : []
 
+  // 후보 중 클릭 시 바로 매칭
+  function selectCandidate(candidate) {
+    setMatchMemberId(candidate.member_id)
+    setMemberSearch(candidate.name)
+  }
+
+  const candidateCount = payments.filter(p => !p.matched && p.candidates?.length > 0).length
+  const unmatchedCount = payments.filter(p => !p.matched).length
+
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4">💰 결제(거래내역) 관리</h2>
+      <h2 className="text-lg font-bold mb-4">💳 결제(입금내역) 관리</h2>
+
+      {/* 통계 배지 */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <div className="bg-soft px-3 py-1.5 rounded-lg text-xs">
+          전체 <span className="font-bold">{payments.length}</span>건
+        </div>
+        <div className="bg-green-50 px-3 py-1.5 rounded-lg text-xs text-green-700">
+          매칭 <span className="font-bold">{payments.filter(p => p.matched).length}</span>건
+        </div>
+        {unmatchedCount > 0 && (
+          <div className="bg-red-50 px-3 py-1.5 rounded-lg text-xs text-red-600">
+            미매칭 <span className="font-bold">{unmatchedCount}</span>건
+          </div>
+        )}
+        {candidateCount > 0 && (
+          <div className="bg-amber-50 px-3 py-1.5 rounded-lg text-xs text-amber-700 cursor-pointer font-semibold"
+            onClick={() => setFilterMatched('candidate')}>
+            ⚠️ 후보 있음 <span className="font-bold">{candidateCount}</span>건 (클릭하여 확인)
+          </div>
+        )}
+      </div>
 
       {/* 업로드 */}
       <div className="bg-white rounded-xl border border-line p-4 mb-4">
-        <h3 className="text-sm font-semibold mb-3">📁 거래내역 업로드</h3>
+        <h3 className="text-sm font-semibold mb-3">📤 입금내역 업로드</h3>
         <p className="text-xs text-sub mb-3">CSV 파일 형식: 날짜, 금액, 입금자명 (첫 줄 헤더)</p>
         <div className="flex gap-2 mb-3 flex-wrap">
           <select value={uploadPurpose} onChange={e => setUploadPurpose(e.target.value)}
             className="text-sm border border-line rounded-lg px-3 py-2">
             <option value="MEMBERSHIP_FEE">등록비</option>
-            <option value="EVENT_ENTRY_FEE">대회 참가비</option>
+            <option value="EVENT_ENTRY_FEE">대회참가비</option>
           </select>
           {uploadPurpose === 'MEMBERSHIP_FEE' && (
             <input type="number" value={uploadYear}
@@ -248,7 +264,7 @@ export default function PaymentAdmin() {
         </div>
         <div className="flex gap-2">
           <label className="bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium cursor-pointer hover:bg-blue-700">
-            {uploading ? '업로드 중...' : 'CSV 파일 선택'}
+            {uploading ? '업로드 중..' : 'CSV 파일 선택'}
             <input type="file" accept=".csv,.txt" onChange={handleFileUpload} className="hidden" disabled={uploading} />
           </label>
           <button onClick={runAutoMatch}
@@ -265,6 +281,7 @@ export default function PaymentAdmin() {
           <option value="">전체</option>
           <option value="matched">매칭됨</option>
           <option value="unmatched">미매칭</option>
+          <option value="candidate">⚠️ 후보 있음</option>
         </select>
         <select value={filterPurpose} onChange={e => setFilterPurpose(e.target.value)}
           className="text-sm border border-line rounded-lg px-3 py-2">
@@ -275,7 +292,7 @@ export default function PaymentAdmin() {
         {selectedIds.size > 0 && (
           <button onClick={handleBulkDelete}
             className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600">
-            🗑️ 선택 삭제 ({selectedIds.size}건)
+            선택 항목 삭제 ({selectedIds.size}건)
           </button>
         )}
       </div>
@@ -301,12 +318,14 @@ export default function PaymentAdmin() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} className="text-center py-8 text-sub">로딩 중...</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-sub">로딩 중..</td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={8} className="text-center py-8 text-sub">데이터 없음</td></tr>
             ) : filtered.map(p => (
               <tr key={p.payment_id} className={`border-t border-line hover:bg-soft
-                ${!p.matched ? 'bg-red-50/30' : ''} ${selectedIds.has(p.payment_id) ? 'bg-blue-50/50' : ''}`}>
+                ${!p.matched && p.candidates?.length > 0 ? 'bg-amber-50/40' : ''}
+                ${!p.matched && !p.candidates?.length ? 'bg-red-50/30' : ''}
+                ${selectedIds.has(p.payment_id) ? 'bg-blue-50/50' : ''}`}>
                 <td className="px-2 py-2 text-center">
                   <input type="checkbox" checked={selectedIds.has(p.payment_id)}
                     onChange={() => toggleSelect(p.payment_id)} className="rounded" />
@@ -314,7 +333,15 @@ export default function PaymentAdmin() {
                 <td className="px-3 py-2 text-xs text-sub whitespace-nowrap">
                   {p.paid_at ? new Date(p.paid_at).toLocaleDateString('ko-KR') : '-'}
                 </td>
-                <td className="px-3 py-2 font-medium">{p.sender_name}</td>
+                <td className="px-3 py-2 font-medium">
+                  {p.sender_name}
+                  {/* 후보 있음 표시 */}
+                  {!p.matched && p.candidates?.length > 0 && (
+                    <span className="ml-1.5 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                      후보 {p.candidates.length}명
+                    </span>
+                  )}
+                </td>
                 <td className="px-3 py-2 text-right">{p.amount?.toLocaleString()}원</td>
                 <td className="px-3 py-2 text-center">
                   <span className={`text-xs px-1.5 py-0.5 rounded ${
@@ -330,9 +357,8 @@ export default function PaymentAdmin() {
                   {p.matched_member_id
                     ? members.find(m => m.member_id === p.matched_member_id)?.name || p.matched_member_id
                     : '-'}
-                  {p.match_method && <span className="text-[10px] ml-1">({p.match_method})</span>}
+                  {p.match_method && <span className="text-[10px] ml-1 text-accent">({p.match_method})</span>}
                 </td>
-                {/* ✅ 옵션 칸 - 수동매칭 + 개별 삭제 */}
                 <td className="px-3 py-2 text-center">
                   <div className="flex justify-center gap-2">
                     {!p.matched && (
@@ -342,8 +368,7 @@ export default function PaymentAdmin() {
                         수동매칭
                       </button>
                     )}
-                    <button
-                      onClick={() => handleSingleDelete(p)}
+                    <button onClick={() => handleSingleDelete(p)}
                       className="text-xs text-red-500 hover:underline">
                       삭제
                     </button>
@@ -356,14 +381,43 @@ export default function PaymentAdmin() {
       </div>
       <p className="text-xs text-sub mt-2">총 {filtered.length}건</p>
 
-      {/* 수동매칭 모달 */}
+      {/* 수동매칭 모달 — 후보 목록 포함 */}
       {matchModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <h3 className="text-base font-bold mb-1">수동 매칭</h3>
             <p className="text-sm text-sub mb-4">
               {matchModal.sender_name} · {matchModal.amount?.toLocaleString()}원
             </p>
+
+            {/* 🤖 자동 추천 후보 */}
+            {matchModal.candidates?.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-amber-700 mb-2">
+                  🤖 자동 추천 후보 ({matchModal.candidates.length}명)
+                </p>
+                <div className="space-y-1.5">
+                  {matchModal.candidates.map((c, idx) => (
+                    <button
+                      key={c.member_id + idx}
+                      onClick={() => selectCandidate(c)}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm border transition-colors
+                        ${matchMemberId === c.member_id
+                          ? 'bg-accent text-white border-accent'
+                          : 'bg-amber-50 border-amber-200 hover:bg-amber-100 text-gray-800'}`}>
+                      <span className="font-semibold">{c.name}</span>
+                      {c.division && <span className="text-xs ml-2 opacity-75">· {c.division}</span>}
+                      {c.club && <span className="text-xs ml-2 opacity-75">· {c.club}</span>}
+                      {c.entry_id && <span className="text-xs ml-2 opacity-60">신청있음</span>}
+                    </button>
+                  ))}
+                </div>
+                <div className="border-t border-line my-3" />
+                <p className="text-xs text-sub mb-2">또는 직접 검색</p>
+              </div>
+            )}
+
+            {/* 직접 검색 */}
             <div className="relative mb-4">
               <label className="block text-xs text-sub mb-1">회원 검색</label>
               <input type="text" value={memberSearch}
@@ -388,36 +442,28 @@ export default function PaymentAdmin() {
               )}
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setMatchModal(null)}
+              <button onClick={() => { setMatchModal(null); setMatchMemberId(''); setMemberSearch('') }}
                 className="flex-1 py-2 border border-line rounded-lg text-sm text-sub">취소</button>
-              <button onClick={handleManualMatch}
-                className="flex-1 py-2 bg-accent text-white rounded-lg text-sm font-medium">매칭</button>
+              <button onClick={handleManualMatch} disabled={!matchMemberId}
+                className="flex-1 py-2 bg-accent text-white rounded-lg text-sm font-medium disabled:opacity-50">매칭</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 삭제 확인 모달 (브라우저 confirm 대체) */}
+      {/* 삭제 확인 모달 */}
       {confirmModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4">
             <h3 className="text-base font-bold text-red-600">⚠️ 삭제 확인</h3>
             <p className="text-sm text-gray-700 whitespace-pre-line">{confirmModal.message}</p>
             <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => setConfirmModal(null)}
-                className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft"
-              >
+              <button onClick={() => setConfirmModal(null)}
+                className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft">
                 취소
               </button>
-              <button
-                onClick={async () => {
-                  const fn = confirmModal.onConfirm
-                  setConfirmModal(null)
-                  await fn()
-                }}
-                className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600"
-              >
+              <button onClick={async () => { const fn = confirmModal.onConfirm; setConfirmModal(null); await fn() }}
+                className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600">
                 삭제
               </button>
             </div>
