@@ -84,13 +84,16 @@ export default function NoticePage() {
             </a>
           ) : null}
 
-          {/* 부서별 참가자격 — 이미지 있으면 버튼으로 표시 */}
-          {m.qualification_image_url ? (
+          {/* 부서별 참가자격 이미지 — 버튼으로 펼치기 */}
+          {m.qualification_image_url && (
             <QualificationImageSection imageUrl={m.qualification_image_url} />
-          ) : m.divisions?.filter(d => d.name).length > 0 ? (
+          )}
+
+          {/* 부서별 대회장소 텍스트 — 항상 표시 */}
+          {m.divisions?.filter(d => d.name).length > 0 && (
             <div className="bg-white rounded-2xl border border-line overflow-hidden">
               <div className="bg-gray-50 px-4 py-2.5 border-b border-line">
-                <p className="text-xs font-bold text-gray-600">부서별 참가자격</p>
+                <p className="text-xs font-bold text-gray-600">📍 부서별 대회장소</p>
               </div>
               <div className="divide-y divide-line/50">
                 {m.divisions.filter(d => d.name).map((div, idx) => (
@@ -103,7 +106,7 @@ export default function NoticePage() {
                 ))}
               </div>
             </div>
-          ) : null}
+          )}
 
           {/* 시상 */}
           {m.prizes && (
@@ -199,7 +202,7 @@ function QualificationImageSection({ imageUrl }) {
       <button
         onClick={() => setOpen(v => !v)}
         className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-line">
-        <p className="text-xs font-bold text-gray-600">📋 부서별 참가자격</p>
+        <p className="text-xs font-bold text-gray-600">📋 부서별 참가자격 확인</p>
         <span className="text-xs text-orange-500 font-medium">{open ? '접기 ▲' : '자세히 보기 ▼'}</span>
       </button>
       {open && (
