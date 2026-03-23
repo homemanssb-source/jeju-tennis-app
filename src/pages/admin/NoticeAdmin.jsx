@@ -4,7 +4,7 @@ import { ToastContext } from '../../App'
 
 const DEFAULT_RULES = `1. 예선 및 본선 5:5 타이브레이크 No-Ad (예선: 순위 결정전, 본선진출 : 토너먼트)
 ※ 경기진행 상황에 따라 변동될 수 있음
-2. 미스 폴은 인정하지 않는다. 즉 미스 폴 한 선수의 실점으로 처리한다.
+2. 미스 콜은 인정하지 않는다. 즉 미스 콜 한 선수의 실점으로 처리한다.
 3. 로빙엄파이어(Roving Umplire) 제도시행(순회심판): 감독관 및 선임된 로빙 엄파이어는 경기 중 현장에서 풋폴트 및 인·아웃의 판정에 대한 확신이 되면 즉시 시정명령과 동시에 사실적인 문제를 결정 할 수 있다. 이에 대한 결정에는 어떠한 경우라도 이의신청을 받아들일 수 없으며, 결정의 절차는 협회의 경기규정에 따른다.
 4. 풋 폴트는 상대선수가 콜을 요할 시 진행요원이 심판으로 경기를 참관하여 풋 폴트를 콜 할 수 있다.
 5. 선수끼리의 합의가 안 될 시 진행요원이 분쟁을 조정을 위해 언제든지 투입 가능하다.
@@ -21,10 +21,12 @@ const EMPTY_META = {
   fee: '', account: '', deadline: '', contact: '',
   divisions: [{ name: '', desc: '' }],
   prizes: '', rules: DEFAULT_RULES,
+  event_type: 'individual',
+  qualification_image_url: '',
 }
 
 const EMPTY_FORM = {
-  title: '', content: '', link: '', pinned: false,
+  title: '', content: '', link: '', image_url: '', pinned: false,
   notice_type: 'general',
   event_id: null,
   meta: EMPTY_META,
@@ -33,7 +35,7 @@ const EMPTY_FORM = {
 export default function NoticeAdmin() {
   const showToast = useContext(ToastContext)
   const [notices, setNotices] = useState([])
-  const [events, setEvents] = useState([]) // 연동할 대회 목록
+  const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -52,25 +54,21 @@ export default function NoticeAdmin() {
   }
 
   async function fetchEvents() {
-    // OPEN 대회 목록 가져오기 (공지 연동용)
     const { data } = await supabase.from('events')
-      .select('event_id, event_name, event_date, event_date_end, entry_fee_team, entry_close_at, account_number, account_holder, account_bank, description')
+      .select('event_id, event_name, event_date, event_date_end, entry_fee_team, entry_close_at, account_number, account_holder, account_bank, description, event_type, qualification_image_url')
       .order('event_date', { ascending: false })
     setEvents(data || [])
   }
 
-  // 대회 선택 시 기본정보 자동 채우기
   async function handleEventSelect(eventId) {
     if (!eventId) {
       setForm(f => ({ ...f, event_id: null, title: '', meta: { ...EMPTY_META } }))
       return
     }
-
     setLoadingEvent(true)
     const ev = events.find(e => e.event_id === eventId)
     if (!ev) { setLoadingEvent(false); return }
 
-    // 부서 목록 가져오기
     const { data: divData } = await supabase.from('event_divisions')
       .select('division_name').eq('event_id', eventId).order('created_at')
 
@@ -78,7 +76,6 @@ export default function NoticeAdmin() {
       ? divData.map(d => ({ name: d.division_name, desc: '' }))
       : [{ name: '', desc: '' }]
 
-    // 날짜 포맷
     const startDate = ev.event_date ? new Date(ev.event_date) : null
     const endDate = ev.event_date_end ? new Date(ev.event_date_end) : null
     const formatMD = (d) => d ? `${d.getMonth() + 1}.${d.getDate()}` : ''
@@ -91,20 +88,17 @@ export default function NoticeAdmin() {
       dateStr = `2026.${formatMD(startDate)}(${dayKor(startDate)})`
     }
 
-    // 마감일 포맷
     let deadlineStr = ''
     if (ev.entry_close_at) {
       const d = new Date(new Date(ev.entry_close_at).getTime() + 9 * 60 * 60 * 1000)
       deadlineStr = `${d.getMonth() + 1}월 ${d.getDate()}일 ${d.getHours()}시까지`
     }
 
-    // 계좌 포맷
     let accountStr = ''
     if (ev.account_number) {
       accountStr = `${ev.account_bank ? ev.account_bank + ' ' : ''}${ev.account_number}${ev.account_holder ? ' (' + ev.account_holder + ')' : ''}`
     }
 
-    // 참가비 포맷
     let feeStr = ev.entry_fee_team > 0 ? `팀당 ${ev.entry_fee_team.toLocaleString()}원` : ''
 
     setForm(f => ({
@@ -123,6 +117,8 @@ export default function NoticeAdmin() {
         divisions,
         prizes: f.meta.prizes,
         rules: f.meta.rules,
+        event_type: ev.event_type || 'individual',
+        qualification_image_url: ev.qualification_image_url || '', // 대회에서 자동으로 가져옴
       }
     }))
     setLoadingEvent(false)
@@ -139,10 +135,11 @@ export default function NoticeAdmin() {
       title: n.title || '',
       content: n.content || '',
       link: n.link || '',
+      image_url: n.image_url || '',
       pinned: n.pinned || false,
       notice_type: n.notice_type || 'general',
       event_id: n.event_id || null,
-      meta: n.meta || EMPTY_META,
+      meta: n.meta ? { ...EMPTY_META, ...n.meta } : EMPTY_META,
     })
     setEditId(n.id)
     setModal('edit')
@@ -154,6 +151,7 @@ export default function NoticeAdmin() {
       title: form.title,
       content: form.content || null,
       link: form.link || null,
+      image_url: form.notice_type === 'general' ? (form.image_url || null) : null,
       pinned: form.pinned,
       notice_type: form.notice_type,
       event_id: form.notice_type === 'tournament' ? (form.event_id || null) : null,
@@ -235,6 +233,9 @@ export default function NoticeAdmin() {
                     {n.notice_type === 'tournament' ? '🏆 대회공지' : '📋 일반'}
                   </span>
                   {n.event_id && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">🔗 대회연동</span>}
+                  {n.notice_type === 'tournament' && n.meta?.qualification_image_url && (
+                    <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded">🖼 자격표</span>
+                  )}
                   <h3 className="text-sm font-semibold truncate">{n.title}</h3>
                 </div>
                 {n.notice_type === 'tournament' && n.meta && (
@@ -292,11 +293,11 @@ export default function NoticeAdmin() {
                   </div>
                 </div>
 
-                {/* 대회공지 - 대회 연동 드롭다운 */}
+                {/* 대회공지 - 대회 연동 */}
                 {form.notice_type === 'tournament' && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
                     <p className="text-xs font-medium text-blue-700">🔗 대회 연동 (선택)</p>
-                    <p className="text-xs text-blue-500">대회를 선택하면 기본 정보가 자동으로 채워집니다.</p>
+                    <p className="text-xs text-blue-500">대회를 선택하면 기본 정보 및 참가자격 이미지가 자동으로 채워집니다.</p>
                     <select
                       value={form.event_id || ''}
                       onChange={e => handleEventSelect(e.target.value || null)}
@@ -305,12 +306,16 @@ export default function NoticeAdmin() {
                       {events.map(ev => (
                         <option key={ev.event_id} value={ev.event_id}>
                           {ev.event_name} ({ev.event_date})
+                          {ev.qualification_image_url ? ' 🖼' : ''}
                         </option>
                       ))}
                     </select>
                     {loadingEvent && <p className="text-xs text-blue-500">대회 정보 불러오는 중...</p>}
                     {form.event_id && !loadingEvent && (
-                      <p className="text-xs text-green-600 font-medium">✅ 연동됨 — 앱에서 참가신청 버튼이 해당 대회로 연결됩니다.</p>
+                      <p className="text-xs text-green-600 font-medium">
+                        ✅ 연동됨
+                        {form.meta.qualification_image_url ? ' · 🖼 참가자격 이미지 자동 적용' : ''}
+                      </p>
                     )}
                   </div>
                 )}
@@ -332,6 +337,19 @@ export default function NoticeAdmin() {
                       <textarea value={form.content}
                         onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
                         className="w-full text-sm border border-line rounded-lg px-3 py-2 h-28 resize-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-sub mb-1">이미지 URL (선택)</label>
+                      <input type="url" value={form.image_url}
+                        onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))}
+                        placeholder="https://..."
+                        className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+                      {form.image_url && (
+                        <div className="mt-2 rounded-lg overflow-hidden border border-line">
+                          <img src={form.image_url} alt="미리보기" className="w-full object-contain max-h-48"
+                            onError={e => { e.target.style.display = 'none' }} />
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-sub mb-1">링크 (선택)</label>
@@ -401,7 +419,6 @@ export default function NoticeAdmin() {
                           className="w-full text-sm border border-line rounded-lg px-3 py-2" />
                       </div>
 
-                      {/* 대회 미연동 시에만 외부링크 입력 */}
                       {!form.event_id && (
                         <div className="col-span-2">
                           <label className="block text-xs text-sub mb-1">외부 참가신청 링크 (선택)</label>
@@ -413,11 +430,33 @@ export default function NoticeAdmin() {
                       )}
                     </div>
 
-                    {/* 부서 */}
+                    {/* 참가자격 이미지 — 대회 연동 시 자동, 수동 수정도 가능 */}
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-green-700">🖼 부서별 참가자격 이미지</p>
+                        {form.event_id && form.meta.qualification_image_url
+                          ? <span className="text-xs text-green-500">대회에서 자동 적용됨 · 수정 가능</span>
+                          : <span className="text-xs text-gray-400">직접 입력 또는 대회 연동 시 자동</span>
+                        }
+                      </div>
+                      <input type="url" value={form.meta.qualification_image_url}
+                        onChange={e => setMeta('qualification_image_url', e.target.value)}
+                        placeholder="https://..."
+                        className="w-full text-sm border border-green-200 rounded-lg px-3 py-2 bg-white" />
+                      {form.meta.qualification_image_url && (
+                        <div className="mt-1 rounded-lg overflow-hidden border border-green-200">
+                          <img src={form.meta.qualification_image_url} alt="자격표 미리보기"
+                            className="w-full object-contain max-h-40"
+                            onError={e => { e.target.style.display = 'none' }} />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 부서 텍스트 */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="text-xs font-medium text-sub">
-                          부서별 참가자격
+                          부서별 참가자격 텍스트
                           {form.event_id && <span className="text-blue-500 ml-1">(자동입력 · 수정가능)</span>}
                         </label>
                         <button type="button" onClick={addDivision}
@@ -455,7 +494,6 @@ export default function NoticeAdmin() {
                       <label className="block text-xs text-sub mb-1">경기방법 / 기타</label>
                       <textarea value={form.meta.rules}
                         onChange={e => setMeta('rules', e.target.value)}
-                        placeholder="예: 1. 예선 및 본선 5:5 타이브레이크 No-Ad&#10;※ 경기진행 상황에 따라 변동될 수 있음"
                         rows={5}
                         className="w-full text-sm border border-line rounded-lg px-3 py-2 resize-none" />
                     </div>

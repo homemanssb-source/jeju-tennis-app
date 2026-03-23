@@ -2,9 +2,6 @@ import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 
-// 포인트 규정에서 가져오는 부서 목록 (DB에서 동적 로드)
-// division_name 입력 시 이 목록에서 선택하도록 드롭다운 제공
-
 export default function EventAdmin() {
   const showToast = useContext(ToastContext)
   const [events, setEvents] = useState([])
@@ -15,9 +12,10 @@ export default function EventAdmin() {
     entry_open_at: '', entry_close_at: '', description: '', tournament_id: '',
     event_type: 'individual', team_match_type: '3_doubles', team_division_id: '',
     account_number: '', account_holder: '', account_bank: '',
+    qualification_image_url: '',
   })
   const [tournaments, setTournaments] = useState([])
-  const [pointRuleDivisions, setPointRuleDivisions] = useState([]) // 포인트 규정 부서 목록
+  const [pointRuleDivisions, setPointRuleDivisions] = useState([])
 
   // 부서 관리
   const [selectedEvent, setSelectedEvent] = useState(null)
@@ -29,7 +27,7 @@ export default function EventAdmin() {
   const [editForm, setEditForm] = useState({})
   const [showEditModal, setShowEditModal] = useState(false)
 
-  // 팀전 설정 수정 (기존)
+  // 팀전 설정 수정
   const [editingTeamSettings, setEditingTeamSettings] = useState(null)
 
   useEffect(() => { fetchAll() }, [])
@@ -48,7 +46,6 @@ export default function EventAdmin() {
   }
 
   async function fetchDivisions(eventId) {
-    // event_divisions를 가져온 뒤 point_rules의 sort_order 순서에 맞게 정렬
     const [{ data: divs }, { data: prules }] = await Promise.all([
       supabase.from('event_divisions').select('*').eq('event_id', eventId),
       supabase.from('point_rules').select('division, sort_order').order('sort_order', { ascending: true, nullsFirst: false }),
@@ -64,8 +61,6 @@ export default function EventAdmin() {
     return sorted
   }
 
-  // ── 대회 생성 ──────────────────────────────────
-  // datetime-local → ISO UTC 변환 (브라우저가 로컬→UTC 자동 변환)
   function toUTC(localStr) {
     if (!localStr) return null
     return new Date(localStr).toISOString()
@@ -90,6 +85,7 @@ export default function EventAdmin() {
       account_number: form.account_number || null,
       account_holder: form.account_holder || null,
       account_bank: form.account_bank || null,
+      qualification_image_url: form.qualification_image_url || null,
     }
     const { error } = await supabase.from('events').insert([insertData])
     if (error) { showToast?.(error.message, 'error'); return }
@@ -98,17 +94,14 @@ export default function EventAdmin() {
     setForm({
       event_name: '', event_date: '', event_date_end: '', entry_fee_team: '', entry_open_at: '', entry_close_at: '',
       description: '', tournament_id: '', event_type: 'individual', team_match_type: '3_doubles', team_division_id: '',
-      account_number: '', account_holder: '', account_bank: '',
+      account_number: '', account_holder: '', account_bank: '', qualification_image_url: '',
     })
     fetchAll()
   }
 
-  // ── 대회 수정 열기 ──────────────────────────────
-  // UTC → datetime-local 변환 (브라우저가 자동으로 로컬시간=KST로 표시)
   function toKSTLocal(utcStr) {
     if (!utcStr) return ''
     const d = new Date(utcStr)
-    // datetime-local 형식: YYYY-MM-DDTHH:MM (로컬시간 기준)
     const pad = n => String(n).padStart(2, '0')
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
   }
@@ -127,11 +120,11 @@ export default function EventAdmin() {
       account_number: ev.account_number || '',
       account_holder: ev.account_holder || '',
       account_bank: ev.account_bank || '',
+      qualification_image_url: ev.qualification_image_url || '',
     })
     setShowEditModal(true)
   }
 
-  // ── 대회 수정 저장 ──────────────────────────────
   async function handleUpdateEvent() {
     if (!editForm.event_name || !editForm.event_date) {
       showToast?.('대회명과 날짜는 필수입니다.', 'error'); return
@@ -148,20 +141,19 @@ export default function EventAdmin() {
       account_number: editForm.account_number || null,
       account_holder: editForm.account_holder || null,
       account_bank: editForm.account_bank || null,
+      qualification_image_url: editForm.qualification_image_url || null,
     }
     const { error } = await supabase.from('events').update(updates).eq('event_id', editingEvent.event_id)
     if (error) { showToast?.(error.message, 'error'); return }
     showToast?.('대회 정보가 수정되었습니다.')
     setShowEditModal(false)
     setEditingEvent(null)
-    // 선택된 이벤트도 갱신
     if (selectedEvent?.event_id === editingEvent.event_id) {
       setSelectedEvent({ ...selectedEvent, ...updates })
     }
     fetchAll()
   }
 
-  // ── OPEN/CLOSED 토글 ────────────────────────────
   async function toggleEventStatus(ev) {
     const newStatus = ev.status === 'OPEN' ? 'CLOSED' : 'OPEN'
     await supabase.from('events').update({ status: newStatus }).eq('event_id', ev.event_id)
@@ -169,7 +161,6 @@ export default function EventAdmin() {
     fetchAll()
   }
 
-  // ── 대회 삭제 ──────────────────────────────────
   async function handleDeleteEvent(ev) {
     const confirmMsg = `⚠️ "${ev.event_name}" 대회를 삭제하시겠습니까?\n\n다음 데이터가 모두 삭제됩니다:\n- 개인전 참가신청 및 결제내역\n- 팀전 참가신청 및 선수명단\n- 부서정보\n- AB 경기결과\n\n이 작업은 되돌릴 수 없습니다.`
     if (!confirm(confirmMsg)) return
@@ -196,7 +187,6 @@ export default function EventAdmin() {
     }
   }
 
-  // ── 팀전 설정 수정 ──────────────────────────────
   async function handleUpdateTeamSettings() {
     if (!editingTeamSettings) return
     const updates = {
@@ -213,7 +203,6 @@ export default function EventAdmin() {
     fetchAll()
   }
 
-  // ── 부서 추가 ──────────────────────────────────
   async function handleAddDivision() {
     if (!divForm.division_name || !selectedEvent) {
       showToast?.('부서명을 입력해주세요.', 'error'); return
@@ -256,14 +245,10 @@ export default function EventAdmin() {
 
   function formatDateTime(str) {
     if (!str) return '-'
-    // KST(한국시간) 기준으로 표시 (UTC+9)
     return new Date(str).toLocaleString('ko-KR', {
       timeZone: 'Asia/Seoul',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
+      month: 'numeric', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: false,
     })
   }
 
@@ -375,6 +360,23 @@ export default function EventAdmin() {
                 onChange={e => setForm({ ...form, entry_close_at: e.target.value })}
                 className="w-full text-sm border border-line rounded-lg px-3 py-2" />
             </div>
+
+            {/* 부서별 참가자격 이미지 URL — 핵심 추가 */}
+            <div className="col-span-2">
+              <label className="block text-xs text-sub mb-1">🖼 부서별 참가자격 이미지 URL <span className="text-gray-400">(선택)</span></label>
+              <input type="url" value={form.qualification_image_url}
+                onChange={e => setForm({ ...form, qualification_image_url: e.target.value })}
+                placeholder="https://... (한번 입력하면 공지 연동 시 자동으로 따라옵니다)"
+                className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+              {form.qualification_image_url && (
+                <div className="mt-2 rounded-lg overflow-hidden border border-line">
+                  <img src={form.qualification_image_url} alt="미리보기"
+                    className="w-full object-contain max-h-40"
+                    onError={e => { e.target.style.display = 'none' }} />
+                </div>
+              )}
+            </div>
+
             <div className="col-span-2">
               <label className="block text-xs text-sub mb-1">연결 대회 마스터 (선택)</label>
               <select value={form.tournament_id}
@@ -418,7 +420,10 @@ export default function EventAdmin() {
                 <tr key={ev.event_id}
                   className={`border-t border-line hover:bg-soft cursor-pointer ${selectedEvent?.event_id === ev.event_id ? 'bg-accentSoft' : ''}`}
                   onClick={() => { setSelectedEvent(ev); fetchDivisions(ev.event_id); setEditingTeamSettings(null) }}>
-                  <td className="px-3 py-2 font-medium">{ev.event_name}</td>
+                  <td className="px-3 py-2 font-medium">
+                    {ev.event_name}
+                    {ev.qualification_image_url && <span className="ml-1 text-xs text-green-500">🖼</span>}
+                  </td>
                   <td className="px-3 py-2 text-sub">{ev.event_date}</td>
                   <td className="px-3 py-2 text-xs text-sub">
                     {ev.entry_open_at || ev.entry_close_at ? (
@@ -533,7 +538,6 @@ export default function EventAdmin() {
         <div className="bg-white rounded-r border border-line p-4">
           <h3 className="text-sm font-bold mb-1">📋 {selectedEvent.event_name} - 부서 관리</h3>
 
-          {/* 팀전/개인전 안내 */}
           {(selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') ? (
             <p className="text-xs text-blue-600 mb-3">👥 클럽대항전 부서 — 직접 입력하세요. (예: 남성부, 여성부, 혼성부)</p>
           ) : (
@@ -543,18 +547,13 @@ export default function EventAdmin() {
           {/* 부서 추가 */}
           <div className="flex gap-2 mb-3">
             <div className="flex-1">
-              {/* 팀전: 직접 입력 */}
               {(selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') ? (
-                <input
-                  type="text"
-                  value={divForm.division_name}
+                <input type="text" value={divForm.division_name}
                   onChange={e => setDivForm({ ...divForm, division_name: e.target.value })}
                   placeholder="부서명 직접 입력 (예: 남성부, 여성부)"
                   className="w-full text-sm border border-line rounded-lg px-3 py-2" />
               ) : (
-                /* 개인전: 포인트 규정 드롭다운 */
-                <select
-                  value={divForm.division_name}
+                <select value={divForm.division_name}
                   onChange={e => setDivForm({ ...divForm, division_name: e.target.value })}
                   className="w-full text-sm border border-line rounded-lg px-3 py-2">
                   <option value="">부서 선택 (포인트 규정 기준)</option>
@@ -682,6 +681,23 @@ export default function EventAdmin() {
                   onChange={e => setEditForm({ ...editForm, entry_close_at: e.target.value })}
                   className="w-full text-sm border border-line rounded-lg px-3 py-2" />
               </div>
+
+              {/* 부서별 참가자격 이미지 URL — 수정 모달에도 추가 */}
+              <div>
+                <label className="block text-xs text-sub mb-1">🖼 부서별 참가자격 이미지 URL</label>
+                <input type="url" value={editForm.qualification_image_url}
+                  onChange={e => setEditForm({ ...editForm, qualification_image_url: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+                {editForm.qualification_image_url && (
+                  <div className="mt-2 rounded-lg overflow-hidden border border-line">
+                    <img src={editForm.qualification_image_url} alt="미리보기"
+                      className="w-full object-contain max-h-40"
+                      onError={e => { e.target.style.display = 'none' }} />
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-xs text-sub mb-1">연결 대회 마스터</label>
                 <select value={editForm.tournament_id}
