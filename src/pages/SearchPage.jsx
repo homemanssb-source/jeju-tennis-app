@@ -150,21 +150,7 @@ export default function SearchPage() {
           </div>
         </form>
 
-        {/* 등급 바로가기 힌트 (검색 전에만 표시) */}
-        {!searched && gradeOptions.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-0.5 items-center">
-            <span className="text-[10px] text-sub mr-1">등급 바로가기</span>
-            {gradeOptions.map(g => (
-              <button
-                key={g}
-                onClick={() => { setQuery(g); search(g) }}
-                className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold border border-line bg-white text-sub hover:border-accent hover:text-accent transition-colors"
-              >
-                {g}
-              </button>
-            ))}
-          </div>
-        )}
+
 
         {/* 결과 요약 + 뷰 탭 */}
         {searched && !loading && results.length > 0 && (
