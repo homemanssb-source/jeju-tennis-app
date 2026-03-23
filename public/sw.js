@@ -1,5 +1,5 @@
 // public/sw.js — JTA 테니스 v6
-const CACHE_NAME = 'jta-ranking-v10';
+const CACHE_NAME = 'jta-ranking-v11';
 const ASSETS = ['/', '/index.html', '/manifest.json', '/icon-192x192.png', '/icon-512x512.png'];
 
 self.addEventListener('install', e => {
@@ -18,7 +18,11 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  if (new URL(e.request.url).hostname.includes('supabase')) return;
+
+  const url = new URL(e.request.url);
+
+  // Supabase 모든 요청은 캐시 제외 (REST, Storage, Auth 모두)
+  if (url.hostname.includes('supabase')) return;
 
   // ✅ Safari PWA 공백화면 핵심 수정: navigate 요청은 index.html 우선 반환
   if (e.request.mode === 'navigate') {
