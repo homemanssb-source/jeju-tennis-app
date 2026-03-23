@@ -28,6 +28,11 @@ body {
   font-family: ui-sans-serif, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   padding-bottom: calc(60px + var(--safe-bottom));
   overscroll-behavior-y: contain;
+  /* ✅ 아이폰 노치/Dynamic Island safe area 대응 */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  /* ✅ 가로 스크롤 방지 */
+  overflow-x: hidden;
 }
 
 /* 스켈레톤 애니메이션 */
@@ -57,7 +62,7 @@ body {
 .toast-enter { animation: toast-in 0.25s ease-out; }
 .toast-exit { animation: toast-out 0.25s ease-in forwards; }
 
-/* 바텀시트 애니메이션 */
+/* 바텀 시트 애니메이션 */
 @keyframes slide-up {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
@@ -76,11 +81,11 @@ body {
   animation: fade-in 0.2s ease-out;
 }
 
-/* 스크롤바 숨김 (모바일) */
+/* 스크롤바 숨김 (크로스브라우저) */
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* 인풋 포커스 */
+/* 포커스 링 */
 input:focus, select:focus, textarea:focus {
   outline: none;
   ring: 2px;

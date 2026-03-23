@@ -47,7 +47,7 @@ export default function HomePage() {
     return '개인전'
   }
 
-  // KST 기준 날짜 포맷 (M/D)
+  // KST 기준 날짜 표시 (M/D)
   function formatDateMD(utcStr) {
     if (!utcStr) return ''
     return new Date(utcStr).toLocaleString('ko-KR', {
@@ -59,24 +59,26 @@ export default function HomePage() {
 
   function getEntryStatus(ev) {
     const now = new Date()
-    if (ev.entry_open_at && new Date(ev.entry_open_at) > now) return '신청 예정'
-    if (ev.entry_close_at && new Date(ev.entry_close_at) < now) return '신청 마감'
-    return '신청 중'
+    if (ev.entry_open_at && new Date(ev.entry_open_at) > now) return '접수 예정'
+    if (ev.entry_close_at && new Date(ev.entry_close_at) < now) return '접수 마감'
+    return '접수 중'
   }
 
   function getEntryStatusColor(ev) {
     const status = getEntryStatus(ev)
-    if (status === '신청 중') return '#22c55e'
-    if (status === '신청 예정') return '#f59e0b'
+    if (status === '접수 중') return '#22c55e'
+    if (status === '접수 예정') return '#f59e0b'
     return '#94a3b8'
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#faf6f1', fontFamily: "'Nunito', 'Noto Sans KR', sans-serif" }}>
+    // ✅ overflowX: 'hidden' 추가 — 가로 삐져나감 방지
+    <div className="min-h-screen" style={{ background: '#faf6f1', fontFamily: "'Nunito', 'Noto Sans KR', sans-serif", overflowX: 'hidden' }}>
 
       {/* 상단 헤더 */}
       <div style={{ background: '#fff8f3', padding: '22px 20px 18px', borderBottom: '1px solid #f0e8e0' }}>
-        <div style={{ maxWidth: 512, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 14 }}>
+        {/* ✅ overflow: 'hidden' 추가 — 헤더 flex 아이템 잘림 방지 */}
+        <div style={{ maxWidth: 512, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 14, overflow: 'hidden' }}>
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <div style={{
               width: 52, height: 52, background: '#c0612b', borderRadius: 18,
@@ -88,7 +90,8 @@ export default function HomePage() {
               borderRadius: 6, border: '2.5px solid #fff8f3'
             }} />
           </div>
-          <div style={{ flex: 1 }}>
+          {/* ✅ minWidth: 0 추가 — flex: 1 아이템이 줄어들 수 있도록 */}
+          <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#2d1a0e', letterSpacing: -0.8, lineHeight: 1 }}>
               J.T.A <span style={{ color: '#c0612b' }}>제주</span>
             </h1>
@@ -97,20 +100,21 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* 🔔 알림 벨 */}
+          {/* 알림 버튼 */}
           <NotificationBell />
 
-          <div style={{ background: '#c0612b', borderRadius: 12, padding: '5px 14px', textAlign: 'center', flexShrink: 0 }}>
+          {/* ✅ flexShrink: 0 유지하되 padding 살짝 줄여 여유 확보 */}
+          <div style={{ background: '#c0612b', borderRadius: 12, padding: '5px 10px', textAlign: 'center', flexShrink: 0 }}>
             <p style={{ margin: 0, fontSize: 9, color: 'rgba(255,255,255,0.7)', letterSpacing: 1.5, fontWeight: 700 }}>SEASON</p>
             <p style={{ margin: 0, fontSize: 18, color: '#fff', fontWeight: 900, lineHeight: 1.1 }}>2026</p>
           </div>
         </div>
       </div>
 
-      {/* 바디 */}
+      {/* 본문 */}
       <div style={{ maxWidth: 512, margin: '0 auto', padding: '16px 16px 80px' }}>
 
-        {/* 대회 일정 (최대 2개) */}
+        {/* 다가오는 대회 (최대 2개) */}
         {upcomingEvents.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             {upcomingEvents.map((ev, idx) => {
@@ -134,7 +138,7 @@ export default function HomePage() {
                     borderLeft: isFirst ? '3px solid #c0612b' : '3px solid #e8ddd8',
                     opacity: isFirst ? 1 : 0.75,
                   }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                     <div style={{
                       background: isFirst ? '#c0612b' : '#e8ddd8',
                       borderRadius: 10,
@@ -147,20 +151,23 @@ export default function HomePage() {
                         color: isFirst ? '#fff' : '#a07060',
                       }}>{getDday(ev.event_date)}</span>
                     </div>
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <p style={{
                         margin: 0,
                         fontSize: isFirst ? 13 : 12,
                         fontWeight: isFirst ? 700 : 600,
                         color: isFirst ? '#2d1a0e' : '#7a6a62',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}>{ev.event_name}</p>
-                      {/* 대회일 + 접수기간 가로 배치 */}
+                      {/* 대회일자 + 접수기간 한 줄 표시 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
-                        {/* 대회일 */}
+                        {/* 대회일자 */}
                         <span style={{ fontSize: 10, color: '#c8a898' }}>
-                          🗓 {ev.event_date}{ev.event_date_end ? ` ~ ${ev.event_date_end.slice(5).replace('-', '/')}` : ''}
+                          📅 {ev.event_date}{ev.event_date_end ? ` ~ ${ev.event_date_end.slice(5).replace('-', '/')}` : ''}
                         </span>
-                        {/* 구분선 */}
+                        {/* 구분자 */}
                         {(ev.entry_open_at || ev.entry_close_at) && (
                           <span style={{ fontSize: 10, color: '#e0d8d0' }}>|</span>
                         )}
@@ -170,13 +177,13 @@ export default function HomePage() {
                             📝 {formatDateMD(ev.entry_open_at)} ~ {formatDateMD(ev.entry_close_at)}
                           </span>
                         )}
-                        {/* 신청 상태 뱃지 (첫번째 대회만) */}
+                        {/* 접수 상태 배지 (첫번째만) */}
                         {isFirst && (
                           <span style={{
                             fontSize: 9, fontWeight: 600,
                             color: getEntryStatusColor(ev),
-                            background: getEntryStatus(ev) === '신청 중' ? '#f0fdf4'
-                              : getEntryStatus(ev) === '신청 예정' ? '#fffbeb' : '#f8fafc',
+                            background: getEntryStatus(ev) === '접수 중' ? '#f0fdf4'
+                              : getEntryStatus(ev) === '접수 예정' ? '#fffbeb' : '#f8fafc',
                             padding: '1px 5px', borderRadius: 4,
                           }}>
                             {getEntryStatus(ev)}
@@ -185,7 +192,7 @@ export default function HomePage() {
                       </div>
                     </div>
                   </div>
-                  <span style={{ color: '#ddd', fontSize: 20 }}>›</span>
+                  <span style={{ color: '#ddd', fontSize: 20, flexShrink: 0 }}>›</span>
                 </div>
               )
             })}
@@ -228,11 +235,11 @@ export default function HomePage() {
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, marginBottom: 12
             }}>🎯</div>
             <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: '#2d1a0e' }}>대회 운영</p>
-            <p style={{ margin: '3px 0 0', fontSize: 10, color: '#d97706' }}>대진표·결과표 · 조편성</p>
+            <p style={{ margin: '3px 0 0', fontSize: 10, color: '#d97706' }}>대진표·결과표·조편성</p>
           </a>
         </div>
 
-        {/* 퀵 메뉴 */}
+        {/* 퀵 버튼 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 28 }}>
           {[
             { icon: '👤', label: '개인전\n참가', path: '/entry' },
@@ -259,7 +266,7 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* 업체 정보 배너 */}
+        {/* 스폰서 배너 영역 */}
         {banners.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -281,10 +288,11 @@ export default function HomePage() {
                     borderRadius: 12,
                     background: '#fff',
                     transition: 'opacity 0.15s',
+                    minWidth: 0,
                   }}
                   onTouchStart={e => e.currentTarget.style.opacity = '0.7'}
                   onTouchEnd={e => e.currentTarget.style.opacity = '1'}>
-                  {/* 로고 이미지 or 이니셜 */}
+                  {/* 로고 이미지 or 텍스트 */}
                   <div style={{
                     width: 44, height: 44, borderRadius: 12,
                     background: b.image_url ? 'transparent' : '#f0f0f0',
