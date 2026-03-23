@@ -9,16 +9,16 @@ export default function SearchPage() {
   usePageView('search')
 
   const [query, setQuery] = useState('')
-  const [selectedGrade, setSelectedGrade] = useState('') // ✅ 등급 필터
-  const [gradeOptions, setGradeOptions] = useState([])   // ✅ 등급 목록
+  const [gradeOptions, setGradeOptions] = useState([])
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
+  const [searchType, setSearchType] = useState('') // 'name' | 'club' | 'grade'
   const [selectedMember, setSelectedMember] = useState(null)
   const [viewMode, setViewMode] = useState('member')
   const timerRef = useRef(null)
 
-  // ✅ 등급 목록 로드
+  // 등급 목록 로드
   useEffect(() => {
     supabase.from('grade_options')
       .select('grade_value')
@@ -36,33 +36,49 @@ export default function SearchPage() {
     })
   }
 
-  async function search(q, grade) {
+  // 입력값이 등급인지 판별
+  function detectGrade(q) {
     const trimmed = q.trim()
-    // 검색어도 없고 등급도 없으면 초기화
-    if (!trimmed && !grade) { setResults([]); setSearched(false); return }
-    setLoading(true); setSearched(true)
+    return gradeOptions.find(g => g.toLowerCase() === trimmed.toLowerCase()) || null
+  }
 
-    if (trimmed) logSearch(trimmed)
+  async function search(q) {
+    const trimmed = q.trim()
+    if (!trimmed) { setResults([]); setSearched(false); setSearchType(''); return }
+    setLoading(true); setSearched(true)
+    logSearch(trimmed)
+
+    const matchedGrade = detectGrade(trimmed)
 
     let queryBuilder = supabase.from('members_public')
       .select('member_id, name, display_name, club, division, grade, status')
       .neq('status', '삭제')
       .limit(100)
 
-    // ✅ 텍스트 검색 조건 (이름/클럽/ID)
-    if (trimmed) {
+    if (matchedGrade) {
+      // 등급 정확 일치
+      queryBuilder = queryBuilder.eq('grade', matchedGrade)
+    } else {
+      // 이름 / 클럽 / ID 검색
       queryBuilder = queryBuilder.or(
         `name.ilike.%${trimmed}%,club.ilike.%${trimmed}%,member_id.ilike.%${trimmed}%,display_name.ilike.%${trimmed}%`
       )
     }
 
-    // ✅ 등급 필터 조건
-    if (grade) {
-      queryBuilder = queryBuilder.eq('grade', grade)
-    }
-
     const { data, error } = await queryBuilder
-    if (!error) setResults(data || [])
+    if (!error) {
+      setResults(data || [])
+      if (matchedGrade) {
+        setSearchType('grade')
+      } else {
+        const clubHit = data?.some(m => m.club?.toLowerCase().includes(trimmed.toLowerCase()))
+        const nameHit = data?.some(m =>
+          (m.name || '').toLowerCase().includes(trimmed.toLowerCase()) ||
+          (m.display_name || '').toLowerCase().includes(trimmed.toLowerCase())
+        )
+        setSearchType(clubHit && !nameHit ? 'club' : 'name')
+      }
+    }
     setLoading(false)
   }
 
@@ -70,13 +86,14 @@ export default function SearchPage() {
     const val = e.target.value
     setQuery(val)
     if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => search(val, selectedGrade), 300)
+    timerRef.current = setTimeout(() => search(val), 300)
   }
 
-  function handleGradeSelect(grade) {
-    const next = selectedGrade === grade ? '' : grade // 같은 거 누르면 해제
-    setSelectedGrade(next)
-    search(query, next)
+  function handleClear() {
+    setQuery('')
+    setResults([])
+    setSearched(false)
+    setSearchType('')
   }
 
   function getClubGroups() {
@@ -90,79 +107,88 @@ export default function SearchPage() {
   }
 
   const clubGroups = getClubGroups()
-  const hasClubResults = results.some(m => m.club && m.club.toLowerCase().includes(query.trim().toLowerCase()))
+  const hasClubResults = results.some(m =>
+    m.club?.toLowerCase().includes(query.trim().toLowerCase())
+  )
+  const isGradeSearch = searchType === 'grade'
+
+  function getSearchLabel() {
+    if (!searched || !query.trim()) return null
+    if (isGradeSearch) return `등급 "${query.trim()}" 선수`
+    if (searchType === 'club') return `클럽 "${query.trim()}" 검색`
+    return `"${query.trim()}" 검색`
+  }
 
   return (
     <div className="pb-20">
-      <PageHeader title="🔎 검색" subtitle="이름, 클럽명, 등급으로 검색" />
+      <PageHeader title="🔎 검색" subtitle="이름 · 클럽명 · 등급 모두 검색 가능" />
 
       <div className="px-5 py-3 max-w-lg mx-auto space-y-2">
 
-        {/* 텍스트 검색창 */}
-        <form onSubmit={e => { e.preventDefault(); search(query, selectedGrade) }}>
+        {/* 통합 검색창 */}
+        <form onSubmit={e => { e.preventDefault(); search(query) }}>
           <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sub text-lg pointer-events-none">
+              {isGradeSearch ? '🏅' : '🔍'}
+            </span>
             <input
               type="text"
               value={query}
               onChange={handleChange}
-              placeholder="이름, 클럽명 또는 회원ID..."
-              className="w-full pl-10 pr-4 py-2.5 border border-line rounded-xl bg-soft text-sm focus:border-accent focus:ring-2 focus:ring-accentSoft"
+              placeholder="이름, 클럽명, 등급 (예: 7부) ..."
+              className="w-full pl-10 pr-9 py-2.5 border border-line rounded-xl bg-soft text-sm focus:border-accent focus:ring-2 focus:ring-accentSoft"
             />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sub text-lg">🔍</span>
+            {query && (
+              <button
+                type="button"
+                onClick={handleClear}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-sub hover:text-gray-600 text-base leading-none"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </form>
 
-        {/* ✅ 등급 필터 버튼 */}
-        {gradeOptions.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
+        {/* 등급 바로가기 힌트 (검색 전에만 표시) */}
+        {!searched && gradeOptions.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-0.5 items-center">
+            <span className="text-[10px] text-sub mr-1">등급 바로가기</span>
             {gradeOptions.map(g => (
               <button
                 key={g}
-                onClick={() => handleGradeSelect(g)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                  selectedGrade === g
-                    ? 'bg-accent text-white border-accent'
-                    : 'bg-white text-sub border-line hover:border-accent hover:text-accent'
-                }`}
+                onClick={() => { setQuery(g); search(g) }}
+                className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold border border-line bg-white text-sub hover:border-accent hover:text-accent transition-colors"
               >
                 {g}
               </button>
             ))}
-            {selectedGrade && (
-              <button
-                onClick={() => handleGradeSelect('')}
-                className="px-3 py-1 rounded-full text-xs font-semibold border border-red-200 text-red-400 bg-white hover:bg-red-50 transition-colors"
-              >
-                ✕ 초기화
-              </button>
-            )}
           </div>
         )}
 
-        {/* 현재 필터 표시 */}
-        {(query || selectedGrade) && searched && !loading && (
-          <p className="text-xs text-sub">
-            {[query && `"${query}"`, selectedGrade && `등급: ${selectedGrade}`].filter(Boolean).join(' + ')}
-            {' 검색 결과 '}
-            <span className="font-bold text-accent">{results.length}명</span>
-          </p>
-        )}
-
-        {/* 뷰 모드 탭 (클럽 검색 결과 있을 때만) */}
-        {results.length > 0 && hasClubResults && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => setViewMode('member')}
-              className={`px-3 py-1 rounded-lg text-xs font-medium ${viewMode === 'member' ? 'bg-accent text-white' : 'bg-soft2 text-sub'}`}
-            >
-              회원별
-            </button>
-            <button
-              onClick={() => setViewMode('club')}
-              className={`px-3 py-1 rounded-lg text-xs font-medium ${viewMode === 'club' ? 'bg-accent text-white' : 'bg-soft2 text-sub'}`}
-            >
-              클럽별
-            </button>
+        {/* 결과 요약 + 뷰 탭 */}
+        {searched && !loading && results.length > 0 && (
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-sub">
+              {getSearchLabel()}{' '}
+              <span className="font-bold text-accent">{results.length}명</span>
+            </p>
+            {hasClubResults && !isGradeSearch && (
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setViewMode('member')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium ${viewMode === 'member' ? 'bg-accent text-white' : 'bg-soft2 text-sub'}`}
+                >
+                  회원별
+                </button>
+                <button
+                  onClick={() => setViewMode('club')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium ${viewMode === 'club' ? 'bg-accent text-white' : 'bg-soft2 text-sub'}`}
+                >
+                  클럽별
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -173,7 +199,9 @@ export default function SearchPage() {
           <SkeletonList count={5} />
         ) : results.length > 0 ? (
           <div className="px-4">
-            {viewMode === 'club' && hasClubResults ? (
+
+            {/* 등급 검색 → 클럽별 그룹 */}
+            {isGradeSearch ? (
               <div className="space-y-3">
                 {clubGroups.map(([clubName, members]) => (
                   <div key={clubName} className="bg-white border border-line rounded-lg overflow-hidden">
@@ -182,8 +210,11 @@ export default function SearchPage() {
                       <span className="text-xs text-accent font-bold">{members.length}명</span>
                     </div>
                     {members.map(m => (
-                      <button key={m.member_id} onClick={() => setSelectedMember(m.member_id)}
-                        className="w-full flex items-center gap-3 py-2.5 px-3 border-t border-line/50 hover:bg-soft transition-colors text-left">
+                      <button
+                        key={m.member_id}
+                        onClick={() => setSelectedMember(m.member_id)}
+                        className="w-full flex items-center gap-3 py-2.5 px-3 border-t border-line/50 hover:bg-soft transition-colors text-left"
+                      >
                         <div className="w-8 h-8 bg-accentSoft rounded-full flex items-center justify-center shrink-0">
                           <span className="text-accent text-xs font-bold">{(m.display_name || m.name || '?')[0]}</span>
                         </div>
@@ -191,11 +222,9 @@ export default function SearchPage() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-sm font-medium text-gray-900 truncate">{m.display_name || m.name}</span>
                             {m.grade && (
-                              <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded shrink-0 ${
-                                selectedGrade === m.grade
-                                  ? 'bg-accent text-white'
-                                  : 'bg-soft2 text-sub'
-                              }`}>{m.grade}</span>
+                              <span className="px-1.5 py-0.5 bg-accent text-white text-[10px] font-semibold rounded shrink-0">
+                                {m.grade}
+                              </span>
                             )}
                           </div>
                           <p className="text-xs text-sub mt-0.5">{m.division || '-'}</p>
@@ -206,10 +235,49 @@ export default function SearchPage() {
                   </div>
                 ))}
               </div>
+
+            ) : viewMode === 'club' && hasClubResults ? (
+              /* 클럽별 뷰 */
+              <div className="space-y-3">
+                {clubGroups.map(([clubName, members]) => (
+                  <div key={clubName} className="bg-white border border-line rounded-lg overflow-hidden">
+                    <div className="bg-soft2 px-3 py-2 flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-900">🎾 {clubName}</span>
+                      <span className="text-xs text-accent font-bold">{members.length}명</span>
+                    </div>
+                    {members.map(m => (
+                      <button
+                        key={m.member_id}
+                        onClick={() => setSelectedMember(m.member_id)}
+                        className="w-full flex items-center gap-3 py-2.5 px-3 border-t border-line/50 hover:bg-soft transition-colors text-left"
+                      >
+                        <div className="w-8 h-8 bg-accentSoft rounded-full flex items-center justify-center shrink-0">
+                          <span className="text-accent text-xs font-bold">{(m.display_name || m.name || '?')[0]}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium text-gray-900 truncate">{m.display_name || m.name}</span>
+                            {m.grade && (
+                              <span className="px-1.5 py-0.5 bg-soft2 text-sub text-[10px] font-medium rounded shrink-0">{m.grade}</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-sub mt-0.5">{m.division || '-'}</p>
+                        </div>
+                        <span className="text-xs text-sub shrink-0">〉</span>
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+
             ) : (
+              /* 회원별 뷰 */
               results.map(m => (
-                <button key={m.member_id} onClick={() => setSelectedMember(m.member_id)}
-                  className="w-full flex items-center gap-3 py-3 px-2 border-b border-line/50 hover:bg-soft transition-colors text-left">
+                <button
+                  key={m.member_id}
+                  onClick={() => setSelectedMember(m.member_id)}
+                  className="w-full flex items-center gap-3 py-3 px-2 border-b border-line/50 hover:bg-soft transition-colors text-left"
+                >
                   <div className="w-9 h-9 bg-accentSoft rounded-full flex items-center justify-center shrink-0">
                     <span className="text-accent text-sm font-bold">{(m.display_name || m.name || '?')[0]}</span>
                   </div>
@@ -217,11 +285,7 @@ export default function SearchPage() {
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-semibold text-gray-900 truncate">{m.display_name || m.name}</span>
                       {m.grade && (
-                        <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded shrink-0 ${
-                          selectedGrade === m.grade
-                            ? 'bg-accent text-white'
-                            : 'bg-soft2 text-sub'
-                        }`}>{m.grade}</span>
+                        <span className="px-1.5 py-0.5 bg-soft2 text-sub text-[10px] font-medium rounded shrink-0">{m.grade}</span>
                       )}
                     </div>
                     <p className="text-xs text-sub mt-0.5 truncate">{(m.club || '-') + ' · ' + (m.division || '-')}</p>
@@ -231,23 +295,23 @@ export default function SearchPage() {
               ))
             )}
           </div>
+
         ) : searched ? (
           <div className="text-center py-12">
             <p className="text-4xl mb-3">😔</p>
             <p className="text-sm text-sub">검색 결과가 없습니다.</p>
-            {selectedGrade && (
-              <button
-                onClick={() => handleGradeSelect('')}
-                className="mt-3 text-xs text-accent underline"
-              >
-                등급 필터 해제하기
-              </button>
+            {gradeOptions.length > 0 && (
+              <p className="text-xs text-sub mt-2">
+                등급 검색은 정확히 입력해주세요
+                <br />
+                <span className="text-accent">({gradeOptions.join(', ')})</span>
+              </p>
             )}
           </div>
         ) : (
           <div className="text-center py-12">
             <p className="text-4xl mb-3">🎾</p>
-            <p className="text-sm text-sub">이름, 클럽명을 검색하거나<br />위에서 등급을 선택하세요.</p>
+            <p className="text-sm text-sub">이름, 클럽명을 검색하거나<br />등급을 직접 입력해보세요.</p>
           </div>
         )}
       </div>
