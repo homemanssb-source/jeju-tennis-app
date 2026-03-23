@@ -135,7 +135,7 @@ export default function SearchPage() {
               type="text"
               value={query}
               onChange={handleChange}
-              placeholder="이름, 클럽명, 등급 (예: 7부) ..."
+              placeholder="이름, 클럽명, 등급 (예: 7점) ..."
               className="w-full pl-10 pr-9 py-2.5 border border-line rounded-xl bg-soft text-sm focus:border-accent focus:ring-2 focus:ring-accentSoft"
             />
             {query && (
@@ -297,7 +297,7 @@ export default function SearchPage() {
         ) : (
           <div className="text-center py-12">
             <p className="text-4xl mb-3">🎾</p>
-            <p className="text-sm text-sub">이름, 클럽명을 검색하거나<br />등급을 직접 입력해보세요.</p>
+            <p className="text-sm text-sub">이름, 클럽명을 검색하거나<br />등급을 직접 입력해보세요. (예: 7점)</p>
           </div>
         )}
       </div>
