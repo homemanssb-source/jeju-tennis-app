@@ -6,7 +6,7 @@ import { SkeletonCard } from '../components/Skeleton'
 export default function NoticePage() {
   const [notices, setNotices] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState(null) // 상세보기
+  const [selected, setSelected] = useState(null)
 
   useEffect(() => { fetchNotices() }, [])
 
@@ -28,6 +28,8 @@ export default function NoticePage() {
   // 상세보기 (대회공지)
   if (selected) {
     const m = selected.meta || {}
+    const entryType = m.event_type || 'individual'
+
     return (
       <div className="pb-20">
         <div className="sticky top-0 bg-white z-10 border-b border-line px-4 py-3 flex items-center gap-3">
@@ -59,17 +61,21 @@ export default function NoticePage() {
             </div>
           </div>
 
-          {/* 참가신청 버튼 — 대회 연동 시 앱 내부로, 아니면 외부 링크 */}
+          {/* 참가신청 버튼 — event_type 기준으로 표시 */}
           {selected.event_id ? (
             <div className="space-y-2">
-              <a href="/entry"
-                className="block w-full bg-accent text-white text-center py-3.5 rounded-2xl font-bold text-sm">
-                🎾 개인전 참가신청
-              </a>
-              <a href="/entry/team"
-                className="block w-full bg-orange-500 text-white text-center py-3.5 rounded-2xl font-bold text-sm">
-                👥 팀전 참가신청
-              </a>
+              {(entryType === 'individual' || entryType === 'both') && (
+                <a href="/entry"
+                  className="block w-full bg-accent text-white text-center py-3.5 rounded-2xl font-bold text-sm">
+                  🎾 개인전 참가신청
+                </a>
+              )}
+              {(entryType === 'team' || entryType === 'both') && (
+                <a href="/entry/team"
+                  className="block w-full bg-orange-500 text-white text-center py-3.5 rounded-2xl font-bold text-sm">
+                  👥 단체전 참가신청
+                </a>
+              )}
             </div>
           ) : selected.link ? (
             <a href={selected.link} target="_blank" rel="noopener noreferrer"
@@ -78,8 +84,10 @@ export default function NoticePage() {
             </a>
           ) : null}
 
-          {/* 부서별 참가자격 */}
-          {m.divisions?.length > 0 && (
+          {/* 부서별 참가자격 — 이미지 있으면 버튼으로 표시 */}
+          {m.qualification_image_url ? (
+            <QualificationImageSection imageUrl={m.qualification_image_url} />
+          ) : m.divisions?.filter(d => d.name).length > 0 ? (
             <div className="bg-white rounded-2xl border border-line overflow-hidden">
               <div className="bg-gray-50 px-4 py-2.5 border-b border-line">
                 <p className="text-xs font-bold text-gray-600">부서별 참가자격</p>
@@ -95,7 +103,7 @@ export default function NoticePage() {
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* 시상 */}
           {m.prizes && (
@@ -120,7 +128,6 @@ export default function NoticePage() {
                   .split('\n')
                   .filter(line => line.trim())
                   .map((line, idx) => {
-                    // ※ 로 시작하는 보조 설명
                     if (line.trim().startsWith('※')) {
                       return (
                         <div key={idx} className="px-4 py-2 bg-amber-50">
@@ -128,7 +135,6 @@ export default function NoticePage() {
                         </div>
                       )
                     }
-                    // 숫자. 로 시작하는 항목
                     const match = line.trim().match(/^(\d+)\.\s*(.+)/)
                     if (match) {
                       return (
@@ -140,7 +146,6 @@ export default function NoticePage() {
                         </div>
                       )
                     }
-                    // 그 외 텍스트
                     return (
                       <div key={idx} className="px-4 py-2">
                         <p className="text-sm text-gray-600 leading-relaxed">{line.trim()}</p>
@@ -186,13 +191,37 @@ export default function NoticePage() {
   )
 }
 
+// 부서별 참가자격 이미지 — 버튼 클릭 시 펼치기/접기
+function QualificationImageSection({ imageUrl }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="bg-white rounded-2xl border border-line overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-line">
+        <p className="text-xs font-bold text-gray-600">📋 부서별 참가자격</p>
+        <span className="text-xs text-orange-500 font-medium">{open ? '접기 ▲' : '자세히 보기 ▼'}</span>
+      </button>
+      {open && (
+        <div className="p-3">
+          <img
+            src={imageUrl}
+            alt="부서별 참가자격"
+            className="w-full object-contain rounded-lg"
+            onError={e => { e.target.style.display = 'none' }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // 대회공지 카드
 function TournamentCard({ n, onSelect, formatDate }) {
   const m = n.meta || {}
   return (
     <button onClick={() => onSelect(n)}
       className="w-full text-left rounded-2xl overflow-hidden border border-orange-200 bg-white hover:shadow-md transition-shadow">
-      {/* 상단 컬러 바 */}
       <div className="bg-gradient-to-r from-orange-500 to-orange-400 px-4 py-2.5 flex items-center justify-between">
         <span className="text-xs font-bold text-white">🏆 대회 공지</span>
         {n.pinned && <span className="text-xs text-orange-100">📌 고정</span>}
@@ -200,12 +229,8 @@ function TournamentCard({ n, onSelect, formatDate }) {
       <div className="px-4 py-3">
         <h3 className="text-sm font-bold text-gray-900 leading-snug">{n.title}</h3>
         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-          {m.date && (
-            <span className="text-xs text-gray-500">📅 {m.date}</span>
-          )}
-          {m.venue && (
-            <span className="text-xs text-gray-500">📍 {m.venue}</span>
-          )}
+          {m.date && <span className="text-xs text-gray-500">📅 {m.date}</span>}
+          {m.venue && <span className="text-xs text-gray-500">📍 {m.venue}</span>}
         </div>
         {m.divisions?.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
@@ -236,6 +261,12 @@ function GeneralCard({ n, formatDate }) {
         {n.pinned && <span className="text-xs shrink-0 mt-0.5">📌</span>}
         <div className="flex-1">
           <h3 className="text-sm font-semibold text-gray-900">{n.title}</h3>
+          {n.image_url && (
+            <div className="mt-2 rounded-xl overflow-hidden border border-line">
+              <img src={n.image_url} alt="첨부이미지" className="w-full object-contain max-h-64"
+                onError={e => { e.target.style.display = 'none' }} />
+            </div>
+          )}
           {n.content && (
             <p className="text-sm text-sub mt-1.5 whitespace-pre-wrap leading-relaxed">{n.content}</p>
           )}
