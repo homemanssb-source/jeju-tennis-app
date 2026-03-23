@@ -8,7 +8,7 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#ff5520" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="JTA" />
     <link rel="apple-touch-icon" href="/icon-152x152.png" />
     <link rel="icon" type="image/png" href="/favicon.png" />
@@ -17,6 +17,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <style>
+      /* ✅ Safari PWA 공백화면 방지: 초기 배경색 */
+      html, body, #root { background-color: #fff8f3; min-height: 100%; }
+      /* ✅ Dynamic Island / 노치 safe-area 대응 */
+      body { padding-top: env(safe-area-inset-top); }
+    </style>
   </head>
   <body class="bg-white text-gray-900 antialiased">
     <div id="root"></div>
