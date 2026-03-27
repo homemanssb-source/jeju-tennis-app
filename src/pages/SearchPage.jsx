@@ -3,10 +3,9 @@ import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import PlayerDetail from '../components/PlayerDetail'
 import { SkeletonList } from '../components/Skeleton'
-import { usePageView } from '../hooks/usePageView'
 
 export default function SearchPage() {
-  usePageView('search')
+  // ❌ usePageView('search') 제거 → App.jsx에서 중앙 처리
 
   const [query, setQuery] = useState('')
   const [gradeOptions, setGradeOptions] = useState([])
@@ -17,6 +16,7 @@ export default function SearchPage() {
   const [selectedMember, setSelectedMember] = useState(null)
   const [viewMode, setViewMode] = useState('member')
   const timerRef = useRef(null)
+  const loggedRef = useRef('') // 마지막으로 로깅된 키워드 추적
 
   // 등급 목록 로드
   useEffect(() => {
@@ -27,26 +27,31 @@ export default function SearchPage() {
       .then(({ data }) => setGradeOptions(data?.map(g => g.grade_value) || []))
   }, [])
 
+  // ✅ 검색 완료(Enter/폼 제출) 시에만 로깅
   async function logSearch(keyword) {
+    const trimmed = keyword.trim()
+    if (!trimmed) return
+    if (loggedRef.current === trimmed) return // 동일 키워드 중복 방지
+    loggedRef.current = trimmed
+
     await supabase.from('page_views').insert({
       page: 'search',
-      keyword: keyword.trim(),
+      keyword: trimmed,
       device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'mobile' : 'pc',
       session_id: sessionStorage.getItem('jta_sid') || ''
     })
   }
 
-  // 입력값이 등급인지 판별
   function detectGrade(q) {
     const trimmed = q.trim()
     return gradeOptions.find(g => g.toLowerCase() === trimmed.toLowerCase()) || null
   }
 
+  // 자동완성용 search: 로깅 없음
   async function search(q) {
     const trimmed = q.trim()
     if (!trimmed) { setResults([]); setSearched(false); setSearchType(''); return }
     setLoading(true); setSearched(true)
-    logSearch(trimmed)
 
     const matchedGrade = detectGrade(trimmed)
 
@@ -56,10 +61,8 @@ export default function SearchPage() {
       .limit(100)
 
     if (matchedGrade) {
-      // 등급 정확 일치
       queryBuilder = queryBuilder.eq('grade', matchedGrade)
     } else {
-      // 이름 / 클럽 / ID 검색
       queryBuilder = queryBuilder.or(
         `name.ilike.%${trimmed}%,club.ilike.%${trimmed}%,member_id.ilike.%${trimmed}%,display_name.ilike.%${trimmed}%`
       )
@@ -82,9 +85,19 @@ export default function SearchPage() {
     setLoading(false)
   }
 
+  // ✅ Enter/폼 제출: 검색 + 로깅
+  function handleSubmit(e) {
+    e.preventDefault()
+    if (timerRef.current) clearTimeout(timerRef.current) // 대기 중인 자동완성 취소
+    logSearch(query) // ← 여기서만 로깅
+    search(query)
+  }
+
+  // 타이핑 자동완성: 로깅 없음
   function handleChange(e) {
     const val = e.target.value
     setQuery(val)
+    loggedRef.current = '' // 내용 바뀌면 다시 로깅 가능하게 초기화
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => search(val), 300)
   }
@@ -94,6 +107,7 @@ export default function SearchPage() {
     setResults([])
     setSearched(false)
     setSearchType('')
+    loggedRef.current = ''
   }
 
   function getClubGroups() {
@@ -124,9 +138,7 @@ export default function SearchPage() {
       <PageHeader title="🔎 검색" subtitle="이름 · 클럽명 · 등급 모두 검색 가능" />
 
       <div className="px-5 py-3 max-w-lg mx-auto space-y-2">
-
-        {/* 통합 검색창 */}
-        <form onSubmit={e => { e.preventDefault(); search(query) }}>
+        <form onSubmit={handleSubmit}>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sub text-lg pointer-events-none">
               {isGradeSearch ? '🏅' : '🔍'}
@@ -150,9 +162,6 @@ export default function SearchPage() {
           </div>
         </form>
 
-
-
-        {/* 결과 요약 + 뷰 탭 */}
         {searched && !loading && results.length > 0 && (
           <div className="flex items-center justify-between">
             <p className="text-xs text-sub">
@@ -179,14 +188,11 @@ export default function SearchPage() {
         )}
       </div>
 
-      {/* 결과 목록 */}
       <div className="max-w-lg mx-auto">
         {loading ? (
           <SkeletonList count={5} />
         ) : results.length > 0 ? (
           <div className="px-4">
-
-            {/* 등급 검색 → 클럽별 그룹 */}
             {isGradeSearch ? (
               <div className="space-y-3">
                 {clubGroups.map(([clubName, members]) => (
@@ -223,7 +229,6 @@ export default function SearchPage() {
               </div>
 
             ) : viewMode === 'club' && hasClubResults ? (
-              /* 클럽별 뷰 */
               <div className="space-y-3">
                 {clubGroups.map(([clubName, members]) => (
                   <div key={clubName} className="bg-white border border-line rounded-lg overflow-hidden">
@@ -257,7 +262,6 @@ export default function SearchPage() {
               </div>
 
             ) : (
-              /* 회원별 뷰 */
               results.map(m => (
                 <button
                   key={m.member_id}

@@ -15,6 +15,7 @@ import BoardPage from './pages/BoardPage'
 import PinChangePage from './pages/PinChangePage'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
+import { usePageView } from './hooks/usePageView'
 
 export const ToastContext = createContext()
 
@@ -24,7 +25,9 @@ export default function App() {
   const isHome = location.pathname === '/'
   const [toast, setToast] = useState(null)
 
-  // ✅ useCallback으로 감싸서 Toast 무한 리렌더 방지
+  // 모든 페이지 접속 자동 추적 (관리자 페이지 제외)
+  usePageView()
+
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type })
   }, [])
@@ -47,7 +50,6 @@ export default function App() {
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/*" element={<AdminLayout />} />
         </Routes>
-        {/* 어드민, 홈 페이지에서는 TabBar 숨김 */}
         {!isAdmin && !isHome && <TabBar />}
         <Toast toast={toast} onClose={() => setToast(null)} />
       </div>
