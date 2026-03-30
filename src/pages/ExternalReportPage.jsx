@@ -58,8 +58,8 @@ export default function ExternalReportPage() {
   function calcExpectedGrade() {
     if (!member || !result || !promotionRules.length) return
     const condition = RESULT_TO_CONDITION[result]
-    // [버그4 수정] Number() 변환으로 string/numeric 타입 불일치 방지
-    const currentGrade = Number(member.grade)
+    // "4.5점" 같은 문자 포함된 경우 숫자만 추출
+    const currentGrade = parseFloat(String(member.grade).replace(/[^0-9.]/g, ''))
     const matched = promotionRules.find(r => {
       const genderMatch = r.gender === member.gender
       const scoreMatch = Number(r.current_score) === currentGrade
