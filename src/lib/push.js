@@ -27,22 +27,19 @@ export async function getPushSubscription() {
   }
 }
 
-// ─── 구독 요청 ───────────────────────────────────
-export async function subscribePush() {
+// ─── 구독 요청 (is_admin 파라미터 추가) ──────────
+export async function subscribePush(isAdmin = false) {
   if (!isPushSupported()) throw new Error('이 브라우저는 푸시 알림을 지원하지 않습니다.')
   if (!VAPID_PUBLIC_KEY) throw new Error('VITE_VAPID_PUBLIC_KEY 환경변수가 없습니다.')
 
-  // SW 등록 (이미 등록돼 있으면 기존 것 반환)
   const reg = await navigator.serviceWorker.register('/sw.js')
   await navigator.serviceWorker.ready
 
-  // 브라우저 권한 요청 + VAPID 구독 생성
   const sub = await reg.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
   })
 
-  // Supabase Edge Function에 구독 정보 저장
   const json = sub.toJSON()
   const res = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/push-subscribe`,
@@ -56,11 +53,11 @@ export async function subscribePush() {
         endpoint: json.endpoint,
         p256dh: json.keys.p256dh,
         auth: json.keys.auth,
+        is_admin: isAdmin,   // ← 추가
       }),
     }
   )
   if (!res.ok) {
-    // DB 저장 실패 시 브라우저 구독도 롤백 (불일치 방지)
     await sub.unsubscribe().catch(() => {})
     throw new Error('구독 정보 저장 실패')
   }
@@ -72,7 +69,6 @@ export async function unsubscribePush() {
   const sub = await getPushSubscription()
   if (!sub) return
 
-  // Supabase에서 삭제
   await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/push-subscribe`,
     {
@@ -85,6 +81,5 @@ export async function unsubscribePush() {
     }
   )
 
-  // 브라우저 구독 해제
   await sub.unsubscribe()
 }

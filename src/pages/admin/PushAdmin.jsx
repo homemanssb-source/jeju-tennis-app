@@ -2,6 +2,7 @@
 import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
+import { isPushSupported, getPushSubscription, subscribePush, unsubscribePush } from '../../lib/push'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -25,7 +26,16 @@ export default function PushAdmin() {
   const [history, setHistory]           = useState([])
   const [subCount, setSubCount]         = useState(null)
 
-  useEffect(() => { fetchEvents(); fetchNotices(); fetchSubCount() }, [])
+  // ── 관리자 구독 상태 ──
+  const [adminSubscribed, setAdminSubscribed] = useState(false)
+  const [subLoading, setSubLoading]           = useState(false)
+
+  useEffect(() => {
+    fetchEvents()
+    fetchNotices()
+    fetchSubCount()
+    checkAdminSubscribed()
+  }, [])
 
   async function fetchEvents() {
     const { data } = await supabase.from('events').select('event_id, event_name, event_date, status').order('event_date', { ascending: false }).limit(30)
@@ -36,8 +46,51 @@ export default function PushAdmin() {
     setNotices(data || [])
   }
   async function fetchSubCount() {
-    const { count } = await supabase.from('push_subscriptions').select('*', { count: 'exact', head: true })
+    const { count } = await supabase.from('push_subscriptions').select('*', { count: 'exact', head: true }).eq('is_admin', true)
     setSubCount(count ?? 0)
+  }
+
+  // 이 기기가 이미 관리자 구독 중인지 확인
+  async function checkAdminSubscribed() {
+    const sub = await getPushSubscription()
+    if (!sub) { setAdminSubscribed(false); return }
+    const { data } = await supabase
+      .from('push_subscriptions')
+      .select('id, is_admin')
+      .eq('endpoint', sub.endpoint)
+      .limit(1)
+    setAdminSubscribed(data && data.length > 0 && data[0].is_admin === true)
+  }
+
+  // 관리자 구독 / 해제
+  async function handleAdminSubscribe() {
+    if (!isPushSupported()) { showToast?.('이 브라우저는 푸시 알림을 지원하지 않습니다.', 'error'); return }
+    setSubLoading(true)
+    try {
+      if (adminSubscribed) {
+        await unsubscribePush()
+        setAdminSubscribed(false)
+        showToast?.('관리자 알림 구독이 해제되었습니다.')
+      } else {
+        // is_admin = true 로 구독
+        await subscribePush(true)
+        // 방금 구독된 endpoint를 is_admin = true 로 업데이트
+        const sub = await getPushSubscription()
+        if (sub) {
+          await supabase
+            .from('push_subscriptions')
+            .update({ is_admin: true })
+            .eq('endpoint', sub.endpoint)
+        }
+        setAdminSubscribed(true)
+        showToast?.('✅ 이 기기가 관리자 알림 수신 기기로 등록되었습니다.')
+      }
+    } catch (e) {
+      showToast?.('설정 실패: ' + e.message, 'error')
+    } finally {
+      setSubLoading(false)
+      fetchSubCount()
+    }
   }
 
   function selectTemplate(t) {
@@ -86,7 +139,33 @@ export default function PushAdmin() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-lg font-bold">🔔 푸시 알림 발송</h2>
-        {subCount !== null && <span className="text-xs text-sub bg-soft px-3 py-1 rounded-full">구독자 {subCount}명</span>}
+        {subCount !== null && <span className="text-xs text-sub bg-soft px-3 py-1 rounded-full">관리자 구독 {subCount}기기</span>}
+      </div>
+
+      {/* ── 관리자 구독 섹션 ── */}
+      <div className={`mb-5 p-4 rounded-xl border ${adminSubscribed ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">
+              {adminSubscribed ? '✅ 이 기기는 관리자 알림 수신 중' : '⚠️ 이 기기는 관리자 알림 미등록'}
+            </p>
+            <p className="text-xs text-sub mt-0.5">
+              {adminSubscribed
+                ? '외부대회 신고 등 관리자 알림을 이 기기에서 받습니다.'
+                : '아래 버튼을 눌러 이 기기를 관리자 알림 수신 기기로 등록하세요.'}
+            </p>
+          </div>
+          <button
+            onClick={handleAdminSubscribe}
+            disabled={subLoading}
+            className={`ml-3 px-4 py-2 rounded-lg text-sm font-medium shrink-0 transition-colors
+              ${adminSubscribed
+                ? 'bg-white border border-green-300 text-green-700 hover:bg-green-50'
+                : 'bg-accent text-white hover:bg-blue-700'}
+              disabled:opacity-50`}>
+            {subLoading ? '처리 중...' : adminSubscribed ? '등록 해제' : '관리자 알림 등록'}
+          </button>
+        </div>
       </div>
 
       {!hasVapid && (
@@ -145,7 +224,7 @@ export default function PushAdmin() {
 
           <button onClick={() => setConfirmModal(true)} disabled={sending || !hasVapid}
             className="w-full py-3 bg-accent text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-            {sending ? '발송 중...' : `🔔 전체 구독자(${subCount ?? '?'}명)에게 발송`}
+            {sending ? '발송 중...' : `🔔 전체 구독자(${subCount ?? '?'}기기)에게 발송`}
           </button>
         </div>
 
@@ -193,7 +272,7 @@ export default function PushAdmin() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
             <h3 className="text-base font-bold mb-1">🔔 푸시 알림 발송</h3>
-            <p className="text-xs text-sub mb-4">전체 구독자({subCount}명)에게 아래 알림을 발송합니다.</p>
+            <p className="text-xs text-sub mb-4">관리자 구독 기기({subCount}개)에게 아래 알림을 발송합니다.</p>
             <div className="bg-soft rounded-xl p-3 mb-5 space-y-1">
               <p className="text-sm font-semibold">{preview.title}</p>
               <p className="text-xs text-sub">{preview.body}</p>
