@@ -38,7 +38,7 @@ export default function PinChangePage() {
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
           <p className="text-xs text-blue-700">📌 PIN 초기값은 <b>전화번호 뒷6자리</b>입니다.</p>
-          <p className="text-xs text-blue-700">예: 010-1234-<b>5678</b>90 → PIN: <b>345678</b></p>
+          <p className="text-xs text-blue-700">예: 010-1234-<b>5678</b> → PIN: <b>345678</b></p>
           <p className="text-xs text-blue-700">변경 후에는 새 PIN으로만 본인확인이 가능합니다.</p>
         </div>
 
