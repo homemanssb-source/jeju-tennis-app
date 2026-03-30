@@ -8,14 +8,15 @@ export default function ApplyPage() {
   const [tab, setTab] = useState('all') // 'all' | 'mine'
 
   // ── 전체 신청 현황 ──
-  const [events, setEvents]               = useState([])
+  const [events, setEvents]                   = useState([])
   const [selectedEventId, setSelectedEventId] = useState('')
-  const [entries, setEntries]             = useState([])
-  const [loading, setLoading]             = useState(false)
+  const [entries, setEntries]                 = useState([])
+  const [loading, setLoading]                 = useState(false)
+  const [activeDivision, setActiveDivision]   = useState('전체') // ✅ 부서 필터 추가
 
   // ── 내 신청 내역 ──
-  const [phone, setPhone]       = useState('')
-  const [pin, setPin]           = useState('')
+  const [phone, setPhone]           = useState('')
+  const [pin, setPin]               = useState('')
   const [myEntries, setMyEntries]   = useState([])
   const [myName, setMyName]         = useState('')
   const [myLoading, setMyLoading]   = useState(false)
@@ -27,14 +28,18 @@ export default function ApplyPage() {
 
   async function fetchEvents() {
     const { data, error } = await supabase.from('events')
-      .select('*').order('event_date', { ascending: false })
+      .select('*').order('event_date', { ascending: true }) // ✅ 오름차순
     if (error || !data || data.length === 0) { setEvents([]); return }
     setEvents(data)
-    if (data.length > 0) setSelectedEventId(data[0].event_id)
+    // ✅ 오늘 기준 가장 가까운 미래 대회 자동 선택, 없으면 가장 최근 과거
+    const today = new Date().toISOString().slice(0, 10)
+    const upcoming = data.find(e => e.event_date >= today)
+    setSelectedEventId((upcoming || data[data.length - 1]).event_id)
   }
 
   async function fetchEntries() {
     setLoading(true)
+    setActiveDivision('전체') // ✅ 이벤트 변경 시 부서 필터 초기화
     const { data } = await supabase
       .from('event_entries')
       .select(`*, teams ( team_name ), event_divisions ( division_name )`)
@@ -72,11 +77,18 @@ export default function ApplyPage() {
   }
 
   const selectedEvent = events.find(e => e.event_id === selectedEventId)
+
+  // 부서별 카운트
   const divCounts = {}
   entries.forEach(e => {
     const d = e.event_divisions?.division_name || '기타'
     divCounts[d] = (divCounts[d] || 0) + 1
   })
+
+  // ✅ 활성 부서에 따라 필터링
+  const filteredEntries = activeDivision === '전체'
+    ? entries
+    : entries.filter(e => (e.event_divisions?.division_name || '기타') === activeDivision)
 
   function formatDate(str) {
     if (!str) return ''
@@ -99,12 +111,23 @@ export default function ApplyPage() {
     return 'bg-red-50 text-red-600'
   }
 
-  // 마감 전인지 확인 (취소 가능 여부)
-  function canCancel(entry) {
-    if (entry.entry_status === 'cancelled') return false
-    if (!entry.entry_close_at) return true
-    return new Date(entry.entry_close_at) > new Date()
+  // ✅ 수정: entry 객체에 entry_close_at 없음
+  // → selectedEvent의 entry_close_at 사용 (전체현황 탭용)
+  function canCancelFromEvent() {
+    const closeAt = selectedEvent?.entry_close_at
+    if (!closeAt) return true
+    return new Date(closeAt) > new Date()
   }
+
+  // ✅ 드롭다운: 미래(가까운 순) → 과거(최근 순) 정렬
+  const sortedEventsForSelect = [...events].sort((a, b) => {
+    const today = new Date().toISOString().slice(0, 10)
+    const aFuture = a.event_date >= today
+    const bFuture = b.event_date >= today
+    if (aFuture && bFuture) return a.event_date.localeCompare(b.event_date)
+    if (!aFuture && !bFuture) return b.event_date.localeCompare(a.event_date)
+    return aFuture ? -1 : 1
+  })
 
   return (
     <div className="pb-20">
@@ -138,10 +161,11 @@ export default function ApplyPage() {
             </div>
           ) : (
             <>
+              {/* ✅ 가까운 미래 → 과거 순 드롭다운 */}
               <select value={selectedEventId}
                 onChange={e => setSelectedEventId(e.target.value)}
                 className="w-full text-sm border border-line rounded-lg px-3 py-2.5 mb-4 bg-white font-medium">
-                {events.map(ev => (
+                {sortedEventsForSelect.map(ev => (
                   <option key={ev.event_id} value={ev.event_id}>
                     {ev.event_name} ({ev.event_date})
                   </option>
@@ -159,30 +183,45 @@ export default function ApplyPage() {
                 </div>
               )}
 
+              {/* ✅ 부서 탭: 클릭 시 필터링 */}
               {Object.keys(divCounts).length > 0 && (
                 <div className="flex gap-2 mb-4 flex-wrap">
-                  <div className="bg-accent text-white px-3 py-2 rounded-lg">
+                  <button
+                    onClick={() => setActiveDivision('전체')}
+                    className={`px-3 py-2 rounded-lg transition-colors ${
+                      activeDivision === '전체'
+                        ? 'bg-accent text-white'
+                        : 'bg-white border border-line hover:bg-soft'
+                    }`}>
                     <p className="text-[10px] opacity-80">전체</p>
                     <p className="text-lg font-bold">{entries.length}팀</p>
-                  </div>
+                  </button>
                   {Object.entries(divCounts).map(([div, count]) => (
-                    <div key={div} className="bg-white border border-line px-3 py-2 rounded-lg">
-                      <p className="text-[10px] text-sub">{div}</p>
-                      <p className="text-lg font-bold text-gray-800">{count}팀</p>
-                    </div>
+                    <button
+                      key={div}
+                      onClick={() => setActiveDivision(activeDivision === div ? '전체' : div)}
+                      className={`px-3 py-2 rounded-lg transition-colors ${
+                        activeDivision === div
+                          ? 'bg-accent text-white'
+                          : 'bg-white border border-line hover:bg-soft'
+                      }`}>
+                      <p className={`text-[10px] ${activeDivision === div ? 'opacity-80' : 'text-sub'}`}>{div}</p>
+                      <p className={`text-lg font-bold ${activeDivision === div ? '' : 'text-gray-800'}`}>{count}팀</p>
+                    </button>
                   ))}
                 </div>
               )}
 
               {loading ? (
                 <p className="text-center py-8 text-sub text-sm">로딩 중...</p>
-              ) : entries.length === 0 ? (
+              ) : filteredEntries.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-sm text-sub">신청 내역이 없습니다.</p>
                 </div>
               ) : (
+                // ✅ entries → filteredEntries
                 <div className="space-y-2">
-                  {entries.map((entry, idx) => (
+                  {filteredEntries.map((entry, idx) => (
                     <div key={entry.entry_id}
                       className="bg-white border border-line rounded-lg p-3 flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -278,13 +317,13 @@ export default function ApplyPage() {
                       </div>
                       <div className="flex gap-3 text-xs text-sub">
                         {e.division_name && <span>📋 {e.division_name}</span>}
+                        {/* ✅ partner_name: RPC 반환값에 있을 때만 표시 */}
                         {e.partner_name && <span>🤝 파트너: {e.partner_name}</span>}
                       </div>
                       <p className="text-[10px] text-gray-400 mt-1.5">신청일: {formatDate(e.applied_at)}</p>
-
-                      {/* 취소 불가 안내 */}
-                      {!canCancel(e) && e.entry_status !== 'cancelled' && (
-                        <p className="text-[10px] text-sub mt-1.5">마감 후 취소는 관리자에게 문의하세요.</p>
+                      {/* ✅ 내 신청 탭에서는 entry별 마감일 없으므로 단순 안내 문구만 */}
+                      {e.entry_status !== 'cancelled' && (
+                        <p className="text-[10px] text-sub mt-1.5">취소는 관리자에게 문의하세요.</p>
                       )}
                     </div>
                   ))}
