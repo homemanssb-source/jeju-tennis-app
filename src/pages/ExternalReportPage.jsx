@@ -79,21 +79,22 @@ export default function ExternalReportPage() {
     }
     setSearching(true)
     setMember(null)
-    // [버그3] members 테이블 직접 조회 (phone 필드 필요, anon RLS 허용 필요)
-    const { data, error } = await supabase
-      .from('members')
-      .select('member_id, name, display_name, gender, grade, division, phone, status')
-      .eq('name', trimName)
-      .eq('phone', trimPhone)
-      .eq('status', '활성')
-      .limit(1)
+    // RPC 함수 사용 (SECURITY DEFINER → RLS 우회)
+    const { data, error } = await supabase.rpc('rpc_find_member_by_name_phone', {
+      p_name: trimName,
+      p_phone: trimPhone,
+    })
     setSearching(false)
-    if (error || !data || data.length === 0) {
-      showToast?.('일치하는 활성 회원을 찾을 수 없습니다.', 'error')
+    if (error) {
+      showToast?.('조회 실패: ' + error.message, 'error')
       return
     }
-    setMember(data[0])
-    showToast?.(`${data[0].display_name || data[0].name} 회원 확인됩니다.`)
+    if (!data?.ok) {
+      showToast?.(data?.message || '일치하는 활성 회원을 찾을 수 없습니다.', 'error')
+      return
+    }
+    setMember(data)
+    showToast?.(`${data.display_name || data.name} 회원 확인됩니다.`)
   }
 
   async function handleSubmitClick() {
