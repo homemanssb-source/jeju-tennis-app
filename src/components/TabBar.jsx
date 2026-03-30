@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+
 const mainTabs = [
   { path: '/', label: '홈', icon: '🏠' },
   { path: '/ranking', label: '랭킹', icon: '🏆' },
@@ -7,18 +8,22 @@ const mainTabs = [
   { path: '/tournament', label: '대회', icon: '🎾' },
   { path: '/notice', label: '공지', icon: '📢' },
 ]
+
 const moreTabs = [
   { path: '/entry', label: '개인전 참가신청', icon: '📝' },
   { path: '/entry/team', label: '단체전 참가신청', icon: '🏟️' },
   { path: '/apply', label: '신청확인', icon: '📋' },
+  { path: '/external-report', label: '외부대회 신고', icon: '🏅' },
   { path: '/register', label: '회원/팀등록', icon: '👤' },
   { path: '/board', label: '건의/문의', icon: '💬' },
   { path: '/pin', label: 'PIN 변경', icon: '🔑' },
 ]
+
 export default function TabBar() {
   const location = useLocation()
   const navigate = useNavigate()
   const [showMore, setShowMore] = useState(false)
+
   return (
     <>
       {showMore && (
