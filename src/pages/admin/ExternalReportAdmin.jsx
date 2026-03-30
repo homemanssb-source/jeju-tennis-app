@@ -2,6 +2,8 @@ import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 
+const GRADE_OPTIONS = ['1', '1.5', '2', '2.5', '3', '3.5', '4', '4.5', '5', '5.5', '6']
+
 export default function ExternalReportAdmin() {
   const showToast = useContext(ToastContext)
 
@@ -14,9 +16,10 @@ export default function ExternalReportAdmin() {
 
   const [noteModal, setNoteModal] = useState(null)
   const [detailModal, setDetailModal] = useState(null)
-  // [버그6 수정] confirm() 대신 커스텀 모달만 사용
   const [confirmModal, setConfirmModal] = useState(null)
   const [rejectModal, setRejectModal] = useState(null)
+  const [deleteModal, setDeleteModal] = useState(null)   // 삭제 모달
+  const [gradeModal, setGradeModal] = useState(null)     // 등급 직접 수정 모달
 
   useEffect(() => { fetchReports() }, [filterStatus, filterType])
 
@@ -89,7 +92,6 @@ export default function ExternalReportAdmin() {
     fetchReports()
   }
 
-  // [버그6 수정] confirm() 없이 커스텀 모달 사용
   function handleRejectClick(id) {
     setRejectModal({ id })
   }
@@ -102,6 +104,57 @@ export default function ExternalReportAdmin() {
       .eq('id', id)
     if (error) { showToast?.('처리 실패', 'error'); return }
     showToast?.('미반영 처리되었습니다.')
+    fetchReports()
+  }
+
+  // ── 삭제 ──────────────────────────────────────────
+  function handleDeleteClick(report) {
+    setDeleteModal({ id: report.id, name: report.member_name, tournament: report.tournament_name })
+  }
+
+  async function doDelete(id) {
+    setDeleteModal(null)
+    const { error } = await supabase
+      .from('external_report_log')
+      .delete()
+      .eq('id', id)
+    if (error) { showToast?.('삭제 실패: ' + error.message, 'error'); return }
+    showToast?.('삭제되었습니다.')
+    fetchReports()
+  }
+
+  // ── 등급 직접 수정 ────────────────────────────────
+  function handleGradeClick(report) {
+    setGradeModal({
+      id: report.id,
+      member_id: report.member_id,
+      member_name: report.member_name,
+      current_grade: report.before_grade,
+      new_grade: report.expected_grade ?? report.before_grade ?? '',
+    })
+  }
+
+  async function doGradeUpdate() {
+    if (!gradeModal.new_grade) { showToast?.('변경할 등급을 선택해주세요.', 'error'); return }
+    const { error: memberError } = await supabase
+      .from('members')
+      .update({ grade: Number(gradeModal.new_grade), grade_source: 'manual' })
+      .eq('member_id', gradeModal.member_id)
+
+    if (memberError) { showToast?.('등급 변경 실패: ' + memberError.message, 'error'); return }
+
+    // 로그도 업데이트
+    await supabase
+      .from('external_report_log')
+      .update({
+        expected_grade: Number(gradeModal.new_grade),
+        admin_applied: true,
+        admin_applied_at: new Date().toISOString(),
+      })
+      .eq('id', gradeModal.id)
+
+    showToast?.(`✅ ${gradeModal.member_name} 등급이 ${gradeModal.new_grade}로 변경되었습니다.`)
+    setGradeModal(null)
     fetchReports()
   }
 
@@ -210,7 +263,6 @@ export default function ExternalReportAdmin() {
                     {r.tournament_type}
                   </span>
                 </td>
-                {/* [버그5] 참가부서 컬럼 */}
                 <td className="px-3 py-2 text-center text-xs text-sub">
                   {r.tournament_division || '-'}
                 </td>
@@ -237,16 +289,24 @@ export default function ExternalReportAdmin() {
                   )}
                 </td>
                 <td className="px-3 py-2">
-                  <div className="flex gap-1 justify-center">
+                  <div className="flex gap-1 justify-center flex-wrap">
+                    {/* 적용/취소 */}
                     {!r.admin_applied ? (
                       <button onClick={() => handleApplyClick(r)}
                         className="text-xs text-white bg-accent px-2 py-1 rounded hover:bg-blue-700">적용</button>
                     ) : (
                       <button onClick={() => handleRejectClick(r.id)}
-                        className="text-xs text-red-500 hover:underline">취소</button>
+                        className="text-xs text-orange-500 hover:underline">취소</button>
                     )}
+                    {/* 등급 직접 수정 */}
+                    <button onClick={() => handleGradeClick(r)}
+                      className="text-xs text-green-600 hover:underline">등급↑</button>
+                    {/* 메모 */}
                     <button onClick={() => setNoteModal({ id: r.id, note: r.admin_note || '' })}
-                      className="text-xs text-sub hover:text-gray-700 px-1">📝</button>
+                      className="text-xs text-sub hover:text-gray-700">📝</button>
+                    {/* 삭제 */}
+                    <button onClick={() => handleDeleteClick(r)}
+                      className="text-xs text-red-500 hover:underline">삭제</button>
                   </div>
                 </td>
               </tr>
@@ -256,7 +316,7 @@ export default function ExternalReportAdmin() {
       </div>
       <p className="text-xs text-sub mt-2">총 {reports.length}건</p>
 
-      {/* 적용 확인 모달 */}
+      {/* ── 적용 확인 모달 ── */}
       {confirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
           <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmModal(null)} />
@@ -269,8 +329,7 @@ export default function ExternalReportAdmin() {
                     <b>{confirmModal.report?.member_name}</b> — {confirmModal.report?.tournament_name}<br />
                     {confirmModal.report?.expected_grade && Number(confirmModal.report.expected_grade) !== Number(confirmModal.report.before_grade)
                       ? <span className="text-accent font-semibold">등급 {confirmModal.report.before_grade} → {confirmModal.report.expected_grade} 변경</span>
-                      : <span className="text-sub text-xs">등급 변경 없이 반영 처리만 됩니다.</span>
-                    }
+                      : <span className="text-sub text-xs">등급 변경 없이 반영 처리만 됩니다.</span>}
                   </>
               }
             </p>
@@ -284,7 +343,7 @@ export default function ExternalReportAdmin() {
         </div>
       )}
 
-      {/* 적용 취소 확인 모달 */}
+      {/* ── 반영 취소 모달 ── */}
       {rejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
           <div className="absolute inset-0 bg-black/50" onClick={() => setRejectModal(null)} />
@@ -295,13 +354,84 @@ export default function ExternalReportAdmin() {
               <button onClick={() => setRejectModal(null)}
                 className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft">취소</button>
               <button onClick={() => doReject(rejectModal.id)}
-                className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600">미반영 처리</button>
+                className="flex-1 py-2.5 bg-orange-500 text-white rounded-xl text-sm font-semibold hover:bg-orange-600">미반영 처리</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 메모 모달 */}
+      {/* ── 삭제 확인 모달 ── */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDeleteModal(null)} />
+          <div className="relative bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
+            <h3 className="text-base font-bold text-center">🗑️ 신고 삭제</h3>
+            <p className="text-sm text-gray-700 text-center leading-relaxed">
+              <b>{deleteModal.name}</b>의<br />
+              <b>"{deleteModal.tournament}"</b> 신고를<br />
+              삭제하시겠습니까?<br />
+              <span className="text-xs text-red-500">삭제 후 복구가 불가합니다.</span>
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteModal(null)}
+                className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft">취소</button>
+              <button onClick={() => doDelete(deleteModal.id)}
+                className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600">삭제</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 등급 직접 수정 모달 ── */}
+      {gradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setGradeModal(null)} />
+          <div className="relative bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
+            <h3 className="text-base font-bold text-center">✏️ 등급 직접 수정</h3>
+            <div className="bg-soft rounded-xl p-3 text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-sub">회원</span>
+                <span className="font-medium">{gradeModal.member_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sub">현재 등급</span>
+                <span className="font-bold text-gray-800">{gradeModal.current_grade ?? '-'}</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-sub mb-2">변경할 등급 선택</label>
+              <div className="grid grid-cols-4 gap-2">
+                {GRADE_OPTIONS.map(g => (
+                  <button key={g} onClick={() => setGradeModal({ ...gradeModal, new_grade: g })}
+                    className={`py-2 rounded-lg text-sm font-medium border transition-colors
+                      ${gradeModal.new_grade === g
+                        ? 'bg-accent text-white border-accent'
+                        : 'bg-white text-gray-700 border-line hover:bg-soft2'}`}>
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {gradeModal.new_grade && (
+              <div className="flex items-center justify-center gap-3 py-1">
+                <span className="text-lg font-bold text-gray-400">{gradeModal.current_grade ?? '-'}</span>
+                <span className="text-sub">→</span>
+                <span className="text-lg font-bold text-accent">{gradeModal.new_grade}</span>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setGradeModal(null)}
+                className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft">취소</button>
+              <button onClick={doGradeUpdate} disabled={!gradeModal.new_grade}
+                className="flex-1 py-2.5 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                등급 변경 적용
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 메모 모달 ── */}
       {noteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
           <div className="absolute inset-0 bg-black/50" onClick={() => setNoteModal(null)} />
@@ -322,7 +452,7 @@ export default function ExternalReportAdmin() {
         </div>
       )}
 
-      {/* 상세 모달 */}
+      {/* ── 상세 모달 ── */}
       {detailModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
           <div className="absolute inset-0 bg-black/50" onClick={() => setDetailModal(null)} />
