@@ -3,9 +3,6 @@ import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-
 const TOURNAMENT_TYPES = ['전국대회', '도내대회']
 const RESULTS = ['우승', '준우승', '4강']
 const DIVISIONS = ['지도자부', '마스터부', '베테랑부', '신인부', '여자마스터부', '여자베테랑부', '여자신인부']
@@ -152,18 +149,6 @@ export default function ExternalReportPage() {
     }])
 
     if (error) { showToast?.('신고 실패: ' + error.message, 'error'); setSubmitting(false); return }
-
-    try {
-      await fetch(`${SUPABASE_URL}/functions/v1/push-send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({
-          title: '🏆 외부대회 입상 신고 접수',
-          body: `[${member.display_name || member.name}] ${tournamentType} ${result} 신고가 접수되었습니다.`,
-          url: '/admin/external-reports',
-        }),
-      })
-    } catch (e) { console.warn('푸시 알림 실패:', e) }
 
     showToast?.('✅ 외부대회 입상 신고가 완료되었습니다!')
     setShowPinModal(false)
