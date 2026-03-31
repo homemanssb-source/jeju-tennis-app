@@ -54,6 +54,10 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [agreed, setAgreed] = useState(false)
+  // ✅ 추가: 전화번호 중복 체크 상태
+  const [phoneChecking, setPhoneChecking] = useState(false)
+  const [phoneDupError, setPhoneDupError] = useState('')
+  const [phoneOk, setPhoneOk] = useState(false)
   const [form, setForm] = useState({
     name: '', gender: '', phone: '', club: '', division: '', grade: '',
   })
@@ -65,7 +69,57 @@ export default function RegisterPage() {
     if (data) setGrades(data.map(d => d.grade_value))
   }
 
-  function handleChange(key, value) { setForm({ ...form, [key]: value }) }
+  function handleChange(key, value) {
+    setForm({ ...form, [key]: value })
+    // ✅ 전화번호 변경 시 체크 상태 초기화
+    if (key === 'phone') {
+      setPhoneDupError('')
+      setPhoneOk(false)
+    }
+  }
+
+  // ✅ 하이픈 제거 (숫자만 추출)
+  function normalizePhone(phone) {
+    return phone.replace(/[^0-9]/g, '')
+  }
+
+  // ✅ 하이픈 포함 형식으로 변환 010-1234-5678
+  function formatPhoneWithDash(phoneNorm) {
+    return phoneNorm.replace(/^(\d{3})(\d{4})(\d{4})$/, '$1-$2-$3')
+  }
+
+  // ✅ 전화번호 포커스 아웃 시 중복 체크
+  // DB에 하이픈 있음/없음 두 형식이 혼재하므로 둘 다 조회
+  async function handlePhoneBlur() {
+    const phoneNorm = normalizePhone(form.phone)
+    if (phoneNorm.length < 10) return
+
+    setPhoneChecking(true)
+    setPhoneDupError('')
+    setPhoneOk(false)
+
+    const phoneWithDash = formatPhoneWithDash(phoneNorm)
+    const { data } = await supabase
+      .from('members')
+      .select('member_id, name, status')
+      .or(`phone.eq.${phoneNorm},phone.eq.${phoneWithDash}`)
+      .neq('status', '삭제')
+      .limit(1)
+
+    setPhoneChecking(false)
+
+    if (data && data.length > 0) {
+      const m = data[0]
+      const statusLabel =
+        m.status === '활성' ? '활성 회원' :
+        m.status === '휴면' ? '가입 대기 중' : m.status
+      setPhoneDupError(`이미 등록된 전화번호입니다. (${m.name} · ${statusLabel})`)
+      setPhoneOk(false)
+    } else {
+      setPhoneDupError('')
+      setPhoneOk(true)
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -74,20 +128,62 @@ export default function RegisterPage() {
       return
     }
     if (!agreed) { showToast?.('약관에 동의해주세요.', 'error'); return }
+    // ✅ 중복 에러 있으면 제출 차단
+    if (phoneDupError) { showToast?.('전화번호를 확인해주세요.', 'error'); return }
 
     setSubmitting(true)
+
+    // ✅ 제출 직전 최종 이중 방어 체크
+    const phoneNorm = normalizePhone(form.phone)
+    const phoneWithDash = formatPhoneWithDash(phoneNorm)
+    const { data: existing } = await supabase
+      .from('members')
+      .select('member_id, name, status')
+      .or(`phone.eq.${phoneNorm},phone.eq.${phoneWithDash}`)
+      .neq('status', '삭제')
+      .limit(1)
+
+    if (existing && existing.length > 0) {
+      const m = existing[0]
+      const statusLabel =
+        m.status === '활성' ? '활성 회원' :
+        m.status === '휴면' ? '가입 대기 중' : m.status
+      setPhoneDupError(`이미 등록된 전화번호입니다. (${m.name} · ${statusLabel})`)
+      showToast?.('이미 등록된 전화번호입니다.', 'error')
+      setSubmitting(false)
+      return
+    }
+
     const memberId = 'M' + Date.now().toString().slice(-8)
     const nameNorm = form.name.replace(/[^가-힣a-zA-Z0-9]/g, '').toLowerCase()
 
     const { error } = await supabase.from('members').insert([{
-      member_id: memberId, name: form.name, display_name: form.name, name_norm: nameNorm,
-      gender: form.gender, phone: form.phone, club: form.club, division: form.division,
-      grade: form.grade.replace(/점$/, ''), status: '휴면', grade_source: 'auto',
+      member_id: memberId,
+      name: form.name,
+      display_name: form.name,
+      name_norm: nameNorm,
+      gender: form.gender,
+      phone: phoneNorm,   // ✅ 항상 하이픈 없이 저장 (통일)
+      club: form.club,
+      division: form.division,
+      grade: form.grade.replace(/점$/, ''),
+      status: '휴면',
+      grade_source: 'auto',
       registered_at: new Date().toISOString(),
     }])
 
-    if (error) showToast?.('등록 실패: ' + error.message, 'error')
-    else { setSubmitted(true); showToast?.('동호인 등록 신청이 완료되었습니다!') }
+    if (error) {
+      // ✅ DB UNIQUE 제약 위반 시 친절한 메시지
+      if (error.code === '23505') {
+        setPhoneDupError('이미 등록된 전화번호입니다.')
+        showToast?.('이미 등록된 전화번호입니다.', 'error')
+      } else {
+        showToast?.('등록 실패: ' + error.message, 'error')
+      }
+    } else {
+      setSubmitted(true)
+      showToast?.('동호인 등록 신청이 완료되었습니다!')
+    }
     setSubmitting(false)
   }
 
@@ -114,6 +210,8 @@ export default function RegisterPage() {
               setSubmitted(false)
               setForm({ name: '', gender: '', phone: '', club: '', division: '', grade: '' })
               setAgreed(false)
+              setPhoneDupError('')
+              setPhoneOk(false)
             }}
             className="mt-6 text-sm text-accent hover:underline"
           >
@@ -165,14 +263,42 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* 전화번호 */}
+          {/* ✅ 전화번호 — 중복 체크 추가 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               전화번호 <span className="text-red-500">*</span>
             </label>
-            <input type="tel" value={form.phone} onChange={e => handleChange('phone', e.target.value)}
-              placeholder="010-0000-0000"
-              className="w-full text-sm border border-line rounded-lg px-3 py-2.5 focus:border-accent focus:ring-2 focus:ring-accentSoft" />
+            <div className="relative">
+              <input type="tel" value={form.phone}
+                onChange={e => handleChange('phone', e.target.value)}
+                onBlur={handlePhoneBlur}
+                placeholder="010-0000-0000"
+                className={`w-full text-sm border rounded-lg px-3 py-2.5
+                  focus:ring-2 focus:ring-accentSoft transition-colors
+                  ${phoneDupError
+                    ? 'border-red-400 focus:border-red-400'
+                    : phoneOk
+                      ? 'border-green-400 focus:border-green-400'
+                      : 'border-line focus:border-accent'}`} />
+              {phoneChecking && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-sub">
+                  확인 중...
+                </span>
+              )}
+            </div>
+            {/* 중복 에러 메시지 */}
+            {phoneDupError && (
+              <div className="mt-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <p className="text-xs text-red-600 font-medium">⚠️ {phoneDupError}</p>
+                <p className="text-xs text-red-500 mt-0.5">
+                  PIN 초기값은 전화번호 뒷 6자리입니다. 기존 계정으로 이용해주세요.
+                </p>
+              </div>
+            )}
+            {/* 사용 가능 메시지 */}
+            {phoneOk && !phoneDupError && (
+              <p className="text-xs text-green-600 mt-1">✅ 사용 가능한 전화번호입니다.</p>
+            )}
           </div>
 
           {/* 소속 클럽 */}
@@ -222,8 +348,10 @@ export default function RegisterPage() {
             </label>
           </div>
 
-          <button type="submit" disabled={submitting}
-            className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50">
+          {/* ✅ 중복 에러 또는 체크 중이면 버튼 비활성화 */}
+          <button type="submit"
+            disabled={submitting || !!phoneDupError || phoneChecking}
+            className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {submitting ? '처리 중...' : `동호인 등록 신청 (등록비 ${formatFee(BANK_INFO.fee)})`}
           </button>
 
