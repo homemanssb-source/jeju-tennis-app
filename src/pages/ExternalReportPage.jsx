@@ -5,7 +5,6 @@ import { ToastContext } from '../App'
 
 const TOURNAMENT_TYPES = ['전국대회', '도내대회']
 const RESULTS = ['우승', '준우승', '4강']
-const DIVISIONS = ['지도자부', '마스터부', '베테랑부', '신인부', '여자마스터부', '여자베테랑부', '여자신인부']
 
 // [버그1 수정] 실제 DB result_condition 값 기준: '입상' | '결승' | '우승'
 const RESULT_TO_CONDITION = {
@@ -266,11 +265,10 @@ export default function ExternalReportPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-sub mb-1">참가 부서 <span className="text-gray-400">(선택)</span></label>
-                  <select value={tournamentDivision} onChange={e => setTournamentDivision(e.target.value)}
-                    className="w-full text-sm border border-line rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-accent">
-                    <option value="">선택 안함</option>
-                    {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
+                  <input type="text" value={tournamentDivision}
+                    onChange={e => setTournamentDivision(e.target.value)}
+                    placeholder="예: 남자 단식 B조, 혼합복식 등"
+                    className="w-full text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
                 </div>
                 {result && tournamentType && (
                   <div className={`rounded-lg p-3 border ${gradeChanged ? 'bg-amber-50 border-amber-200' : 'bg-soft border-line'}`}>
