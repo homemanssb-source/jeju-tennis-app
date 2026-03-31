@@ -82,7 +82,7 @@ export default function RegisterPage() {
     const { error } = await supabase.from('members').insert([{
       member_id: memberId, name: form.name, display_name: form.name, name_norm: nameNorm,
       gender: form.gender, phone: form.phone, club: form.club, division: form.division,
-      grade: form.grade, status: '휴면', grade_source: 'auto',
+      grade: form.grade.replace(/점$/, ''), status: '휴면', grade_source: 'auto',
       registered_at: new Date().toISOString(),
     }])
 
