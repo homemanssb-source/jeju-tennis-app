@@ -25,15 +25,15 @@ export default function EventEntryPage() {
     const { data } = await supabase.from('events')
       .select('*')
       .eq('status', 'OPEN')
-      .in('event_type', ['individual', 'both'])
-      .order('event_date', { ascending: true })
+      .order('event_date', { ascending: false })
     setEvents(data || [])
   }
 
   async function fetchMembers() {
     const { data } = await supabase.from('members_public')
       .select('member_id, name, display_name, club, division, grade, status')
-      .neq('status', '탈퇴').order('name')
+      .eq('status', '활성')  // ← 활성만 조회
+      .order('name')
     setMembers(data || [])
   }
 
@@ -48,7 +48,6 @@ export default function EventEntryPage() {
     if (eventId) fetchDivisions(eventId); else setDivisions([])
   }
 
-  // 참가신청 가능 여부 체크
   function getEntryAvailability(ev) {
     if (!ev) return { ok: false, message: '' }
     const now = new Date()
@@ -87,7 +86,16 @@ export default function EventEntryPage() {
       showToast?.('PIN 6자리를 입력해주세요.', 'error'); return
     }
 
-    // 참가신청 시간 체크
+    // 활성 상태 체크
+    const m1 = getMemberInfo(member1Id)
+    const m2 = getMemberInfo(member2Id)
+    if (!m1?.isActive) {
+      showToast?.('⚠️ 선수1이 활성 회원이 아닙니다.', 'error'); return
+    }
+    if (!m2?.isActive) {
+      showToast?.('⚠️ 선수2가 활성 회원이 아닙니다.', 'error'); return
+    }
+
     const avail = getEntryAvailability(selectedEvent)
     if (!avail.ok) {
       showToast?.('⚠️ ' + avail.message, 'error'); return
@@ -95,7 +103,7 @@ export default function EventEntryPage() {
 
     setSubmitting(true)
 
-    // 1단계: PIN 검증
+    // PIN 검증
     const { data: pinData, error: pinError } = await supabase.rpc('rpc_verify_member_pin', {
       p_name: members.find(m => m.member_id === member1Id)?.name || '',
       p_pin: member1Pin,
@@ -106,7 +114,6 @@ export default function EventEntryPage() {
       showToast?.('⚠️ PIN과 선택한 선수가 일치하지 않습니다.', 'error'); setSubmitting(false); return
     }
 
-    // 2단계: RPC 호출
     const { data, error } = await supabase.rpc('rpc_apply_team_to_event', {
       p_event_id: selectedEvent.event_id, p_division_id: selectedDivision,
       p_member1_id: member1Id, p_member2_id: member2Id,
@@ -154,19 +161,6 @@ export default function EventEntryPage() {
             <p className="text-sm font-semibold text-gray-800">{selectedEvent.event_name}</p>
             <p className="text-xs text-sub mt-1">📅 {selectedEvent.event_date}
               {selectedEvent.entry_fee_team > 0 && ` · 💰 ${selectedEvent.entry_fee_team.toLocaleString()}원`}</p>
-            {/* 계좌번호 */}
-            {selectedEvent.account_number && (
-              <div className="mt-2 bg-white rounded-lg px-3 py-2 border border-green-200">
-                <p className="text-xs font-medium text-gray-700 mb-0.5">💳 입금 계좌</p>
-                <p className="text-sm font-bold text-gray-900">
-                  {selectedEvent.account_bank && `${selectedEvent.account_bank} `}
-                  {selectedEvent.account_number}
-                </p>
-                {selectedEvent.account_holder && (
-                  <p className="text-xs text-gray-500 mt-0.5">예금주: {selectedEvent.account_holder}</p>
-                )}
-              </div>
-            )}
             {!entryAvail.ok ? (
               <p className={`text-xs mt-1 font-medium ${entryAvail.type === 'notYet' ? 'text-amber-600' : 'text-red-600'}`}>
                 {entryAvail.type === 'notYet' ? '⏳' : '🔒'} {entryAvail.message}
@@ -177,7 +171,6 @@ export default function EventEntryPage() {
           </div>
         )}
 
-        {/* 신청 가능한 경우에만 아래 폼 표시 */}
         {selectedEvent && entryAvail.ok && (
           <>
             {/* 부서 선택 */}
@@ -201,9 +194,8 @@ export default function EventEntryPage() {
                     placeholder="이름 검색.."
                     className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
                   {member1Info && (
-                    <div className={`mt-1 px-3 py-1.5 rounded-lg text-xs ${member1Info.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                      {member1Info.name} · {member1Info.club || '-'} · {member1Info.grade || '-'}
-                      {member1Info.isActive ? ' ✅활성' : ' ⚠️등록비미납'}
+                    <div className="mt-1 px-3 py-1.5 rounded-lg text-xs bg-green-50 text-green-700">
+                      {member1Info.name} · {member1Info.club || '-'} · {member1Info.grade || '-'} ✅활성
                     </div>
                   )}
                   {showDropdown1 && filterMembers(member1Search).length > 0 && (
@@ -214,9 +206,7 @@ export default function EventEntryPage() {
                           className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30">
                           <span className="font-medium">{m.display_name || m.name}</span>
                           <span className="text-sub text-xs ml-2">{m.club || ''} · {m.grade || ''}</span>
-                          <span className={`text-xs ml-2 ${m.status === '활성' ? 'text-green-600' : 'text-red-500'}`}>
-                            {m.status === '활성' ? '✅' : '⚠️'}
-                          </span>
+                          <span className="text-xs ml-2 text-green-600">✅</span>
                         </button>
                       ))}
                     </div>
@@ -246,9 +236,8 @@ export default function EventEntryPage() {
                     placeholder="이름 검색.."
                     className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
                   {member2Info && (
-                    <div className={`mt-1 px-3 py-1.5 rounded-lg text-xs ${member2Info.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                      {member2Info.name} · {member2Info.club || '-'} · {member2Info.grade || '-'}
-                      {member2Info.isActive ? ' ✅활성' : ' ⚠️등록비미납'}
+                    <div className="mt-1 px-3 py-1.5 rounded-lg text-xs bg-green-50 text-green-700">
+                      {member2Info.name} · {member2Info.club || '-'} · {member2Info.grade || '-'} ✅활성
                     </div>
                   )}
                   {showDropdown2 && filterMembers(member2Search).length > 0 && (
@@ -259,9 +248,7 @@ export default function EventEntryPage() {
                           className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30">
                           <span className="font-medium">{m.display_name || m.name}</span>
                           <span className="text-sub text-xs ml-2">{m.club || ''} · {m.grade || ''}</span>
-                          <span className={`text-xs ml-2 ${m.status === '활성' ? 'text-green-600' : 'text-red-500'}`}>
-                            {m.status === '활성' ? '✅' : '⚠️'}
-                          </span>
+                          <span className="text-xs ml-2 text-green-600">✅</span>
                         </button>
                       ))}
                     </div>
