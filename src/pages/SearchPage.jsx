@@ -42,9 +42,15 @@ export default function SearchPage() {
     })
   }
 
+  // ✅ "7점" → "7" 정규화: 점 유무에 무관하게 grade_options 와 매칭
+  function normalizeGrade(s) {
+    return s.replace(/점$/, '').trim().toLowerCase()
+  }
+
   function detectGrade(q) {
     const trimmed = q.trim()
-    return gradeOptions.find(g => g.toLowerCase() === trimmed.toLowerCase()) || null
+    const normInput = normalizeGrade(trimmed)
+    return gradeOptions.find(g => normalizeGrade(g) === normInput) || null
   }
 
   // 자동완성용 search: 로깅 없음
@@ -61,7 +67,10 @@ export default function SearchPage() {
       .limit(100)
 
     if (matchedGrade) {
-      queryBuilder = queryBuilder.eq('grade', matchedGrade)
+      // DB에 "7" 또는 "7점" 어느 쪽으로 저장돼 있어도 모두 커버
+      const withoutPoint = normalizeGrade(matchedGrade)
+      const withPoint = withoutPoint + '점'
+      queryBuilder = queryBuilder.or(`grade.eq.${withoutPoint},grade.eq.${withPoint}`)
     } else {
       queryBuilder = queryBuilder.or(
         `name.ilike.%${trimmed}%,club.ilike.%${trimmed}%,member_id.ilike.%${trimmed}%,display_name.ilike.%${trimmed}%`
