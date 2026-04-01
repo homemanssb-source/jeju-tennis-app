@@ -1,10 +1,12 @@
 // src/pages/ApplyPage.jsx
 // 신청확인: 전체 목록 + 내 신청 내역 (전화번호+PIN 인증)
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
+import { ToastContext } from '../App'
 
 export default function ApplyPage() {
+  const showToast = useContext(ToastContext)
   const [tab, setTab] = useState('all') // 'all' | 'mine'
 
   // ── 전체 신청 현황 ──
@@ -12,7 +14,7 @@ export default function ApplyPage() {
   const [selectedEventId, setSelectedEventId] = useState('')
   const [entries, setEntries]                 = useState([])
   const [loading, setLoading]                 = useState(false)
-  const [activeDivision, setActiveDivision]   = useState('전체') // ✅ 부서 필터 추가
+  const [activeDivision, setActiveDivision]   = useState('전체')
 
   // ── 내 신청 내역 ──
   const [phone, setPhone]           = useState('')
@@ -23,15 +25,21 @@ export default function ApplyPage() {
   const [myError, setMyError]       = useState('')
   const [mySearched, setMySearched] = useState(false)
 
+  // ── 취소 모달 ──
+  const [cancelTarget, setCancelTarget]   = useState(null)
+  const [refundBank, setRefundBank]       = useState('')
+  const [refundAccount, setRefundAccount] = useState('')
+  const [refundHolder, setRefundHolder]   = useState('')
+  const [cancelling, setCancelling]       = useState(false)
+
   useEffect(() => { fetchEvents() }, [])
   useEffect(() => { if (selectedEventId) fetchEntries() }, [selectedEventId])
 
   async function fetchEvents() {
     const { data, error } = await supabase.from('events')
-      .select('*').order('event_date', { ascending: true }) // ✅ 오름차순
+      .select('*').order('event_date', { ascending: true })
     if (error || !data || data.length === 0) { setEvents([]); return }
     setEvents(data)
-    // ✅ 오늘 기준 가장 가까운 미래 대회 자동 선택, 없으면 가장 최근 과거
     const today = new Date().toISOString().slice(0, 10)
     const upcoming = data.find(e => e.event_date >= today)
     setSelectedEventId((upcoming || data[data.length - 1]).event_id)
@@ -39,10 +47,10 @@ export default function ApplyPage() {
 
   async function fetchEntries() {
     setLoading(true)
-    setActiveDivision('전체') // ✅ 이벤트 변경 시 부서 필터 초기화
+    setActiveDivision('전체')
     const { data } = await supabase
       .from('event_entries')
-      .select(`*, teams ( team_name ), event_divisions ( division_name )`)
+      .select('*, teams ( team_name ), event_divisions ( division_name )')
       .eq('event_id', selectedEventId)
       .neq('entry_status', '취소')
       .order('applied_at', { ascending: false })
@@ -76,16 +84,101 @@ export default function ApplyPage() {
     setMyEntries(data.entries || [])
   }
 
+  // ── 취소 가능 여부 판단 ──
+  // 접수 마감 전이면 취소 가능 (미납·결제완료 모두)
+  // 마감 후 또는 이미 취소/환불 상태면 불가
+  function getCancelStatus(entry) {
+    if (entry.entry_status === 'cancelled') return 'already'
+    if (entry.payment_status === '환불대기') return 'refund_pending'
+    if (entry.payment_status === '환불완료') return 'refund_done'
+    const ev = events.find(e => e.event_id === entry.event_id)
+    if (!ev) return 'no_event'
+    if (ev.entry_close_at && new Date(ev.entry_close_at) < new Date()) return 'closed'
+    return 'ok'
+  }
+
+  function openCancelModal(entry) {
+    const status = getCancelStatus(entry)
+    if (status === 'already')        { showToast('이미 취소된 신청입니다.', 'error'); return }
+    if (status === 'refund_pending') { showToast('환불 신청 접수 중입니다.', 'error'); return }
+    if (status === 'refund_done')    { showToast('이미 환불 완료된 건입니다.', 'error'); return }
+    if (status === 'closed')         { showToast('접수 마감 후에는 취소할 수 없습니다.\n관리자에게 문의하세요.', 'error'); return }
+    if (status === 'no_event')       { showToast('대회 정보를 불러올 수 없습니다.', 'error'); return }
+    setRefundBank('')
+    setRefundAccount('')
+    setRefundHolder('')
+    setCancelTarget(entry)
+  }
+
+  function closeCancelModal() {
+    setCancelTarget(null)
+    setRefundBank('')
+    setRefundAccount('')
+    setRefundHolder('')
+  }
+
+  const isPaid = cancelTarget?.payment_status === '결제완료'
+
+  async function handleConfirmCancel() {
+    if (!cancelTarget) return
+
+    if (isPaid) {
+      if (!refundBank.trim())    { showToast('은행명을 입력해주세요.', 'error'); return }
+      if (!refundAccount.trim()) { showToast('계좌번호를 입력해주세요.', 'error'); return }
+      if (!refundHolder.trim())  { showToast('예금주를 입력해주세요.', 'error'); return }
+    }
+
+    setCancelling(true)
+
+    const updatePayload = {
+      entry_status: '취소',
+      cancelled_at: new Date().toISOString(),
+    }
+
+    if (isPaid) {
+      updatePayload.payment_status      = '환불대기'
+      updatePayload.refund_bank         = refundBank.trim()
+      updatePayload.refund_account      = refundAccount.trim()
+      updatePayload.refund_holder       = refundHolder.trim()
+      updatePayload.refund_requested_at = new Date().toISOString()
+    }
+
+    const { error } = await supabase
+      .from('event_entries')
+      .update(updatePayload)
+      .eq('entry_id', cancelTarget.entry_id)
+
+    setCancelling(false)
+
+    if (error) {
+      showToast('취소 처리 실패: ' + error.message, 'error')
+      return
+    }
+
+    showToast(isPaid ? '✅ 취소 및 환불 신청이 접수되었습니다.' : '✅ 신청이 취소되었습니다.')
+    closeCancelModal()
+
+    // 목록 낙관적 업데이트
+    setMyEntries(prev => prev.map(e =>
+      e.entry_id === cancelTarget.entry_id
+        ? {
+            ...e,
+            entry_status:   'cancelled',
+            payment_status: isPaid ? '환불대기' : e.payment_status,
+          }
+        : e
+    ))
+  }
+
+  // ── 표시 헬퍼 ──
   const selectedEvent = events.find(e => e.event_id === selectedEventId)
 
-  // 부서별 카운트
   const divCounts = {}
   entries.forEach(e => {
     const d = e.event_divisions?.division_name || '기타'
     divCounts[d] = (divCounts[d] || 0) + 1
   })
 
-  // ✅ 활성 부서에 따라 필터링
   const filteredEntries = activeDivision === '전체'
     ? entries
     : entries.filter(e => (e.event_divisions?.division_name || '기타') === activeDivision)
@@ -93,6 +186,11 @@ export default function ApplyPage() {
   function formatDate(str) {
     if (!str) return ''
     return new Date(str).toLocaleDateString('ko-KR')
+  }
+  function formatCloseAt(eventId) {
+    const ev = events.find(e => e.event_id === eventId)
+    if (!ev?.entry_close_at) return null
+    return formatDate(ev.entry_close_at)
   }
 
   function getStatusStyle(status) {
@@ -108,18 +206,11 @@ export default function ApplyPage() {
   function getPayStyle(status) {
     if (status === '결제완료') return 'bg-green-50 text-green-700'
     if (status === '현장납부') return 'bg-yellow-50 text-yellow-700'
+    if (status === '환불대기') return 'bg-orange-50 text-orange-700'
+    if (status === '환불완료') return 'bg-gray-100 text-gray-500'
     return 'bg-red-50 text-red-600'
   }
 
-  // ✅ 수정: entry 객체에 entry_close_at 없음
-  // → selectedEvent의 entry_close_at 사용 (전체현황 탭용)
-  function canCancelFromEvent() {
-    const closeAt = selectedEvent?.entry_close_at
-    if (!closeAt) return true
-    return new Date(closeAt) > new Date()
-  }
-
-  // ✅ 드롭다운: 미래(가까운 순) → 과거(최근 순) 정렬
   const sortedEventsForSelect = [...events].sort((a, b) => {
     const today = new Date().toISOString().slice(0, 10)
     const aFuture = a.event_date >= today
@@ -161,7 +252,6 @@ export default function ApplyPage() {
             </div>
           ) : (
             <>
-              {/* ✅ 가까운 미래 → 과거 순 드롭다운 */}
               <select value={selectedEventId}
                 onChange={e => setSelectedEventId(e.target.value)}
                 className="w-full text-sm border border-line rounded-lg px-3 py-2.5 mb-4 bg-white font-medium">
@@ -183,7 +273,6 @@ export default function ApplyPage() {
                 </div>
               )}
 
-              {/* ✅ 부서 탭: 클릭 시 필터링 */}
               {Object.keys(divCounts).length > 0 && (
                 <div className="flex gap-2 mb-4 flex-wrap">
                   <button
@@ -197,8 +286,7 @@ export default function ApplyPage() {
                     <p className="text-lg font-bold">{entries.length}팀</p>
                   </button>
                   {Object.entries(divCounts).map(([div, count]) => (
-                    <button
-                      key={div}
+                    <button key={div}
                       onClick={() => setActiveDivision(activeDivision === div ? '전체' : div)}
                       className={`px-3 py-2 rounded-lg transition-colors ${
                         activeDivision === div
@@ -219,7 +307,6 @@ export default function ApplyPage() {
                   <p className="text-sm text-sub">신청 내역이 없습니다.</p>
                 </div>
               ) : (
-                // ✅ entries → filteredEntries
                 <div className="space-y-2">
                   {filteredEntries.map((entry, idx) => (
                     <div key={entry.entry_id}
@@ -270,9 +357,7 @@ export default function ApplyPage() {
                 className="w-full text-sm border border-line rounded-lg px-3 py-2.5 tracking-widest" />
               <p className="text-xs text-sub mt-1">PIN 초기값은 전화번호 뒷 6자리입니다.</p>
             </div>
-            {myError && (
-              <p className="text-xs text-red-500">⚠️ {myError}</p>
-            )}
+            {myError && <p className="text-xs text-red-500">⚠️ {myError}</p>}
             <button
               onClick={handleMySearch}
               disabled={myLoading}
@@ -282,7 +367,6 @@ export default function ApplyPage() {
             </button>
           </div>
 
-          {/* 조회 결과 */}
           {mySearched && !myError && (
             <div>
               {myName && (
@@ -298,39 +382,160 @@ export default function ApplyPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {myEntries.map((e, idx) => (
-                    <div key={e.entry_id || idx}
-                      className="bg-white border border-line rounded-xl p-4">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div>
-                          <p className="text-sm font-bold text-gray-900">{e.event_name}</p>
-                          <p className="text-xs text-sub mt-0.5">📅 {e.event_date}</p>
+                  {myEntries.map((e, idx) => {
+                    const cancelStatus = getCancelStatus(e)
+                    const isCancelled  = e.entry_status === 'cancelled'
+                    const closeDate    = formatCloseAt(e.event_id)
+                    const showCancelBtn = !isCancelled
+                      && e.payment_status !== '환불대기'
+                      && e.payment_status !== '환불완료'
+
+                    return (
+                      <div key={e.entry_id || idx} className="bg-white border border-line rounded-xl p-4">
+                        {/* 헤더 */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div>
+                            <p className="text-sm font-bold text-gray-900">{e.event_name}</p>
+                            <p className="text-xs text-sub mt-0.5">📅 {e.event_date}</p>
+                          </div>
+                          <div className="flex flex-col gap-1 items-end shrink-0">
+                            <span className={`text-[10px] px-2 py-0.5 rounded ${getStatusStyle(e.entry_status)}`}>
+                              {getStatusLabel(e.entry_status)}
+                            </span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded ${getPayStyle(e.payment_status)}`}>
+                              {e.payment_status || '미납'}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex flex-col gap-1 items-end shrink-0">
-                          <span className={`text-[10px] px-2 py-0.5 rounded ${getStatusStyle(e.entry_status)}`}>
-                            {getStatusLabel(e.entry_status)}
-                          </span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded ${getPayStyle(e.payment_status)}`}>
-                            {e.payment_status || '미납'}
-                          </span>
+
+                        {/* 부서 / 파트너 */}
+                        <div className="flex gap-3 text-xs text-sub mb-1">
+                          {e.division_name && <span>📋 {e.division_name}</span>}
+                          {e.partner_name  && <span>🤝 파트너: {e.partner_name}</span>}
                         </div>
+                        <p className="text-[10px] text-gray-400 mb-2">신청일: {formatDate(e.applied_at)}</p>
+
+                        {/* 환불 상태 안내 */}
+                        {e.payment_status === '환불대기' && (
+                          <div className="bg-orange-50 rounded-lg px-3 py-2 mt-1">
+                            <p className="text-[10px] text-orange-700">환불 신청 접수 완료. 관리자 확인 후 입금됩니다.</p>
+                          </div>
+                        )}
+                        {e.payment_status === '환불완료' && (
+                          <p className="text-[10px] text-gray-400 mt-1">환불 처리가 완료되었습니다.</p>
+                        )}
+
+                        {/* 취소 버튼 영역 */}
+                        {showCancelBtn && (
+                          <div className="border-t border-line mt-3 pt-3 flex items-center justify-between">
+                            <span className="text-[10px] text-sub">
+                              {cancelStatus === 'closed'
+                                ? '🔴 마감 후 취소불가 · 관리자 문의'
+                                : closeDate ? `마감: ${closeDate}` : ''}
+                            </span>
+                            {cancelStatus === 'ok' ? (
+                              <button
+                                onClick={() => openCancelModal(e)}
+                                className="text-xs text-red-500 border border-red-200 bg-red-50
+                                  hover:bg-red-100 rounded-lg px-3 py-1.5 transition-colors">
+                                신청 취소
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 border border-gray-200
+                                bg-gray-50 rounded-lg px-3 py-1.5">
+                                취소불가
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex gap-3 text-xs text-sub">
-                        {e.division_name && <span>📋 {e.division_name}</span>}
-                        {/* ✅ partner_name: RPC 반환값에 있을 때만 표시 */}
-                        {e.partner_name && <span>🤝 파트너: {e.partner_name}</span>}
-                      </div>
-                      <p className="text-[10px] text-gray-400 mt-1.5">신청일: {formatDate(e.applied_at)}</p>
-                      {/* ✅ 내 신청 탭에서는 entry별 마감일 없으므로 단순 안내 문구만 */}
-                      {e.entry_status !== 'cancelled' && (
-                        <p className="text-[10px] text-sub mt-1.5">취소는 관리자에게 문의하세요.</p>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── 취소 확인 모달 (Bottom Sheet) ── */}
+      {cancelTarget && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          <div className="absolute inset-0 bg-black/40" onClick={closeCancelModal} />
+          <div className="relative w-full max-w-lg bg-white rounded-t-2xl px-5 pt-4 pb-8 z-10">
+            {/* 핸들 */}
+            <div className="flex justify-center mb-4">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+
+            <h3 className="text-base font-semibold text-gray-900 mb-1">
+              {isPaid ? '신청 취소 및 환불 신청' : '신청 취소 확인'}
+            </h3>
+            <p className="text-xs text-sub mb-4">취소 후에는 되돌릴 수 없습니다.</p>
+
+            {/* 신청 요약 */}
+            <div className="bg-soft rounded-xl px-4 py-3 mb-4">
+              <p className="text-sm font-semibold text-gray-900">{cancelTarget.event_name}</p>
+              <p className="text-xs text-sub mt-0.5">
+                {[cancelTarget.division_name, cancelTarget.payment_status || '미납'].filter(Boolean).join(' · ')}
+              </p>
+            </div>
+
+            {/* 결제완료 건: 환불 계좌 입력 */}
+            {isPaid && (
+              <>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    결제 완료 건입니다. 환불받을 계좌를 입력해 주세요.
+                    관리자 확인 후 입금 처리됩니다.
+                  </p>
+                </div>
+                <div className="space-y-3 mb-4">
+                  <div>
+                    <label className="block text-xs text-sub mb-1">은행명</label>
+                    <input
+                      type="text" value={refundBank}
+                      onChange={e => setRefundBank(e.target.value)}
+                      placeholder="예) 농협, 국민, 카카오뱅크"
+                      className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-sub mb-1">계좌번호</label>
+                    <input
+                      type="text" inputMode="numeric" value={refundAccount}
+                      onChange={e => setRefundAccount(e.target.value.replace(/[^0-9-]/g, ''))}
+                      placeholder="숫자만 입력"
+                      className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-sub mb-1">예금주</label>
+                    <input
+                      type="text" value={refundHolder}
+                      onChange={e => setRefundHolder(e.target.value)}
+                      placeholder="예금주 이름"
+                      className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={closeCancelModal}
+                className="flex-1 py-3 border border-line rounded-xl text-sm text-sub
+                  hover:bg-soft transition-colors">
+                닫기
+              </button>
+              <button
+                onClick={handleConfirmCancel}
+                disabled={cancelling}
+                className="flex-1 py-3 bg-red-500 text-white rounded-xl text-sm font-semibold
+                  hover:bg-red-600 disabled:opacity-50 transition-colors">
+                {cancelling ? '처리 중...' : isPaid ? '취소 및 환불신청' : '신청 취소'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
