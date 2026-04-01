@@ -33,12 +33,28 @@ export default function EntryAdmin() {
 
   async function fetchEntries() {
     setLoading(true)
-    const { data } = await supabase
+    // 일반 신청 건 (취소 제외)
+    const { data: normalData } = await supabase
       .from('event_entries')
       .select('*, teams ( team_id, team_name, member1_id, member2_id ), event_divisions ( division_name )')
       .eq('event_id', selectedEventId)
-      // 취소+환불대기+환불완료 모두 표시하기 위해 entry_status 필터 제거
+      .neq('entry_status', '취소')
       .order('applied_at', { ascending: false })
+
+    // 환불대기/환불완료 건 (취소됐지만 관리자가 처리해야 할 건)
+    const { data: refundData } = await supabase
+      .from('event_entries')
+      .select('*, teams ( team_id, team_name, member1_id, member2_id ), event_divisions ( division_name )')
+      .eq('event_id', selectedEventId)
+      .eq('entry_status', '취소')
+      .in('payment_status', ['환불대기', '환불완료'])
+      .order('applied_at', { ascending: false })
+
+    const merged = [
+      ...(normalData || []),
+      ...(refundData || []),
+    ]
+    const data = merged
     setEntries(data || [])
     setLoading(false)
   }
@@ -298,33 +314,29 @@ export default function EntryAdmin() {
                   </td>
                   <td className="px-3 py-2 text-center">
                     <div className="flex gap-1 justify-center flex-wrap">
-                      {/* 환불대기 → 환불 처리 버튼 */}
-                      {e.payment_status === '환불대기' && e._source === 'individual' && (
+                      {/* 환불대기 → 환불 처리 버튼만 표시 */}
+                      {e.payment_status === '환불대기' ? (
                         <button
                           onClick={() => setRefundModal(e)}
                           className="text-xs text-orange-600 border border-orange-200 bg-orange-50
                             hover:bg-orange-100 rounded px-2 py-0.5 font-medium">
                           환불 처리
                         </button>
-                      )}
-                      {/* 미납 → 결제확인 / 현장납부 */}
-                      {e.payment_status !== '결제완료'
-                        && e.payment_status !== '환불대기'
-                        && e.payment_status !== '환불완료' && (
-                        <button onClick={() => handlePaymentSet(e, '결제완료')}
-                          className="text-xs text-green-600 hover:underline">결제확인</button>
-                      )}
-                      {e.payment_status !== '현장납부'
-                        && e.payment_status !== '결제완료'
-                        && e.payment_status !== '환불대기'
-                        && e.payment_status !== '환불완료' && (
-                        <button onClick={() => handlePaymentSet(e, '현장납부')}
-                          className="text-xs text-yellow-600 hover:underline">현장납부</button>
-                      )}
-                      {/* 취소 (환불완료·환불대기 건은 이미 취소 상태이므로 숨김) */}
-                      {e.payment_status !== '환불대기' && e.payment_status !== '환불완료' && (
-                        <button onClick={() => handleCancelConfirm(e)}
-                          className="text-xs text-red-500 hover:underline">취소</button>
+                      ) : e.payment_status === '환불완료' ? (
+                        <span className="text-xs text-gray-400">완료</span>
+                      ) : (
+                        <>
+                          {e.payment_status !== '결제완료' && (
+                            <button onClick={() => handlePaymentSet(e, '결제완료')}
+                              className="text-xs text-green-600 hover:underline">결제확인</button>
+                          )}
+                          {e.payment_status !== '현장납부' && e.payment_status !== '결제완료' && (
+                            <button onClick={() => handlePaymentSet(e, '현장납부')}
+                              className="text-xs text-yellow-600 hover:underline">현장납부</button>
+                          )}
+                          <button onClick={() => handleCancelConfirm(e)}
+                            className="text-xs text-red-500 hover:underline">취소</button>
+                        </>
                       )}
                     </div>
                   </td>
