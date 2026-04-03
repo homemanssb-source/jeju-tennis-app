@@ -77,7 +77,7 @@ export default function UploadAdmin() {
         member_id: memberId, name, display_name: displayName || name,
         name_norm: name.replace(/[^가-힣a-zA-Z0-9]/g, '').toLowerCase(),
         gender: gender || null, phone, club, division,
-        grade: grade || null, status: '활성', grade_source: 'auto',
+        grade: grade || null, status: '휴면', grade_source: 'auto',
         registered_at: new Date().toISOString(),
       }])
       if (error) errorList.push(`${name}: ${error.message}`)
