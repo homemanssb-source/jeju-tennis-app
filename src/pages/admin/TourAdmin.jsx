@@ -10,26 +10,29 @@ const RANK_MAP = {
 
 export default function TourAdmin() {
   const showToast = useContext(ToastContext)
-  const [tournaments, setTournaments] = useState([])
+  const [events, setEvents] = useState([])           // events 테이블 (대회 관리)
   const [pointRules, setPointRules] = useState([])
   const [results, setResults] = useState([])
   const [members, setMembers] = useState([])
-  const [showTourForm, setShowTourForm] = useState(false)
-  const [tourForm, setTourForm] = useState({ tournament_name: '', date: '' })
-  const [selectedTour, setSelectedTour] = useState(null)
+  const [selectedTour, setSelectedTour] = useState(null) // { tournament_name, date, ... }
   const [resultForm, setResultForm] = useState({ member_id: '', rank: '', division: '' })
   const [memberSearch, setMemberSearch] = useState('')
   const [autoPoints, setAutoPoints] = useState(null)
+  const [loadingTour, setLoadingTour] = useState(false)
 
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
-    const [{ data: tours }, { data: rules }, { data: mems }] = await Promise.all([
-      supabase.from('tournaments_master').select('*').order('date', { ascending: false }),
+    const [{ data: evs }, { data: rules }, { data: mems }] = await Promise.all([
+      supabase.from('events')
+        .select('event_id, event_name, event_date, tournament_id')
+        .order('event_date', { ascending: false }),
       supabase.from('point_rules').select('*'),
-      supabase.from('members').select('member_id, name, display_name, division').eq('status', '활성').order('name'),
+      supabase.from('members')
+        .select('member_id, name, display_name, division')
+        .eq('status', '활성').order('name'),
     ])
-    setTournaments(tours || [])
+    setEvents(evs || [])
     setPointRules(rules || [])
     setMembers(mems || [])
   }
@@ -47,19 +50,86 @@ export default function TourAdmin() {
     return col ? rule[col] : null
   }
 
-  useEffect(() => { setAutoPoints(calcPoints(resultForm.division, resultForm.rank)) }, [resultForm.division, resultForm.rank])
+  useEffect(() => {
+    setAutoPoints(calcPoints(resultForm.division, resultForm.rank))
+  }, [resultForm.division, resultForm.rank])
 
-  async function handleAddTour() {
-    if (!tourForm.tournament_name || !tourForm.date) { showToast?.('대회명과 날짜는 필수입니다.', 'error'); return }
-    const year = tourForm.date.substring(0, 4)
-    const { error } = await supabase.from('tournaments_master').insert([{
-      tournament_name: tourForm.tournament_name,
-      date: tourForm.date,
-      year: year,
-    }])
-    if (error) { showToast?.(error.message, 'error'); return }
-    showToast?.('대회가 추가되었습니다.')
-    setShowTourForm(false); setTourForm({ tournament_name: '', date: '' }); fetchAll()
+  // events에서 대회 선택 → tournaments_master 자동 매칭 or 생성
+  async function handleEventSelect(eventId) {
+    if (!eventId) {
+      setSelectedTour(null)
+      setResults([])
+      setResultForm({ member_id: '', rank: '', division: '' })
+      return
+    }
+
+    const ev = events.find(e => e.event_id === eventId)
+    if (!ev) return
+
+    setLoadingTour(true)
+
+    // 1) event에 tournament_id가 연결되어 있으면 해당 레코드 조회
+    if (ev.tournament_id) {
+      const { data: tour } = await supabase
+        .from('tournaments_master')
+        .select('*')
+        .eq('tournament_id', ev.tournament_id)
+        .single()
+
+      if (tour) {
+        setSelectedTour(tour)
+        fetchResults(tour.tournament_name)
+        setResultForm({ member_id: '', rank: '', division: '' })
+        setLoadingTour(false)
+        return
+      }
+    }
+
+    // 2) tournament_id 없거나 조회 실패 → 대회명으로 조회
+    const { data: existing } = await supabase
+      .from('tournaments_master')
+      .select('*')
+      .eq('tournament_name', ev.event_name)
+      .limit(1)
+
+    if (existing && existing.length > 0) {
+      setSelectedTour(existing[0])
+      fetchResults(existing[0].tournament_name)
+      setResultForm({ member_id: '', rank: '', division: '' })
+      setLoadingTour(false)
+      return
+    }
+
+    // 3) 없으면 자동 생성
+    const dateVal = ev.event_date || new Date().toISOString().substring(0, 10)
+    const year = dateVal.substring(0, 4)
+    const { data: created, error } = await supabase
+      .from('tournaments_master')
+      .insert([{ tournament_name: ev.event_name, date: dateVal, year }])
+      .select()
+      .single()
+
+    if (error) {
+      showToast?.('tournaments_master 생성 실패: ' + error.message, 'error')
+      setLoadingTour(false)
+      return
+    }
+
+    // event에 tournament_id 업데이트
+    await supabase.from('events')
+      .update({ tournament_id: created.tournament_id })
+      .eq('event_id', ev.event_id)
+
+    showToast?.(`"${ev.event_name}" 대회 마스터를 자동 생성했습니다.`)
+    setSelectedTour(created)
+    fetchResults(created.tournament_name)
+    setResultForm({ member_id: '', rank: '', division: '' })
+
+    // events 목록 갱신 (tournament_id 반영)
+    setEvents(prev => prev.map(e =>
+      e.event_id === ev.event_id ? { ...e, tournament_id: created.tournament_id } : e
+    ))
+    setLoadingTour(false)
   }
 
   async function handleAddResult() {
@@ -82,65 +152,62 @@ export default function TourAdmin() {
   }
 
   async function handleDeleteResult(id) {
-    if (!confirm('이 결과를 삭제하시겠습니까?')) return
+    if (!window.confirm('이 결과를 삭제하시겠습니까?')) return
     await supabase.from('tournament_results').delete().eq('id', id)
     showToast?.('삭제되었습니다.')
     if (selectedTour) fetchResults(selectedTour.tournament_name)
   }
 
   const filteredMembers = memberSearch.trim()
-    ? members.filter(m => (m.name || '').includes(memberSearch) || (m.display_name || '').includes(memberSearch) || (m.member_id || '').includes(memberSearch)).slice(0, 10)
+    ? members.filter(m =>
+        (m.name || '').includes(memberSearch) ||
+        (m.display_name || '').includes(memberSearch) ||
+        (m.member_id || '').includes(memberSearch)
+      ).slice(0, 10)
     : []
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4">
         <h2 className="text-lg font-bold">🏆 대회 결과 입력</h2>
-        <button onClick={() => setShowTourForm(!showTourForm)}
-          className="bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">+ 대회 추가</button>
+        <p className="text-xs text-sub mt-0.5">대회 관리에서 생성된 대회를 선택하면 자동으로 연결됩니다.</p>
       </div>
 
-      {showTourForm && (
-        <div className="bg-white rounded-lg border border-line p-4 mb-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <input type="text" placeholder="대회명" value={tourForm.tournament_name}
-              onChange={e => setTourForm({ ...tourForm, tournament_name: e.target.value })}
-              className="text-sm border border-line rounded-lg px-3 py-2" />
-            <input type="date" value={tourForm.date}
-              onChange={e => setTourForm({ ...tourForm, date: e.target.value })}
-              className="text-sm border border-line rounded-lg px-3 py-2" />
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleAddTour} className="bg-accent text-white px-4 py-2 rounded-lg text-sm">저장</button>
-            <button onClick={() => setShowTourForm(false)} className="text-sm text-sub px-4 py-2">취소</button>
-          </div>
-        </div>
-      )}
-
+      {/* 대회 선택 */}
       <div className="bg-white rounded-lg border border-line p-4 mb-4">
         <label className="block text-xs font-medium text-sub mb-2">대회 선택</label>
         <select
-          value={selectedTour?.tournament_id || ''}
-          onChange={e => {
-            const t = tournaments.find(t => t.tournament_id === e.target.value)
-            setSelectedTour(t || null)
-            if (t) { fetchResults(t.tournament_name); setResultForm({ ...resultForm, division: '' }) }
-          }}
-          className="w-full text-sm border border-line rounded-lg px-3 py-2">
+          value={events.find(e => e.tournament_id === selectedTour?.tournament_id)?.event_id || ''}
+          onChange={e => handleEventSelect(e.target.value || null)}
+          className="w-full text-sm border border-line rounded-lg px-3 py-2"
+          disabled={loadingTour}
+        >
           <option value="">대회를 선택하세요</option>
-          {tournaments.map(t => (
-            <option key={t.tournament_id} value={t.tournament_id}>{t.tournament_name} ({t.date})</option>
+          {events.map(ev => (
+            <option key={ev.event_id} value={ev.event_id}>
+              {ev.event_name} ({ev.event_date})
+            </option>
           ))}
         </select>
+        {loadingTour && (
+          <p className="text-xs text-accent mt-1">대회 정보 연결 중...</p>
+        )}
+        {selectedTour && !loadingTour && (
+          <p className="text-xs text-green-600 mt-1">
+            ✅ {selectedTour.tournament_name} ({selectedTour.date}) 연결됨
+          </p>
+        )}
       </div>
 
+      {/* 결과 입력 폼 */}
       {selectedTour && (
         <div className="bg-white rounded-lg border border-line p-4 mb-4">
           <h3 className="text-sm font-semibold mb-3">결과 입력: {selectedTour.tournament_name}</h3>
           <div className="space-y-3">
             <div>
               <label className="block text-xs text-sub mb-1">부서</label>
-              <select value={resultForm.division} onChange={e => setResultForm({ ...resultForm, division: e.target.value })}
+              <select value={resultForm.division}
+                onChange={e => setResultForm({ ...resultForm, division: e.target.value })}
                 className="w-full text-sm border border-line rounded-lg px-3 py-2">
                 <option value="">부서 선택</option>
                 {pointRules.map(r => <option key={r.id} value={r.division}>{r.division}</option>)}
@@ -148,16 +215,23 @@ export default function TourAdmin() {
             </div>
             <div className="relative">
               <label className="block text-xs text-sub mb-1">회원 검색</label>
-              <input type="text" value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
-                placeholder="이름 또는 ID 입력..." className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+              <input type="text" value={memberSearch}
+                onChange={e => setMemberSearch(e.target.value)}
+                placeholder="이름 또는 ID 입력..."
+                className="w-full text-sm border border-line rounded-lg px-3 py-2" />
               {resultForm.member_id && (
-                <p className="text-xs text-accent mt-1">선택: {members.find(m => m.member_id === resultForm.member_id)?.name}</p>
+                <p className="text-xs text-accent mt-1">
+                  선택: {members.find(m => m.member_id === resultForm.member_id)?.name}
+                </p>
               )}
               {filteredMembers.length > 0 && (
                 <div className="absolute left-0 right-0 top-full bg-white border border-line rounded-lg shadow-lg mt-1 z-10 max-h-40 overflow-y-auto">
                   {filteredMembers.map(m => (
                     <button key={m.member_id}
-                      onClick={() => { setResultForm({ ...resultForm, member_id: m.member_id }); setMemberSearch(m.display_name || m.name) }}
+                      onClick={() => {
+                        setResultForm({ ...resultForm, member_id: m.member_id })
+                        setMemberSearch(m.display_name || m.name)
+                      }}
                       className="w-full text-left px-3 py-2 text-sm hover:bg-soft border-b border-line/50">
                       {m.display_name || m.name} <span className="text-sub">({m.member_id})</span>
                     </button>
@@ -167,7 +241,8 @@ export default function TourAdmin() {
             </div>
             <div>
               <label className="block text-xs text-sub mb-1">순위</label>
-              <select value={resultForm.rank} onChange={e => setResultForm({ ...resultForm, rank: e.target.value })}
+              <select value={resultForm.rank}
+                onChange={e => setResultForm({ ...resultForm, rank: e.target.value })}
                 className="w-full text-sm border border-line rounded-lg px-3 py-2">
                 <option value="">순위 선택</option>
                 {RANKS.map(r => <option key={r} value={r}>{r}</option>)}
@@ -179,11 +254,14 @@ export default function TourAdmin() {
               </div>
             )}
             <button onClick={handleAddResult}
-              className="w-full bg-accent text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">결과 입력</button>
+              className="w-full bg-accent text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+              결과 입력
+            </button>
           </div>
         </div>
       )}
 
+      {/* 결과 목록 */}
       {results.length > 0 && (
         <div className="bg-white rounded-lg border border-line overflow-x-auto">
           <table className="w-full text-sm">
@@ -204,7 +282,8 @@ export default function TourAdmin() {
                   <td className="px-3 py-2">{r.rank}</td>
                   <td className="px-3 py-2 text-right font-semibold text-accent">+{r.points}</td>
                   <td className="px-3 py-2 text-center">
-                    <button onClick={() => handleDeleteResult(r.id)} className="text-xs text-red-500 hover:underline">삭제</button>
+                    <button onClick={() => handleDeleteResult(r.id)}
+                      className="text-xs text-red-500 hover:underline">삭제</button>
                   </td>
                 </tr>
               ))}
