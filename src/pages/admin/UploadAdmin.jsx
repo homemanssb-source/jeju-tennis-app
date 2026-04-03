@@ -18,9 +18,33 @@ export default function UploadAdmin() {
     setFile(f); setResult(null); setDetailModal(null)
     const reader = new FileReader()
     reader.onload = (evt) => {
-      const wb = XLSX.read(evt.target.result, { type: 'array', cellDates: true, dateNF: 'yyyy-mm-dd' })
-      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false })
-      setPreview(data.slice(0, 200))
+      // ✅ cellDates: false, raw: true → 전화번호가 날짜로 파싱되는 것 방지
+      const wb = XLSX.read(evt.target.result, { type: 'array', cellDates: false, raw: true })
+      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: true })
+
+      // ✅ 전화번호/등급 컬럼 후처리
+      const PHONE_KEYS = ['전화번호', '휴대폰', '연락처']
+      const normalized = data.map(row => {
+        const r = { ...row }
+        // 전화번호: 숫자로 저장된 경우 문자열로 변환 (하이픈 제거 후 저장)
+        PHONE_KEYS.forEach(key => {
+          if (r[key] !== undefined) {
+            const v = r[key]
+            if (typeof v === 'number') {
+              r[key] = v.toString()
+            } else {
+              r[key] = (v || '').toString().trim()
+            }
+          }
+        })
+        // 등급: "2점" → "2" 정규화
+        if (r['등급']) {
+          r['등급'] = r['등급'].toString().replace('점', '').trim()
+        }
+        return r
+      })
+
+      setPreview(normalized.slice(0, 200))
     }
     reader.readAsArrayBuffer(f)
   }
@@ -36,7 +60,8 @@ export default function UploadAdmin() {
       const name = (row['이름'] || '').toString().trim()
       if (!name) { skippedList.push('빈 행 건너뜀'); continue }
       const gender = (row['성별(남/여)'] || row['성별'] || '').toString().trim()
-      const phone = (row['전화번호'] || '').toString().trim()
+      // ✅ '휴대폰' 컬럼명도 인식
+      const phone = (row['전화번호'] || row['휴대폰'] || row['연락처'] || '').toString().trim()
       const club = (row['소속클럽'] || '').toString().trim()
       const division = (row['랭킹부서'] || '').toString().trim()
       const grade = (row['등급'] || '').toString().trim()
@@ -73,9 +98,7 @@ export default function UploadAdmin() {
     const RANK_MAP = { '우승': 'points_1', '준우승': 'points_2', '4강': 'points_3', '8강': 'points_4', '16강': 'points_5', '32강': 'points_6', '참가': 'points_7' }
 
     function autoCalcPoints(division, rank, manualPoints) {
-      // 엑셀에 포인트가 직접 입력되어 있으면 그걸 사용
       if (manualPoints && manualPoints > 0) return manualPoints
-      // point_rules에서 자동 계산
       if (!pointRules || !division || !rank) return 0
       const rule = pointRules.find(r => r.division === division)
       if (!rule) return 0
@@ -85,7 +108,7 @@ export default function UploadAdmin() {
 
     for (const row of preview) {
       const memberName = (row['회원이름'] || '').toString().trim()
-      const phone = (row['전화번호'] || '').toString().trim()
+      const phone = (row['전화번호'] || row['휴대폰'] || '').toString().trim()
       const tournamentName = (row['대회명'] || '').toString().trim()
       const dateStr = (row['대회일자(YYYY-MM-DD)'] || row['대회일자'] || '').toString().trim()
       const division = (row['부서'] || '').toString().trim()
@@ -155,7 +178,7 @@ export default function UploadAdmin() {
       <div className="bg-soft rounded-lg p-3 mb-4 text-xs text-gray-700 space-y-1">
         {tab === 'member' ? (<>
           <p className="font-semibold">회원 일괄 등록</p>
-          <p>필수: 이름, 전화번호, 소속클럽, 랭킹부서</p>
+          <p>필수: 이름, 전화번호(또는 휴대폰), 소속클럽, 랭킹부서</p>
         </>) : (<>
           <p className="font-semibold">대회결과 등록</p>
           <p>매칭: 회원ID → 이름+전화번호 → 이름만 (동명이인이면 에러)</p>
