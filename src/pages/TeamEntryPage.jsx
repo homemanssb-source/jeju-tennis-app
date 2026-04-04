@@ -3,27 +3,40 @@ import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
 
+// 기존 신청 수에 따라 팀 suffix 반환: 0→'', 1→' B', 2→' C' ...
+function getTeamSuffix(count) {
+  if (count === 0) return ''
+  return ' ' + String.fromCharCode(65 + count) // 1→B, 2→C, 3→D
+}
+
 export default function TeamEntryPage() {
   const showToast = useContext(ToastContext)
 
-  const [events, setEvents] = useState([])
-  const [selectedEvent, setSelectedEvent] = useState(null)
-  const [divisions, setDivisions] = useState([])
+  const [events, setEvents]                     = useState([])
+  const [selectedEvent, setSelectedEvent]       = useState(null)
+  const [divisions, setDivisions]               = useState([])
   const [selectedDivision, setSelectedDivision] = useState(null)
-  const [captainName, setCaptainName] = useState('')
-  const [captainPin, setCaptainPin] = useState('')
-  const [captainVerified, setCaptainVerified] = useState(null)
-  const [verifying, setVerifying] = useState(false)
-  const [clubName, setClubName] = useState('')
-  const [allMembers, setAllMembers] = useState([])
-  const [roster, setRoster] = useState([])
-  const [addMode, setAddMode] = useState('club')
-  const [selectedClub, setSelectedClub] = useState('')
-  const [clubChecked, setClubChecked] = useState({})
-  const [searchQuery, setSearchQuery] = useState('')
+  const [captainName, setCaptainName]           = useState('')
+  const [captainPin, setCaptainPin]             = useState('')
+  const [captainVerified, setCaptainVerified]   = useState(null)
+  const [verifying, setVerifying]               = useState(false)
+  const [clubBase, setClubBase]                 = useState('')   // 순수 클럽명
+  const [teamSuffix, setTeamSuffix]             = useState('')   // 자동 suffix (B, C...)
+  const [existingCount, setExistingCount]       = useState(0)   // 같은 클럽 기존 신청 수
+  const [checkingClub, setCheckingClub]         = useState(false)
+  const [allMembers, setAllMembers]             = useState([])
+  const [roster, setRoster]                     = useState([])
+  const [addMode, setAddMode]                   = useState('club')
+  const [selectedClub, setSelectedClub]         = useState('')
+  const [clubChecked, setClubChecked]           = useState({})
+  const [searchQuery, setSearchQuery]           = useState('')
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
-  const [showClubPicker, setShowClubPicker] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [showClubPicker, setShowClubPicker]     = useState(false)
+  const [submitting, setSubmitting]             = useState(false)
+
+  // 신청 완료 확인 화면
+  const [submitted, setSubmitted]               = useState(false)
+  const [submittedInfo, setSubmittedInfo]       = useState(null)
 
   useEffect(() => { fetchEvents(); fetchActiveMembers() }, [])
 
@@ -62,6 +75,7 @@ export default function TeamEntryPage() {
   }, [allMembers, searchQuery, roster])
 
   const memberLimit = selectedEvent?.team_member_limit || null
+  const finalClubName = clubBase.trim() + teamSuffix
 
   function getEntryAvailability(ev) {
     if (!ev) return { ok: false, message: '' }
@@ -82,7 +96,8 @@ export default function TeamEntryPage() {
     setSelectedEvent(ev || null)
     setSelectedDivision(null); setDivisions([])
     setCaptainVerified(null); setCaptainName(''); setCaptainPin('')
-    setRoster([]); setClubName('')
+    setRoster([]); setClubBase(''); setTeamSuffix(''); setExistingCount(0)
+    setSelectedClub(''); setClubChecked({})
     if (ev) fetchDivisions(ev.event_id)
   }
 
@@ -90,6 +105,33 @@ export default function TeamEntryPage() {
     const { data } = await supabase.from('event_divisions')
       .select('division_id, division_name').eq('event_id', eventId).order('created_at')
     setDivisions(data || [])
+  }
+
+  // 같은 대회+부서에서 해당 클럽 기존 신청 수 조회
+  async function checkExistingClubEntries(base, divisionId) {
+    if (!selectedEvent || !base.trim()) { setExistingCount(0); setTeamSuffix(''); return }
+    setCheckingClub(true)
+    let query = supabase.from('team_event_entries')
+      .select('id, club_name')
+      .eq('event_id', selectedEvent.event_id)
+      .neq('status', 'cancelled')
+    if (divisionId) query = query.eq('division_id', divisionId)
+
+    const { data } = await query
+    // base와 같거나 base + ' X' 패턴인 것만 카운트
+    const regex = new RegExp(`^${base.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( [B-Z])?$`)
+    const count = (data || []).filter(e => regex.test((e.club_name || '').trim())).length
+    setExistingCount(count)
+    setTeamSuffix(getTeamSuffix(count))
+    setCheckingClub(false)
+  }
+
+  async function handleDivisionChange(divId) {
+    const div = divisions.find(d => d.division_id === divId)
+    setSelectedDivision(div || null)
+    if (captainVerified && clubBase) {
+      await checkExistingClubEntries(clubBase, divId || null)
+    }
   }
 
   async function handleVerifyCaptain() {
@@ -103,7 +145,10 @@ export default function TeamEntryPage() {
     if (error) { showToast?.('인증 실패: ' + error.message, 'error') }
     else if (data && !data.ok) { showToast?.('⚠️ ' + data.message, 'error') }
     else if (data && data.ok) {
-      setCaptainVerified(data); setClubName(data.club || '')
+      setCaptainVerified(data)
+      const base = data.club || ''
+      setClubBase(base)
+      await checkExistingClubEntries(base, selectedDivision?.division_id || null)
       showToast?.('✅ 본인 인증 완료')
     }
     setVerifying(false)
@@ -175,29 +220,59 @@ export default function TeamEntryPage() {
     if (!selectedEvent) { showToast?.('대회를 선택해주세요.', 'error'); return }
     if (divisions.length > 0 && !selectedDivision) { showToast?.('부서를 선택해주세요.', 'error'); return }
     if (!captainVerified) { showToast?.('주장 본인인증을 해주세요.', 'error'); return }
-    if (!clubName.trim()) { showToast?.('클럽명을 입력해주세요.', 'error'); return }
+    if (!finalClubName.trim()) { showToast?.('클럽명을 입력해주세요.', 'error'); return }
     if (roster.length === 0) { showToast?.('선수를 1명 이상 추가해주세요.', 'error'); return }
     const avail = getEntryAvailability(selectedEvent)
     if (!avail.ok) { showToast?.('⚠️ ' + avail.message, 'error'); return }
+
     setSubmitting(true)
     const membersPayload = roster.map((r, i) => ({
       member_id: r.member_id, name: r.name, gender: r.gender, grade: r.grade, order: i + 1,
     }))
+
     const { data, error } = await supabase.rpc('rpc_submit_team_entry', {
-      p_event_id: selectedEvent.event_id,
-      p_captain_name: captainName.trim(), p_captain_pin: captainPin,
-      p_club_name: clubName.trim(), p_members: membersPayload,
-      p_division_id: selectedDivision?.division_id || null,
-      p_division_name: selectedDivision?.division_name || null,
+      p_event_id:      selectedEvent.event_id,
+      p_captain_name:  captainName.trim(),
+      p_captain_pin:   captainPin,
+      p_club_name:     finalClubName.trim(),
+      p_members:       membersPayload,
+      p_division_id:   selectedDivision?.division_id ?? null,
+      p_division_name: selectedDivision?.division_name ?? null,
     })
-    if (error) { showToast?.('신청 실패: ' + error.message, 'error') }
-    else if (data && !data.ok) { showToast?.('⚠️ ' + data.message, 'error') }
-    else if (data && data.ok) {
-      showToast?.('🎾 팀전 참가 신청 완료!')
-      setRoster([]); setClubName(''); setCaptainVerified(null)
-      setCaptainName(''); setCaptainPin(''); setSelectedDivision(null)
+
+    if (error) {
+      showToast?.('신청 실패: ' + error.message, 'error')
+    } else if (data && !data.ok) {
+      showToast?.('⚠️ ' + (data.message || '신청할 수 없습니다.'), 'error')
+    } else if (data && data.ok) {
+      const now = new Date()
+      setSubmittedInfo({
+        eventName:     selectedEvent.event_name,
+        eventDate:     selectedEvent.event_date,
+        eventDateEnd:  selectedEvent.event_date_end,
+        divisionName:  selectedDivision?.division_name ?? null,
+        clubName:      finalClubName.trim(),
+        clubBase:      clubBase.trim(),
+        isMultiTeam:   existingCount > 0,
+        captainName:   captainName.trim(),
+        roster:        [...roster],
+        accountBank:   selectedEvent.account_bank,
+        accountNumber: selectedEvent.account_number,
+        accountHolder: selectedEvent.account_holder,
+        entryFee:      selectedEvent.entry_fee_team,
+        applyTime:     `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
+      })
+      setSubmitted(true)
     }
     setSubmitting(false)
+  }
+
+  function handleReset() {
+    setSubmitted(false); setSubmittedInfo(null)
+    setSelectedEvent(null); setSelectedDivision(null); setDivisions([])
+    setCaptainVerified(null); setCaptainName(''); setCaptainPin('')
+    setRoster([]); setClubBase(''); setTeamSuffix(''); setExistingCount(0)
+    setSelectedClub(''); setClubChecked({})
   }
 
   const checkedNewCount = selectedClub
@@ -206,6 +281,117 @@ export default function TeamEntryPage() {
 
   const entryAvail = getEntryAvailability(selectedEvent)
 
+  // ── 신청 완료 확인 화면 ──
+  if (submitted && submittedInfo) {
+    return (
+      <div className="pb-20">
+        <PageHeader title="👥 팀전 참가신청" subtitle="클럽 단위 팀전 참가 신청" />
+        <div className="max-w-lg mx-auto px-5 py-4 space-y-4">
+
+          <div className="text-center py-4">
+            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3 text-2xl">✓</div>
+            <p className="text-lg font-semibold text-gray-900">신청이 완료되었습니다!</p>
+            <p className="text-sm text-sub mt-1">아래 내용을 확인해 주세요</p>
+          </div>
+
+          {submittedInfo.isMultiTeam && (
+            <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2.5 text-xs text-green-700">
+              같은 부서에 <b>{submittedInfo.clubBase}</b>이 이미 신청되어 있어<br />
+              팀명이 <b>{submittedInfo.clubName}</b>으로 자동 지정되었습니다.
+            </div>
+          )}
+
+          <div className="border border-line rounded-xl overflow-hidden">
+            <div className="bg-soft px-4 py-2.5 text-xs font-medium text-sub border-b border-line">신청 정보</div>
+            <div className="px-4 py-3 space-y-2.5">
+              <div className="flex justify-between">
+                <span className="text-xs text-sub">대회</span>
+                <span className="text-sm font-medium text-right">{submittedInfo.eventName}</span>
+              </div>
+              {submittedInfo.divisionName && (
+                <div className="flex justify-between">
+                  <span className="text-xs text-sub">부서</span>
+                  <span className="text-sm font-medium">{submittedInfo.divisionName}</span>
+                </div>
+              )}
+              <div className="border-t border-line/50 pt-2.5 flex justify-between">
+                <span className="text-xs text-sub">클럽명</span>
+                <span className="text-sm font-semibold text-accent">{submittedInfo.clubName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-sub">주장</span>
+                <span className="text-sm font-medium">{submittedInfo.captainName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-sub">신청일시</span>
+                <span className="text-xs text-sub">{submittedInfo.applyTime}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="border border-line rounded-xl overflow-hidden">
+            <div className="bg-soft px-4 py-2.5 text-xs font-medium text-sub border-b border-line">
+              선수 명단 ({submittedInfo.roster.length}명)
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-xs text-sub border-b border-line">
+                  <th className="text-left px-3 py-2 w-8">#</th>
+                  <th className="text-left px-3 py-2">이름</th>
+                  <th className="text-left px-3 py-2 w-12">성별</th>
+                  <th className="text-left px-3 py-2 w-16">등급</th>
+                </tr>
+              </thead>
+              <tbody>
+                {submittedInfo.roster.map((r, i) => (
+                  <tr key={r.member_id} className="border-t border-line/30">
+                    <td className="px-3 py-2 text-xs text-sub">{i + 1}</td>
+                    <td className="px-3 py-2 font-medium">
+                      {r.name}
+                      {r.name === submittedInfo.captainName && (
+                        <span className="ml-1 text-[10px] text-blue-500">★</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-sub">{r.gender === 'M' ? '남' : r.gender === 'F' ? '여' : '-'}</td>
+                    <td className="px-3 py-2 text-xs text-accent">{r.grade || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {submittedInfo.accountNumber && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 space-y-1.5">
+              <p className="text-xs font-medium text-blue-800">💳 입금 계좌</p>
+              <p className="text-sm font-bold text-blue-900">
+                {submittedInfo.accountBank && `${submittedInfo.accountBank} `}{submittedInfo.accountNumber}
+              </p>
+              {submittedInfo.accountHolder && (
+                <p className="text-xs text-blue-600">예금주: {submittedInfo.accountHolder}</p>
+              )}
+              {submittedInfo.entryFee > 0 && (
+                <p className="text-sm font-semibold text-blue-800 pt-1.5 border-t border-blue-200">
+                  참가비 {submittedInfo.entryFee.toLocaleString()}원 입금 후 확정됩니다
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-700">
+            입금자명은 <b>클럽명({submittedInfo.clubName})</b>으로 해주세요.<br />
+            입금 확인 후 관리자가 확정합니다.
+          </div>
+
+          <button onClick={handleReset}
+            className="w-full py-3 border border-line rounded-xl text-sm text-sub hover:bg-soft transition-colors">
+            다른 팀 추가 신청하기
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── 신청 폼 ──
   return (
     <div className="pb-20">
       <PageHeader title="👥 팀전 참가신청" subtitle="클럽 단위 팀전 참가 신청" />
@@ -213,7 +399,7 @@ export default function TeamEntryPage() {
 
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
           <p className="text-xs text-amber-700">👥 클럽 대표(주장)가 신청합니다.</p>
-          <p className="text-xs text-amber-700 mt-0.5">🏆 <b>상호등록(활성) 회원만</b> 선수로 등록 가능합니다.</p>
+          <p className="text-xs text-amber-700 mt-0.5">🏆 <b>활성 회원만</b> 선수로 등록 가능합니다.</p>
         </div>
 
         {/* 대회 선택 */}
@@ -231,7 +417,7 @@ export default function TeamEntryPage() {
           )}
         </div>
 
-        {/* 대회 정보 + 참가신청 기간 */}
+        {/* 대회 정보 */}
         {selectedEvent && (
           <div className={`rounded-lg p-3 ${entryAvail.ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
             <p className="text-sm font-semibold text-gray-800">{selectedEvent.event_name}</p>
@@ -260,16 +446,15 @@ export default function TeamEntryPage() {
           </div>
         )}
 
-        {/* 신청 가능한 경우에만 표시 */}
         {selectedEvent && entryAvail.ok && (
           <>
+            {/* 부서 선택 */}
             {divisions.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">부서 선택</label>
-                <select value={selectedDivision?.division_id || ''} onChange={e => {
-                  const div = divisions.find(d => d.division_id === e.target.value)
-                  setSelectedDivision(div || null)
-                }} className="w-full text-sm border border-line rounded-lg px-3 py-2.5">
+                <select value={selectedDivision?.division_id || ''}
+                  onChange={e => handleDivisionChange(e.target.value)}
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2.5">
                   <option value="">부서를 선택하세요</option>
                   {divisions.map(d => (
                     <option key={d.division_id} value={d.division_id}>{d.division_name}</option>
@@ -278,13 +463,14 @@ export default function TeamEntryPage() {
               </div>
             )}
 
+            {/* 주장 인증 */}
             {(divisions.length === 0 || selectedDivision) && (
               <div className="bg-soft rounded-lg p-3 space-y-2">
                 <p className="text-xs font-medium text-gray-700">대표(주장) 본인인증</p>
                 <p className="text-xs text-sub">🔐 PIN 초기값은 전화번호 뒷 6자리입니다.</p>
                 <div className="flex gap-2">
                   <input type="text" value={captainName}
-                    onChange={e => { setCaptainName(e.target.value); setCaptainVerified(null) }}
+                    onChange={e => { setCaptainName(e.target.value); setCaptainVerified(null); setClubBase(''); setTeamSuffix('') }}
                     placeholder="이름" className="flex-1 text-sm border border-line rounded-lg px-3 py-2" />
                   <input type="password" inputMode="numeric" maxLength={6} value={captainPin}
                     onChange={e => { setCaptainPin(e.target.value.replace(/\D/g, '').slice(0, 6)); setCaptainVerified(null) }}
@@ -303,16 +489,42 @@ export default function TeamEntryPage() {
               </div>
             )}
 
+            {/* 클럽명 */}
             {captainVerified && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">클럽명</label>
-                <input type="text" value={clubName} onChange={e => setClubName(e.target.value)}
-                  placeholder="클럽명을 입력하세요"
-                  className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
+                {checkingClub ? (
+                  <p className="text-xs text-sub px-1 py-2">확인 중...</p>
+                ) : (
+                  <>
+                    <div className="flex gap-2 items-center">
+                      <input type="text" value={clubBase}
+                        onChange={async e => {
+                          setClubBase(e.target.value)
+                          await checkExistingClubEntries(e.target.value, selectedDivision?.division_id || null)
+                        }}
+                        placeholder="클럽명을 입력하세요"
+                        className="flex-1 text-sm border border-line rounded-lg px-3 py-2.5" />
+                      {teamSuffix && (
+                        <div className="bg-blue-100 border border-blue-300 rounded-lg px-3 py-2.5 text-sm font-bold text-blue-800 shrink-0">
+                          {teamSuffix.trim()}팀
+                        </div>
+                      )}
+                    </div>
+                    {teamSuffix ? (
+                      <p className="text-xs text-blue-600 mt-1">
+                        같은 부서에 <b>{clubBase}</b>이 이미 신청되어 <b>{finalClubName}</b>으로 등록됩니다.
+                      </p>
+                    ) : clubBase.trim() ? (
+                      <p className="text-xs text-sub mt-1">등록 클럽명: <b>{finalClubName}</b></p>
+                    ) : null}
+                  </>
+                )}
               </div>
             )}
 
-            {captainVerified && clubName.trim() && (
+            {/* 선수 명단 구성 */}
+            {captainVerified && finalClubName.trim() && (
               <>
                 <div className="flex border border-line rounded-lg overflow-hidden">
                   <button onClick={() => setAddMode('club')}
@@ -411,6 +623,7 @@ export default function TeamEntryPage() {
               </>
             )}
 
+            {/* 선수 명단 테이블 */}
             {roster.length > 0 && (
               <div className="border border-line rounded-lg overflow-hidden">
                 <div className="px-3 py-2 bg-soft border-b border-line flex justify-between items-center">
@@ -447,7 +660,8 @@ export default function TeamEntryPage() {
               </div>
             )}
 
-            {captainVerified && clubName.trim() && (
+            {/* 신청 버튼 */}
+            {captainVerified && finalClubName.trim() && (
               <button onClick={handleSubmit}
                 disabled={submitting || roster.length === 0}
                 className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm
