@@ -1,6 +1,3 @@
-FILE: C:\Users\homem\OneDrive\바탕 화면\jeju-tennis-app\src\pages\HomePage.jsx
-========================================
-
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
