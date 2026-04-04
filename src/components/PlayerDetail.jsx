@@ -3,26 +3,12 @@ import { supabase } from '../lib/supabase'
 import BottomSheet from './BottomSheet'
 import { SkeletonLine } from './Skeleton'
 
-// promotion_rules result_condition 매핑
-const RESULT_TO_CONDITION = {
-  '우승': '우승',
-  '준우승': '결승',
-  '4강': '입상',
-}
-
 export default function PlayerDetail({ memberId, open, onClose }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [seasonYear, setSeasonYear] = useState(new Date().getFullYear())
   const [currentRank, setCurrentRank] = useState(null)
-
-  // [버그7] promotion_rules 추가
-  const [promotionRules, setPromotionRules] = useState([])
-
-  // [버그8] 외부대회 신고 이력 추가
   const [externalHistory, setExternalHistory] = useState([])
-
-  // 탭: 'jta' | 'external'
   const [histTab, setHistTab] = useState('jta')
 
   useEffect(() => {
@@ -35,10 +21,8 @@ export default function PlayerDetail({ memberId, open, onClose }) {
     setCurrentRank(null)
     setHistTab('jta')
 
-    // [버그7,8] 병렬로 한번에 조회
-    const [{ data: result, error }, { data: rules }, { data: extData }] = await Promise.all([
+    const [{ data: result, error }, { data: extData }] = await Promise.all([
       supabase.rpc('get_member_history', { p_member_id: memberId, p_season_year: year }),
-      supabase.from('promotion_rules').select('*'),
       supabase.from('external_report_log')
         .select('*')
         .eq('member_id', memberId)
@@ -51,7 +35,6 @@ export default function PlayerDetail({ memberId, open, onClose }) {
         fetchRank(result.member.division, year, memberId)
       }
     }
-    setPromotionRules(rules || [])
     setExternalHistory(extData || [])
     setLoading(false)
   }
@@ -72,32 +55,8 @@ export default function PlayerDetail({ memberId, open, onClose }) {
     setCurrentRank(null)
     setSeasonYear(new Date().getFullYear())
     setExternalHistory([])
-    setPromotionRules([])
     setHistTab('jta')
     onClose()
-  }
-
-  // [버그7] 이 대회 결과가 승급 조건에 해당하는지 계산
-  // history 아이템에 당시 등급 정보가 없으므로
-  // 현재 member.grade 기준으로 "이 결과가 룰에 매칭되는지" 표시
-  function calcGradeChange(h) {
-    if (!data?.member || !promotionRules.length) return null
-    const member = data.member
-    const condition = RESULT_TO_CONDITION[h.rank]
-    if (!condition) return null
-
-    const currentGrade = Number(member.grade)
-    const matched = promotionRules.find(r => {
-      const genderMatch = r.gender === member.gender
-      const scoreMatch = Number(r.current_score) === currentGrade
-      const conditionMatch = r.result_condition === condition
-      // JTA 대회는 tournament_type 무관하게 매칭
-      return genderMatch && scoreMatch && conditionMatch
-    })
-
-    if (!matched) return null
-    if (Number(matched.next_score) === currentGrade) return null
-    return { before: matched.current_score, after: matched.next_score }
   }
 
   const member = data?.member
@@ -106,7 +65,6 @@ export default function PlayerDetail({ memberId, open, onClose }) {
   const currentYear = new Date().getFullYear()
   const seasonOptions = Array.from({ length: 5 }, (_, i) => currentYear + 1 - i)
 
-  // 외부대회 신고 중 미처리 건수 (탭 뱃지용)
   const pendingExtCount = externalHistory.filter(h => !h.admin_applied).length
 
   return (
@@ -122,7 +80,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
         </div>
       ) : member ? (
         <div>
-          {/* ── 프로필 헤더 (현재와 동일) ── */}
+          {/* ── 프로필 헤더 ── */}
           <div className="space-y-2 mb-6">
             <div className="flex items-center gap-2">
               <span className="text-lg font-bold text-gray-900">
@@ -130,7 +88,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
               </span>
               {member.grade && (
                 <span className="px-2 py-0.5 bg-accentSoft text-accent text-xs font-semibold rounded-full">
-                  {member.grade}
+                  등급 {member.grade}
                 </span>
               )}
             </div>
@@ -159,7 +117,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
             )}
           </div>
 
-          {/* ── 시즌 선택 (현재와 동일) ── */}
+          {/* ── 시즌 선택 ── */}
           <div className="flex items-center gap-2 mb-4">
             <span className="text-sm font-medium text-gray-700">시즌:</span>
             <select value={seasonYear} onChange={e => setSeasonYear(Number(e.target.value))}
@@ -202,29 +160,25 @@ export default function PlayerDetail({ memberId, open, onClose }) {
                 <p className="text-sm text-sub py-4 text-center">해당 시즌 대회 기록이 없습니다.</p>
               ) : (
                 <div className="space-y-2">
-                  {history.map((h, i) => {
-                    const gradeChange = calcGradeChange(h)
-                    return (
-                      <div key={i} className="flex items-start justify-between py-2.5 px-3 bg-soft rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{h.tournament_name}</p>
-                          <p className="text-xs text-sub mt-0.5">{h.date} · {h.division}</p>
-                          {/* [버그7] 승급 조건 해당 시만 등급 변화 표시 */}
-                          {gradeChange && (
-                            <div className="inline-flex items-center gap-1 mt-1 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">
-                              <span className="text-[10px] font-semibold text-green-700">
-                                {gradeChange.before} → {gradeChange.after}
-                              </span>
-                            </div>
+                  {history.map((h, i) => (
+                    <div key={i} className="flex items-start justify-between py-2.5 px-3 bg-soft rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{h.tournament_name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-xs text-sub">{h.date} · {h.division}</p>
+                          {h.grade && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">
+                              출전등급 {h.grade}
+                            </span>
                           )}
                         </div>
-                        <div className="text-right ml-2 shrink-0">
-                          <p className="text-sm font-semibold text-gray-900">{h.rank}</p>
-                          <p className="text-xs text-accent font-medium">+{h.points}</p>
-                        </div>
                       </div>
-                    )
-                  })}
+                      <div className="text-right ml-2 shrink-0">
+                        <p className="text-sm font-semibold text-gray-900">{h.rank}</p>
+                        <p className="text-xs text-accent font-medium">+{h.points}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -241,7 +195,6 @@ export default function PlayerDetail({ memberId, open, onClose }) {
                     <div key={h.id} className="py-2.5 px-3 bg-soft rounded-lg">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          {/* 대회구분 + 날짜 */}
                           <div className="flex items-center gap-1.5 mb-0.5">
                             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded
                               ${h.tournament_type === '전국대회'
@@ -252,11 +205,9 @@ export default function PlayerDetail({ memberId, open, onClose }) {
                             <span className="text-[10px] text-sub">{h.tournament_date}</span>
                           </div>
                           <p className="text-sm font-medium text-gray-900">{h.tournament_name}</p>
-                          {/* 참가부서 표시 */}
                           {h.tournament_division && (
                             <p className="text-xs text-sub mt-0.5">{h.tournament_division}</p>
                           )}
-                          {/* 등급 변화 (반영된 경우만) */}
                           {h.admin_applied && h.expected_grade &&
                            Number(h.expected_grade) !== Number(h.before_grade) && (
                             <div className="inline-flex items-center gap-1 mt-1 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">
@@ -265,12 +216,10 @@ export default function PlayerDetail({ memberId, open, onClose }) {
                               </span>
                             </div>
                           )}
-                          {/* 처리 상태 */}
                           <p className={`text-[10px] mt-1 ${h.admin_applied ? 'text-green-600' : 'text-amber-600'}`}>
                             {h.admin_applied ? '✅ 등급 반영 완료' : '🟡 관리자 검토중'}
                           </p>
                         </div>
-                        {/* 결과 뱃지 */}
                         <div className="text-right ml-2 shrink-0">
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full
                             ${h.result === '우승' ? 'bg-yellow-100 text-yellow-700' :
