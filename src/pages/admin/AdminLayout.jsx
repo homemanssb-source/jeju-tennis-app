@@ -22,6 +22,7 @@ import AdminLogsPage from './AdminLogsPage'
 import AccessLogAdmin from './AccessLogAdmin'
 import PushAdmin from './PushAdmin'
 import ExternalReportAdmin from './ExternalReportAdmin'
+import ClubAdmin from './ClubAdmin'
 
 // ─── 관리자 정보 Context ─────────────────────────
 export const AdminContext = createContext(null)
@@ -91,6 +92,7 @@ const TAB_GROUPS = [
     subs: [
       { path: '/admin/managers', label: '관리자 계정' },
       { path: '/admin/logs', label: '수정 로그' },
+      { path: '/admin/clubs', label: '클럽 관리' },
     ],
   },
 ]
@@ -232,6 +234,7 @@ export default function AdminLayout() {
             <Route path="access-log" element={<AccessLogAdmin />} />
             <Route path="push" element={<PushAdmin />} />
             <Route path="external-reports" element={<ExternalReportAdmin />} />
+            <Route path="clubs" element={<ClubAdmin />} />
           </Routes>
         </div>
       </div>
