@@ -1,3 +1,6 @@
+FILE: C:\Users\homem\OneDrive\바탕 화면\jeju-tennis-app\src\pages\HomePage.jsx
+========================================
+
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -244,7 +247,7 @@ export default function HomePage() {
           {[
             { icon: '👤', label: '개인전\n참가', path: '/entry' },
             { icon: '👥', label: '팀전\n참가', path: '/entry/team' },
-            { icon: '📢', label: '공지\n사항', path: '/notice' },
+            { icon: '👤', label: '회원\n등록', path: '/register' },
             { icon: '🔍', label: '선수\n검색', path: '/search' },
           ].map(item => (
             <button

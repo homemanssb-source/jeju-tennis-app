@@ -35,7 +35,7 @@ export default function ApplyPage() {
   const [editError, setEditError]       = useState('')
 
   useEffect(() => { fetchEvents(); fetchActiveMembers() }, [])
-  useEffect(() => { if (selectedEventId) fetchEntries() }, [selectedEventId])
+  useEffect(() => { if (selectedEventId && events.length > 0) fetchEntries() }, [selectedEventId, events])
 
   async function fetchEvents() {
     const { data } = await supabase.from('events')
@@ -243,7 +243,7 @@ export default function ApplyPage() {
 
   return (
     <div className="pb-20">
-      <PageHeader title="📝 신청확인" subtitle="대회 참가 신청 현황" />
+      <PageHeader title="📝 신청확인/수정" subtitle="대회 참가 신청 현황 및 수정" />
 
       {/* 탭 */}
       <div className="max-w-lg mx-auto px-5 pt-4">
@@ -256,7 +256,7 @@ export default function ApplyPage() {
           <button onClick={() => setTab('mine')}
             className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors
               ${tab === 'mine' ? 'bg-white text-accent shadow-sm' : 'text-sub'}`}>
-            내 신청 내역
+            내 신청/수정
           </button>
         </div>
       </div>
