@@ -1,8 +1,7 @@
 import { useState, useEffect, useContext } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase, writeLog } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 import { useAdmin } from './AdminLayout'
-import { writeLog } from '../../lib/writeLog'
 
 export default function ClubAdmin() {
   const showToast = useContext(ToastContext)
