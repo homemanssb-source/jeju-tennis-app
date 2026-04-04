@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react'
+import { useState, useEffect, useContext, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
@@ -44,6 +44,100 @@ function BankInfoBox({ compact = false }) {
       <p className={`mt-2 text-blue-600 ${compact ? 'text-xs' : 'text-xs'}`}>
         ※ 입금자명은 <b>본인 이름</b>으로 해주세요.
       </p>
+    </div>
+  )
+}
+
+// ── 클럽 콤보박스 ─────────────────────────────────────
+function ClubComboBox({ value, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [inputVal, setInputVal] = useState(value || '')
+  const [clubs, setClubs] = useState([])
+  const wrapRef = useRef(null)
+
+  useEffect(() => {
+    supabase.from('members_public').select('club').neq('status', '삭제')
+      .then(({ data }) => {
+        if (!data) return
+        const unique = [...new Set(data.map(r => r.club).filter(Boolean))].sort()
+        setClubs(unique)
+      })
+  }, [])
+
+  useEffect(() => { setInputVal(value || '') }, [value])
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const filtered = clubs.filter(c =>
+    c.toLowerCase().includes(inputVal.trim().toLowerCase())
+  )
+
+  function handleInput(e) {
+    setInputVal(e.target.value)
+    onChange(e.target.value)
+    setOpen(true)
+  }
+
+  function handleSelect(club) {
+    setInputVal(club)
+    onChange(club)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          value={inputVal}
+          onChange={handleInput}
+          onFocus={() => setOpen(true)}
+          placeholder="클럽명 선택 또는 직접 입력"
+          className="w-full text-sm border border-line rounded-lg px-3 py-2.5 pr-8
+            focus:border-accent focus:ring-2 focus:ring-accentSoft"
+        />
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-sub text-xs"
+        >▾</button>
+      </div>
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-lg shadow-lg z-[60] max-h-48 overflow-y-auto">
+          {inputVal.trim() && !clubs.includes(inputVal.trim()) && (
+            <button
+              type="button"
+              onClick={() => handleSelect(inputVal.trim())}
+              className="w-full text-left px-3 py-2 text-sm text-accent hover:bg-soft border-b border-line/30"
+            >
+              + "{inputVal.trim()}" 직접 입력
+            </button>
+          )}
+          {filtered.length === 0 && inputVal.trim() && (
+            <p className="px-3 py-2 text-xs text-sub">일치하는 클럽 없음 — 직접 입력하세요</p>
+          )}
+          {filtered.length === 0 && !inputVal.trim() && clubs.length === 0 && (
+            <p className="px-3 py-2 text-xs text-sub">불러오는 중...</p>
+          )}
+          {filtered.map(c => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => handleSelect(c)}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-soft border-b border-line/30
+                ${c === value ? 'bg-accentSoft text-accent font-medium' : 'text-gray-800'}`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -306,9 +400,10 @@ export default function RegisterPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               소속 클럽 <span className="text-red-500">*</span>
             </label>
-            <input type="text" value={form.club} onChange={e => handleChange('club', e.target.value)}
-              placeholder="소속 클럽명"
-              className="w-full text-sm border border-line rounded-lg px-3 py-2.5 focus:border-accent focus:ring-2 focus:ring-accentSoft" />
+            <ClubComboBox
+              value={form.club}
+              onChange={val => handleChange('club', val)}
+            />
           </div>
 
           {/* 랭킹부서 */}

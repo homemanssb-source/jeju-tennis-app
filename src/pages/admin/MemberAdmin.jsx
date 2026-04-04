@@ -54,7 +54,7 @@ function ClubComboBox({ value, onChange, clubs }) {
         >▾</button>
       </div>
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-lg shadow-lg z-[60] max-h-48 overflow-y-auto">
           {inputVal.trim() && !clubs.includes(inputVal.trim()) && (
             <button
               type="button"
@@ -64,7 +64,10 @@ function ClubComboBox({ value, onChange, clubs }) {
               + "{inputVal.trim()}" 직접 입력
             </button>
           )}
-          {filtered.length === 0 && !inputVal.trim() && (
+          {filtered.length === 0 && inputVal.trim() && (
+            <p className="px-3 py-2 text-xs text-sub">일치하는 클럽 없음 — 직접 입력하세요</p>
+          )}
+          {filtered.length === 0 && !inputVal.trim() && clubs.length === 0 && (
             <p className="px-3 py-2 text-xs text-sub">클럽 목록 없음</p>
           )}
           {filtered.map(c => (
