@@ -1,6 +1,88 @@
-import { useState, useEffect, useContext } from 'react'
+import { useState, useEffect, useContext, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
+
+// ── 클럽 콤보박스 컴포넌트 ─────────────────────────────
+function ClubComboBox({ value, onChange, clubs }) {
+  const [open, setOpen] = useState(false)
+  const [inputVal, setInputVal] = useState(value || '')
+  const wrapRef = useRef(null)
+
+  // 외부 value 변경 시 동기화 (모달 열릴 때 등)
+  useEffect(() => { setInputVal(value || '') }, [value])
+
+  // 외부 클릭 시 닫기
+  useEffect(() => {
+    function handleClick(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const filtered = clubs.filter(c =>
+    c.toLowerCase().includes(inputVal.trim().toLowerCase())
+  )
+
+  function handleInput(e) {
+    setInputVal(e.target.value)
+    onChange(e.target.value)
+    setOpen(true)
+  }
+
+  function handleSelect(club) {
+    setInputVal(club)
+    onChange(club)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          value={inputVal}
+          onChange={handleInput}
+          onFocus={() => setOpen(true)}
+          placeholder="클럽명 선택 또는 직접 입력"
+          className="w-full text-sm border border-line rounded-lg px-3 py-2 pr-8 focus:border-accent focus:ring-2 focus:ring-accentSoft"
+        />
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-sub text-xs"
+        >▾</button>
+      </div>
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+          {inputVal.trim() && !clubs.includes(inputVal.trim()) && (
+            <button
+              type="button"
+              onClick={() => handleSelect(inputVal.trim())}
+              className="w-full text-left px-3 py-2 text-sm text-accent hover:bg-soft border-b border-line/30"
+            >
+              + "{inputVal.trim()}" 직접 입력
+            </button>
+          )}
+          {filtered.length === 0 && !inputVal.trim() && (
+            <p className="px-3 py-2 text-xs text-sub">클럽 목록 없음</p>
+          )}
+          {filtered.map(c => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => handleSelect(c)}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-soft border-b border-line/30
+                ${c === value ? 'bg-accentSoft text-accent font-medium' : 'text-gray-800'}`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function MemberAdmin() {
   const showToast = useContext(ToastContext)
@@ -253,7 +335,6 @@ export default function MemberAdmin() {
                 { key: 'name', label: '\uC774\uB984' },
                 { key: 'display_name', label: '\uD45C\uC2DC\uBA85' },
                 { key: 'phone', label: '\uC804\uD654\uBC88\uD638' },
-                { key: 'club', label: '\uC18C\uC18D' },
               ].map(({ key, label, disabled }) => (
                 <div key={key}>
                   <label className="block text-xs font-medium text-sub mb-1">{label}</label>
@@ -263,6 +344,14 @@ export default function MemberAdmin() {
                     className="w-full text-sm border border-line rounded-lg px-3 py-2 disabled:bg-soft2" />
                 </div>
               ))}
+              <div>
+                <label className="block text-xs font-medium text-sub mb-1">소속</label>
+                <ClubComboBox
+                  value={form.club || ''}
+                  onChange={val => setForm({ ...form, club: val })}
+                  clubs={clubs}
+                />
+              </div>
               <div>
                 <label className="block text-xs font-medium text-sub mb-1">{'\uBD80\uC11C'}</label>
                 <select value={form.division || ''} onChange={e => setForm({ ...form, division: e.target.value })}
