@@ -11,7 +11,6 @@ const mainTabs = [
 ]
 
 const moreTabs = [
-  { path: '/market',      label: '용품 거래',     icon: '🛒' },
   { path: '/entry',       label: '개인전 참가신청', icon: '📝' },
   { path: '/entry/team',  label: '단체전 참가신청', icon: '🏟️' },
   { path: '/apply',       label: '신청확인',       icon: '📋' },

@@ -221,10 +221,10 @@ export default function HomePage() {
           </a>
         </div>
 
-        {/* 퀵 버튼 4칸 — 용품거래·신청확인·회원등록·선수검색 */}
+        {/* 퀵 버튼 4칸 — 건의문의·신청확인·회원등록·선수검색 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 28 }}>
           {[
-            { icon: '🛒', label: '용품\n거래',   path: '/market' },
+            { icon: '💬', label: '건의\n문의',   path: '/board' },
             { icon: '📋', label: '신청\n확인',   path: '/apply' },
             { icon: '👤', label: '회원\n등록',   path: '/register' },
             { icon: '🔍', label: '선수\n검색',   path: '/search' },

@@ -1,5 +1,5 @@
 // public/sw.js — JTA 테니스 v6
-const CACHE_NAME = 'jta-ranking-v14';
+const CACHE_NAME = 'jta-ranking-v15';
 const ASSETS = ['/', '/index.html', '/manifest.json', '/icon-192x192.png', '/icon-512x512.png'];
 
 self.addEventListener('install', e => {
