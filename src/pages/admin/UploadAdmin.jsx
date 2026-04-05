@@ -27,8 +27,12 @@ export default function UploadAdmin() {
         PHONE_KEYS.forEach(key => {
           if (r[key] !== undefined) {
             const v = r[key]
-            if (typeof v === 'number') r[key] = v.toString()
-            else r[key] = (v || '').toString().trim()
+            // 숫자형으로 저장된 경우 앞의 0이 사라지므로 문자열 변환 후 0 복원
+            let str = typeof v === 'number' ? v.toString() : (v || '').toString().trim()
+            str = str.replace(/[^0-9]/g, '') // 하이픈 등 제거, 숫자만 남김
+            if (str.length === 10 && str.startsWith('1')) str = '0' + str // 01x 복원
+            else if (str.length === 9 && str.startsWith('2')) str = '0' + str // 02 지역번호
+            r[key] = str
           }
         })
         if (r['등급']) {
