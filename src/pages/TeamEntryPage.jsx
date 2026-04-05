@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useMemo } from 'react'
+import { useState, useEffect, useContext, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
@@ -24,6 +24,7 @@ export default function TeamEntryPage() {
   const [teamSuffix, setTeamSuffix]             = useState('')   // 자동 suffix (B, C...)
   const [existingCount, setExistingCount]       = useState(0)   // 같은 클럽 기존 신청 수
   const [checkingClub, setCheckingClub]         = useState(false)
+  const clubCheckTimer = useRef(null)
   const [allMembers, setAllMembers]             = useState([])
   const [roster, setRoster]                     = useState([])
   const [addMode, setAddMode]                   = useState('club')
@@ -148,6 +149,10 @@ export default function TeamEntryPage() {
       setCaptainVerified(data)
       const base = data.club || ''
       setClubBase(base)
+      // ✅ 클럽명과 일치하는 클럽 자동 선택 → 클럽별 선택 패널 자동 오픈
+      if (base && clubList.includes(base)) {
+        handleClubSelect(base)
+      }
       await checkExistingClubEntries(base, selectedDivision?.division_id || null)
       showToast?.('✅ 본인 인증 완료')
     }
@@ -493,33 +498,35 @@ export default function TeamEntryPage() {
             {captainVerified && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">클럽명</label>
-                {checkingClub ? (
-                  <p className="text-xs text-sub px-1 py-2">확인 중...</p>
-                ) : (
-                  <>
-                    <div className="flex gap-2 items-center">
-                      <input type="text" value={clubBase}
-                        onChange={async e => {
-                          setClubBase(e.target.value)
-                          await checkExistingClubEntries(e.target.value, selectedDivision?.division_id || null)
-                        }}
-                        placeholder="클럽명을 입력하세요"
-                        className="flex-1 text-sm border border-line rounded-lg px-3 py-2.5" />
-                      {teamSuffix && (
-                        <div className="bg-blue-100 border border-blue-300 rounded-lg px-3 py-2.5 text-sm font-bold text-blue-800 shrink-0">
-                          {teamSuffix.trim()}팀
-                        </div>
-                      )}
+                <div className="flex gap-2 items-center">
+                  <input type="text" value={clubBase}
+                    onChange={e => {
+                      const val = e.target.value
+                      setClubBase(val)
+                      // ✅ debounce: 글자 입력 멈춘 후 600ms 뒤에만 DB 조회
+                      if (clubCheckTimer.current) clearTimeout(clubCheckTimer.current)
+                      clubCheckTimer.current = setTimeout(() => {
+                        checkExistingClubEntries(val, selectedDivision?.division_id || null)
+                      }, 600)
+                    }}
+                    placeholder="클럽명을 입력하세요"
+                    className="flex-1 text-sm border border-line rounded-lg px-3 py-2.5" />
+                  {checkingClub && (
+                    <span className="text-xs text-sub shrink-0">확인 중..</span>
+                  )}
+                  {!checkingClub && teamSuffix && (
+                    <div className="bg-blue-100 border border-blue-300 rounded-lg px-3 py-2.5 text-sm font-bold text-blue-800 shrink-0">
+                      {teamSuffix.trim()}팀
                     </div>
-                    {teamSuffix ? (
-                      <p className="text-xs text-blue-600 mt-1">
-                        같은 부서에 <b>{clubBase}</b>이 이미 신청되어 <b>{finalClubName}</b>으로 등록됩니다.
-                      </p>
-                    ) : clubBase.trim() ? (
-                      <p className="text-xs text-sub mt-1">등록 클럽명: <b>{finalClubName}</b></p>
-                    ) : null}
-                  </>
-                )}
+                  )}
+                </div>
+                {!checkingClub && teamSuffix ? (
+                  <p className="text-xs text-blue-600 mt-1">
+                    같은 부서에 <b>{clubBase}</b>이 이미 신청되어 <b>{finalClubName}</b>으로 등록됩니다.
+                  </p>
+                ) : !checkingClub && clubBase.trim() ? (
+                  <p className="text-xs text-sub mt-1">등록 클럽명: <b>{finalClubName}</b></p>
+                ) : null}
               </div>
             )}
 
