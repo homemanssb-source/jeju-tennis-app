@@ -1,3 +1,4 @@
+// src/pages/HomePage.jsx
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -47,7 +48,6 @@ export default function HomePage() {
     return '개인전'
   }
 
-  // KST 기준 날짜 표시 (M/D)
   function formatDateMD(utcStr) {
     if (!utcStr) return ''
     return new Date(utcStr).toLocaleString('ko-KR', {
@@ -72,12 +72,10 @@ export default function HomePage() {
   }
 
   return (
-    // ✅ overflowX: 'hidden' 추가 — 가로 삐져나감 방지
     <div className="min-h-screen" style={{ background: '#faf6f1', fontFamily: "'Nunito', 'Noto Sans KR', sans-serif", overflowX: 'hidden' }}>
 
       {/* 상단 헤더 */}
       <div style={{ background: '#fff8f3', padding: '22px 20px 18px', borderBottom: '1px solid #f0e8e0' }}>
-        {/* ✅ overflow: 'hidden' 추가 — 헤더 flex 아이템 잘림 방지 */}
         <div style={{ maxWidth: 512, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 14, overflow: 'hidden' }}>
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <div style={{
@@ -90,7 +88,6 @@ export default function HomePage() {
               borderRadius: 6, border: '2.5px solid #fff8f3'
             }} />
           </div>
-          {/* ✅ minWidth: 0 추가 — flex: 1 아이템이 줄어들 수 있도록 */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#2d1a0e', letterSpacing: -0.8, lineHeight: 1 }}>
               J.T.A <span style={{ color: '#c0612b' }}>제주</span>
@@ -99,11 +96,7 @@ export default function HomePage() {
               JEJUSI TENNIS ASSOCIATION
             </p>
           </div>
-
-          {/* 알림 버튼 */}
           <NotificationBell />
-
-          {/* ✅ flexShrink: 0 유지하되 padding 살짝 줄여 여유 확보 */}
           <div style={{ background: '#c0612b', borderRadius: 12, padding: '5px 10px', textAlign: 'center', flexShrink: 0 }}>
             <p style={{ margin: 0, fontSize: 9, color: 'rgba(255,255,255,0.7)', letterSpacing: 1.5, fontWeight: 700 }}>SEASON</p>
             <p style={{ margin: 0, fontSize: 18, color: '#fff', fontWeight: 900, lineHeight: 1.1 }}>2026</p>
@@ -114,7 +107,7 @@ export default function HomePage() {
       {/* 본문 */}
       <div style={{ maxWidth: 512, margin: '0 auto', padding: '16px 16px 80px' }}>
 
-        {/* 다가오는 대회 (최대 2개) */}
+        {/* 다가오는 대회 */}
         {upcomingEvents.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             {upcomingEvents.map((ev, idx) => {
@@ -141,43 +134,32 @@ export default function HomePage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                     <div style={{
                       background: isFirst ? '#c0612b' : '#e8ddd8',
-                      borderRadius: 10,
-                      padding: '4px 11px',
-                      flexShrink: 0,
+                      borderRadius: 10, padding: '4px 11px', flexShrink: 0,
                     }}>
                       <span style={{
-                        fontSize: isFirst ? 12 : 11,
-                        fontWeight: 700,
+                        fontSize: isFirst ? 12 : 11, fontWeight: 700,
                         color: isFirst ? '#fff' : '#a07060',
                       }}>{getDday(ev.event_date)}</span>
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <p style={{
-                        margin: 0,
-                        fontSize: isFirst ? 13 : 12,
+                        margin: 0, fontSize: isFirst ? 13 : 12,
                         fontWeight: isFirst ? 700 : 600,
                         color: isFirst ? '#2d1a0e' : '#7a6a62',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>{ev.event_name}</p>
-                      {/* 대회일자 + 접수기간 한 줄 표시 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
-                        {/* 대회일자 */}
                         <span style={{ fontSize: 10, color: '#c8a898' }}>
                           📅 {ev.event_date}{ev.event_date_end ? ` ~ ${ev.event_date_end.slice(5).replace('-', '/')}` : ''}
                         </span>
-                        {/* 구분자 */}
                         {(ev.entry_open_at || ev.entry_close_at) && (
                           <span style={{ fontSize: 10, color: '#e0d8d0' }}>|</span>
                         )}
-                        {/* 접수기간 */}
                         {(ev.entry_open_at || ev.entry_close_at) && (
                           <span style={{ fontSize: 10, color: '#c8a898' }}>
                             📝 {formatDateMD(ev.entry_open_at)} ~ {formatDateMD(ev.entry_close_at)}
                           </span>
                         )}
-                        {/* 접수 상태 배지 (첫번째만) */}
                         {isFirst && (
                           <span style={{
                             fontSize: 9, fontWeight: 600,
@@ -199,7 +181,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* 메인 바로가기 */}
+        {/* 메인 바로가기 2칸 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           <button
             onClick={() => navigate('/ranking')}
@@ -239,13 +221,13 @@ export default function HomePage() {
           </a>
         </div>
 
-        {/* 퀵 버튼 */}
+        {/* 퀵 버튼 4칸 — 용품거래·신청확인·회원등록·선수검색 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 28 }}>
           {[
-            { icon: '👤', label: '개인전\n참가', path: '/entry' },
-            { icon: '👥', label: '팀전\n참가', path: '/entry/team' },
-            { icon: '👤', label: '회원\n등록', path: '/register' },
-            { icon: '🔍', label: '선수\n검색', path: '/search' },
+            { icon: '🛒', label: '용품\n거래',   path: '/market' },
+            { icon: '📋', label: '신청\n확인',   path: '/apply' },
+            { icon: '👤', label: '회원\n등록',   path: '/register' },
+            { icon: '🔍', label: '선수\n검색',   path: '/search' },
           ].map(item => (
             <button
               key={item.path}
@@ -266,7 +248,7 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* 스폰서 배너 영역 */}
+        {/* 스폰서 배너 */}
         {banners.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -281,47 +263,26 @@ export default function HomePage() {
                   href={b.link_url || '#'}
                   target="_blank" rel="noopener noreferrer"
                   style={{
-                    flex: 1,
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-                    textDecoration: 'none',
-                    padding: '8px 4px',
-                    borderRadius: 12,
-                    background: '#fff',
-                    transition: 'opacity 0.15s',
-                    minWidth: 0,
+                    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                    textDecoration: 'none', padding: '8px 4px', borderRadius: 12, background: '#fff',
+                    transition: 'opacity 0.15s', minWidth: 0,
                   }}
                   onTouchStart={e => e.currentTarget.style.opacity = '0.7'}
                   onTouchEnd={e => e.currentTarget.style.opacity = '1'}>
-                  {/* 로고 이미지 or 텍스트 */}
                   <div style={{
                     width: 44, height: 44, borderRadius: 12,
                     background: b.image_url ? 'transparent' : '#f0f0f0',
-                    overflow: 'hidden',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0,
+                    overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   }}>
-                    {b.image_url ? (
-                      <img
-                        src={b.image_url} alt={b.company_name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <span style={{
-                        fontSize: 15, fontWeight: 900, color: '#c0612b',
-                      }}>
-                        {b.company_name?.charAt(0) || '?'}
-                      </span>
-                    )}
+                    {b.image_url
+                      ? <img src={b.image_url} alt={b.company_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <span style={{ fontSize: 15, fontWeight: 900, color: '#c0612b' }}>{b.company_name?.charAt(0) || '?'}</span>
+                    }
                   </div>
-                  {/* 업체명 */}
                   <p style={{
                     margin: 0, fontSize: 9, fontWeight: 600,
-                    color: '#b0a8a0', textAlign: 'center', lineHeight: 1.3,
-                    wordBreak: 'keep-all',
-                    overflow: 'hidden',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
+                    color: '#b0a8a0', textAlign: 'center', lineHeight: 1.3, wordBreak: 'keep-all',
+                    overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                   }}>{b.company_name}</p>
                 </a>
               ))}

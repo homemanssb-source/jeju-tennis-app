@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
-import { getSession, adminLogout, getAdminUser } from '../../lib/supabase'
+import { getSession, adminLogout, getAdminUser, supabase } from '../../lib/supabase'
 
 import MemberAdmin from './MemberAdmin'
 import TourAdmin from './TourAdmin'
@@ -23,6 +23,7 @@ import AccessLogAdmin from './AccessLogAdmin'
 import PushAdmin from './PushAdmin'
 import ExternalReportAdmin from './ExternalReportAdmin'
 import ClubAdmin from './ClubAdmin'
+import MarketAdmin from './MarketAdmin'
 
 // ─── 관리자 정보 Context ─────────────────────────
 export const AdminContext = createContext(null)
@@ -78,6 +79,13 @@ const TAB_GROUPS = [
     ],
   },
   {
+    key: 'market',
+    label: '🛒 거래',
+    subs: [
+      { path: '/admin/market', label: '거래 게시판' },
+    ],
+  },
+  {
     key: 'stats',
     label: '📈 통계',
     superOnly: true,
@@ -100,9 +108,11 @@ const TAB_GROUPS = [
 export default function AdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [adminUser, setAdminUser] = useState(null)
-  const [checking, setChecking] = useState(true)
+  const [adminUser, setAdminUser]     = useState(null)
+  const [checking, setChecking]       = useState(true)
   const [activeGroup, setActiveGroup] = useState(null)
+  // 신고 미처리 건수 (🛒 거래 탭 뱃지)
+  const [pendingReports, setPendingReports] = useState(0)
 
   useEffect(() => { checkSession() }, [])
 
@@ -113,6 +123,20 @@ export default function AdminLayout() {
     )
     if (group) setActiveGroup(group.key)
   }, [location.pathname])
+
+  // 신고 미처리 건수 1분마다 체크
+  useEffect(() => {
+    if (!adminUser) return
+    fetchPendingReports()
+    const timer = setInterval(fetchPendingReports, 60000)
+    return () => clearInterval(timer)
+  }, [adminUser])
+
+  async function fetchPendingReports() {
+    const { count } = await supabase.from('market_reports')
+      .select('*', { count: 'exact', head: true }).eq('status', '검토중')
+    setPendingReports(count || 0)
+  }
 
   async function checkSession() {
     const session = await getSession()
@@ -137,6 +161,8 @@ export default function AdminLayout() {
     if (!adminUser) return false
     if (adminUser.is_super) return true
     if (groupKey === 'settings' || groupKey === 'stats') return false
+    // market 탭은 notices 권한으로 접근
+    if (groupKey === 'market') return adminUser.permissions?.notices === true
     return adminUser.permissions?.[groupKey] === true
   }
 
@@ -172,7 +198,8 @@ export default function AdminLayout() {
           <div className="flex px-4 gap-1 max-w-5xl mx-auto overflow-x-auto hide-scrollbar pb-1">
             {TAB_GROUPS.map(group => {
               const accessible = canAccess(group.key)
-              const isActive = activeGroup === group.key
+              const isActive   = activeGroup === group.key
+              const badge      = group.key === 'market' && pendingReports > 0 ? pendingReports : 0
               return (
                 <button
                   key={group.key}
@@ -186,6 +213,11 @@ export default function AdminLayout() {
                 >
                   {group.label}
                   {!accessible && <span className="text-[10px]">🔒</span>}
+                  {badge > 0 && (
+                    <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full leading-none">
+                      {badge}
+                    </span>
+                  )}
                 </button>
               )
             })}
@@ -214,27 +246,28 @@ export default function AdminLayout() {
         {/* ── 페이지 콘텐츠 ── */}
         <div className="max-w-5xl mx-auto p-4">
           <Routes>
-            <Route path="members" element={<MemberAdmin />} />
-            <Route path="upload" element={<UploadAdmin />} />
-            <Route path="events" element={<EventAdmin />} />
-            <Route path="entries" element={<EntryAdmin />} />
-            <Route path="team-entries" element={<AdminTeamEntryPage />} />
-            <Route path="payments" element={<PaymentAdmin />} />
-            <Route path="tournaments" element={<TourAdmin />} />
-            <Route path="adjustments" element={<PointAdjAdmin />} />
-            <Route path="rules" element={<PointRulesAdmin />} />
-            <Route path="grades" element={<GradeAdmin />} />
-            <Route path="promotion-rules" element={<PromotionRulesAdmin />} />
-            <Route path="promotions" element={<PromotionAdmin />} />
-            <Route path="notices" element={<NoticeAdmin />} />
-            <Route path="board" element={<AdminBoardPage />} />
-            <Route path="sponsors" element={<SponsorAdmin />} />
-            <Route path="managers" element={<AdminManagerPage />} />
-            <Route path="logs" element={<AdminLogsPage />} />
-            <Route path="access-log" element={<AccessLogAdmin />} />
-            <Route path="push" element={<PushAdmin />} />
+            <Route path="members"          element={<MemberAdmin />} />
+            <Route path="upload"           element={<UploadAdmin />} />
+            <Route path="events"           element={<EventAdmin />} />
+            <Route path="entries"          element={<EntryAdmin />} />
+            <Route path="team-entries"     element={<AdminTeamEntryPage />} />
+            <Route path="payments"         element={<PaymentAdmin />} />
+            <Route path="tournaments"      element={<TourAdmin />} />
+            <Route path="adjustments"      element={<PointAdjAdmin />} />
+            <Route path="rules"            element={<PointRulesAdmin />} />
+            <Route path="grades"           element={<GradeAdmin />} />
+            <Route path="promotion-rules"  element={<PromotionRulesAdmin />} />
+            <Route path="promotions"       element={<PromotionAdmin />} />
+            <Route path="notices"          element={<NoticeAdmin />} />
+            <Route path="board"            element={<AdminBoardPage />} />
+            <Route path="sponsors"         element={<SponsorAdmin />} />
+            <Route path="managers"         element={<AdminManagerPage />} />
+            <Route path="logs"             element={<AdminLogsPage />} />
+            <Route path="access-log"       element={<AccessLogAdmin />} />
+            <Route path="push"             element={<PushAdmin />} />
             <Route path="external-reports" element={<ExternalReportAdmin />} />
-            <Route path="clubs" element={<ClubAdmin />} />
+            <Route path="clubs"            element={<ClubAdmin />} />
+            <Route path="market"           element={<MarketAdmin />} />
           </Routes>
         </div>
       </div>
