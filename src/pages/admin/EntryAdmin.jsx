@@ -11,6 +11,7 @@ export default function EntryAdmin() {
   const [selectedEventId, setSelectedEventId] = useState('')
   const [filterPayment, setFilterPayment]     = useState('')
   const [filterType, setFilterType]           = useState('')
+  const [filterName, setFilterName]           = useState('')  // ★ 이름 검색
   const [loading, setLoading]                 = useState(false)
 
   // ── 취소 확인 모달 (관리자) ──
@@ -54,8 +55,7 @@ export default function EntryAdmin() {
       ...(normalData || []),
       ...(refundData || []),
     ]
-    const data = merged
-    setEntries(data || [])
+    setEntries(merged)
     setLoading(false)
   }
 
@@ -105,11 +105,12 @@ export default function EntryAdmin() {
   const unpaidCount  = activeEntries.filter(e => e.payment_status === '미납').length
   const refundCount  = allEntries.filter(e => e.payment_status === '환불대기').length
 
-  // 필터 적용
+  // ★ 필터 적용 (이름 검색 포함)
   const filtered = allEntries.filter(e => {
     if (filterPayment && e.payment_status !== filterPayment) return false
     if (filterType === '개인' && e.type !== '개인') return false
     if (filterType === '단체' && e.type !== '단체') return false
+    if (filterName.trim() && !e.name.toLowerCase().includes(filterName.trim().toLowerCase())) return false
     return true
   })
 
@@ -197,6 +198,16 @@ export default function EntryAdmin() {
             </option>
           ))}
         </select>
+
+        {/* ★ 이름 검색 */}
+        <input
+          type="text"
+          value={filterName}
+          onChange={e => setFilterName(e.target.value)}
+          placeholder="이름 검색..."
+          className="text-sm border border-line rounded-lg px-3 py-2 w-32"
+        />
+
         <select value={filterType} onChange={e => setFilterType(e.target.value)}
           className="text-sm border border-line rounded-lg px-3 py-2">
           <option value="">전체 유형</option>
