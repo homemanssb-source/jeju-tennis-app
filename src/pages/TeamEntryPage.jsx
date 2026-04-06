@@ -28,7 +28,7 @@ export default function TeamEntryPage() {
   const [allMembers, setAllMembers]             = useState([])
   const [roster, setRoster]                     = useState([])
   const [addMode, setAddMode]                   = useState('club')
-  const [selectedClub, setSelectedClub]         = useState('')
+  const [selectedClubs, setSelectedClubs]       = useState(new Set()) // 복수 클럽 선택
   const [clubChecked, setClubChecked]           = useState({})
   const [searchQuery, setSearchQuery]           = useState('')
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
@@ -61,9 +61,9 @@ export default function TeamEntryPage() {
   }, [allMembers])
 
   const clubMembers = useMemo(() => {
-    if (!selectedClub) return []
-    return allMembers.filter(m => m.club === selectedClub)
-  }, [allMembers, selectedClub])
+    if (selectedClubs.size === 0) return []
+    return allMembers.filter(m => m.club && selectedClubs.has(m.club))
+  }, [allMembers, selectedClubs])
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
@@ -98,7 +98,7 @@ export default function TeamEntryPage() {
     setSelectedDivision(null); setDivisions([])
     setCaptainVerified(null); setCaptainName(''); setCaptainPin('')
     setRoster([]); setClubBase(''); setTeamSuffix(''); setExistingCount(0)
-    setSelectedClub(''); setClubChecked({})
+    setSelectedClubs(new Set()); setClubChecked({})
     if (ev) fetchDivisions(ev.event_id)
   }
 
@@ -149,9 +149,15 @@ export default function TeamEntryPage() {
       setCaptainVerified(data)
       const base = data.club || ''
       setClubBase(base)
-      // ✅ 클럽명과 일치하는 클럽 자동 선택 → 클럽별 선택 패널 자동 오픈
-      if (base && clubList.includes(base)) {
-        handleClubSelect(base)
+      // ✅ clubBase를 포함하는 클럽 전부 자동 선택 (예: "제주하나클럽", "행복배틀" 등)
+      if (base) {
+        const related = clubList.filter(c =>
+          c.includes(base) || base.includes(c)
+        )
+        const matchedClubs = related.length > 0 ? related : (clubList.includes(base) ? [base] : [])
+        if (matchedClubs.length > 0) {
+          handleMultiClubSelect(new Set(matchedClubs))
+        }
       }
       await checkExistingClubEntries(base, selectedDivision?.division_id || null)
       showToast?.('✅ 본인 인증 완료')
@@ -159,14 +165,28 @@ export default function TeamEntryPage() {
     setVerifying(false)
   }
 
-  function handleClubSelect(club) {
-    setSelectedClub(club)
+  // 클럽 다중 선택 (Set 기반)
+  function handleMultiClubSelect(newClubsSet) {
+    setSelectedClubs(newClubsSet)
     const rosterIds = new Set(roster.map(r => r.member_id))
     const initial = {}
-    allMembers.filter(m => m.club === club).forEach(m => {
+    allMembers.filter(m => m.club && newClubsSet.has(m.club)).forEach(m => {
       initial[m.member_id] = rosterIds.has(m.member_id)
     })
     setClubChecked(initial); setShowClubPicker(false)
+  }
+
+  // 클럽 피커에서 개별 클럽 토글
+  function handleClubToggle(club) {
+    const next = new Set(selectedClubs)
+    if (next.has(club)) { next.delete(club) } else { next.add(club) }
+    setSelectedClubs(next)
+    const rosterIds = new Set(roster.map(r => r.member_id))
+    const initial = {}
+    allMembers.filter(m => m.club && next.has(m.club)).forEach(m => {
+      initial[m.member_id] = rosterIds.has(m.member_id)
+    })
+    setClubChecked(initial)
   }
 
   function handleToggleMember(memberId) {
@@ -202,7 +222,7 @@ export default function TeamEntryPage() {
       gender: m.gender || '', grade: m.grade || '',
     }))
     setRoster(prev => [...prev, ...newMembers])
-    setSelectedClub(''); setClubChecked({})
+    setSelectedClubs(new Set()); setClubChecked({})
     if (newMembers.length > 0) showToast?.(`${newMembers.length}명 추가됨`)
   }
 
@@ -277,10 +297,10 @@ export default function TeamEntryPage() {
     setSelectedEvent(null); setSelectedDivision(null); setDivisions([])
     setCaptainVerified(null); setCaptainName(''); setCaptainPin('')
     setRoster([]); setClubBase(''); setTeamSuffix(''); setExistingCount(0)
-    setSelectedClub(''); setClubChecked({})
+    setSelectedClubs(new Set()); setClubChecked({})
   }
 
-  const checkedNewCount = selectedClub
+  const checkedNewCount = selectedClubs.size > 0
     ? clubMembers.filter(m => clubChecked[m.member_id] && !roster.find(r => r.member_id === m.member_id)).length
     : 0
 
@@ -546,27 +566,49 @@ export default function TeamEntryPage() {
 
                 {addMode === 'club' && (
                   <div className="space-y-2">
+                    {/* 클럽 다중선택 피커 */}
                     <div className="relative">
                       <button onClick={() => setShowClubPicker(!showClubPicker)}
                         className="w-full text-left text-sm border border-line rounded-lg px-3 py-2.5 bg-white">
-                        {selectedClub || '클럽을 선택하세요'}
+                        {selectedClubs.size === 0
+                          ? '클럽을 선택하세요'
+                          : [...selectedClubs].join(', ')}
                       </button>
                       {showClubPicker && (
                         <div className="absolute left-0 right-0 top-full bg-white border border-line rounded-lg shadow-lg mt-1 z-20 max-h-48 overflow-y-auto">
                           {clubList.map(club => (
-                            <button key={club} onClick={() => handleClubSelect(club)}
-                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30">
-                              {club}
-                            </button>
+                            <label key={club}
+                              className="flex items-center px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30 cursor-pointer">
+                              <input type="checkbox"
+                                checked={selectedClubs.has(club)}
+                                onChange={() => handleClubToggle(club)}
+                                className="mr-3 w-4 h-4 rounded accent-accent" />
+                              <span>{club}</span>
+                              <span className="ml-auto text-xs text-sub">
+                                {allMembers.filter(m => m.club === club).length}명
+                              </span>
+                            </label>
                           ))}
                           {clubList.length === 0 && <p className="px-4 py-3 text-xs text-sub">클럽이 없습니다.</p>}
+                          {selectedClubs.size > 0 && (
+                            <div className="px-4 py-2 border-t border-line">
+                              <button onClick={() => setShowClubPicker(false)}
+                                className="w-full py-1.5 bg-accent text-white text-xs rounded-lg">
+                                확인 ({selectedClubs.size}개 클럽 선택됨)
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                    {selectedClub && (
+
+                    {/* 선택된 클럽들의 통합 멤버 목록 */}
+                    {selectedClubs.size > 0 && (
                       <div className="border border-line rounded-lg overflow-hidden">
                         <div className="flex justify-between items-center px-3 py-2 bg-soft border-b border-line">
-                          <span className="text-xs font-medium text-gray-700">{selectedClub} ({clubMembers.length}명)</span>
+                          <span className="text-xs font-medium text-gray-700">
+                            {[...selectedClubs].join(' · ')} ({clubMembers.length}명)
+                          </span>
                           <div className="flex gap-2">
                             <button onClick={handleSelectAll} className="text-xs text-accent">전체 선택</button>
                             <button onClick={handleDeselectAll} className="text-xs text-sub">선택 해제</button>
@@ -585,6 +627,9 @@ export default function TeamEntryPage() {
                                   <span className="text-sm font-medium">{m.display_name || m.name}</span>
                                   <span className="text-xs text-sub ml-2">{m.gender === 'M' ? '남' : m.gender === 'F' ? '여' : ''}</span>
                                   <span className="text-xs text-accent ml-2">{m.grade || ''}</span>
+                                  {selectedClubs.size > 1 && (
+                                    <span className="text-xs text-sub ml-2">({m.club})</span>
+                                  )}
                                 </div>
                                 {inRoster && <span className="text-xs text-blue-500">등록됨</span>}
                               </label>
