@@ -1,4 +1,4 @@
-// src/pages/admin/EntryAdmin.jsx
+﻿// src/pages/admin/EntryAdmin.jsx
 import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
@@ -55,6 +55,27 @@ export default function EntryAdmin() {
       ...(normalData || []),
       ...(refundData || []),
     ]
+
+    // ★ member_id 목록 수집 → members 테이블에서 club 한번에 조회
+    const memberIds = [...new Set(
+      merged.flatMap(e => [e.teams?.member1_id, e.teams?.member2_id].filter(Boolean))
+    )]
+    let memberClubMap = {}
+    if (memberIds.length > 0) {
+      const { data: membersData } = await supabase
+        .from('members')
+        .select('member_id, name, club')
+        .in('member_id', memberIds)
+      for (const m of (membersData || [])) {
+        memberClubMap[m.member_id] = { name: m.name, club: m.club }
+      }
+    }
+    // ★ 각 entry에 club 정보 첨부
+    for (const e of merged) {
+      e._m1 = e.teams?.member1_id ? memberClubMap[e.teams.member1_id] : null
+      e._m2 = e.teams?.member2_id ? memberClubMap[e.teams.member2_id] : null
+    }
+
     setEntries(merged)
     setLoading(false)
   }
@@ -71,17 +92,23 @@ export default function EntryAdmin() {
 
   // ── 통합 목록 ──
   const allEntries = [
-    ...entries.map(e => ({
-      id:             e.entry_id,
-      type:           '개인',
-      name:           e.teams?.team_name || '-',
-      division:       e.event_divisions?.division_name || '-',
-      status:         e.entry_status,
-      payment_status: e.payment_status,
-      date:           e.applied_at,
-      _source:        'individual',
-      _raw:           e,
-    })),
+    ...entries.map(e => {
+      // ★ "홍길동(제주하나)/홍길금(제주아라)" 형식 조합
+      const p1 = e._m1 ? (e._m1.club ? `${e._m1.name}(${e._m1.club})` : e._m1.name) : ''
+      const p2 = e._m2 ? (e._m2.club ? `${e._m2.name}(${e._m2.club})` : e._m2.name) : ''
+      const displayName = p1 && p2 ? `${p1}/${p2}` : (p1 || e.teams?.team_name || '-')
+      return {
+        id:             e.entry_id,
+        type:           '개인',
+        name:           displayName,
+        division:       e.event_divisions?.division_name || '-',
+        status:         e.entry_status,
+        payment_status: e.payment_status,
+        date:           e.applied_at,
+        _source:        'individual',
+        _raw:           e,
+      }
+    }),
     ...teamEntries.map(e => ({
       id:             e.id,
       type:           '단체',
