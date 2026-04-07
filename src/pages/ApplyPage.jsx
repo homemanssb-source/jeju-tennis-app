@@ -50,10 +50,31 @@ export default function ApplyPage() {
     setActiveDivision('전체')
     const { data } = await supabase
       .from('event_entries')
-      .select('*, teams ( team_name ), event_divisions ( division_name )')
+      .select('*, teams ( team_name, member1_id, member2_id ), event_divisions ( division_name )')
       .eq('event_id', selectedEventId)
       .neq('entry_status', '취소')
       .order('applied_at', { ascending: false })
+
+    // ★ member_id → club 조회
+    const memberIds = [...new Set(
+      (data || []).flatMap(e => [e.teams?.member1_id, e.teams?.member2_id].filter(Boolean))
+    )]
+    let memberClubMap = {}
+    if (memberIds.length > 0) {
+      const { data: membersData } = await supabase
+        .from('members')
+        .select('member_id, name, club')
+        .in('member_id', memberIds)
+      for (const m of (membersData || [])) {
+        memberClubMap[m.member_id] = { name: m.name, club: m.club }
+      }
+    }
+    // ★ 각 entry에 club 정보 첨부
+    for (const e of (data || [])) {
+      e._m1 = e.teams?.member1_id ? memberClubMap[e.teams.member1_id] : null
+      e._m2 = e.teams?.member2_id ? memberClubMap[e.teams.member2_id] : null
+    }
+
     setEntries(data || [])
     setLoading(false)
   }
@@ -312,7 +333,12 @@ export default function ApplyPage() {
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-bold text-sub w-6">{idx + 1}</span>
                         <div>
-                          <p className="text-sm font-medium">{entry.teams?.team_name || '-'}</p>
+                          <p className="text-sm font-medium">
+                            {entry._m1
+                              ? `${entry._m1.name}${entry._m1.club ? `(${entry._m1.club})` : ''}` +
+                                (entry._m2 ? `/${entry._m2.name}${entry._m2.club ? `(${entry._m2.club})` : ''}` : '')
+                              : (entry.teams?.team_name || '-')}
+                          </p>
                           <p className="text-xs text-sub">
                             {entry.event_divisions?.division_name || '-'}
                             <span className="ml-2">
