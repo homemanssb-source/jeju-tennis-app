@@ -32,6 +32,14 @@ export default function ApplyPage() {
   const [refundHolder, setRefundHolder]   = useState('')
   const [cancelling, setCancelling]       = useState(false)
 
+  // ── 파트너 변경 모달 ──
+  const [partnerTarget, setPartnerTarget]         = useState(null) // entry 객체
+  const [partnerSearch, setPartnerSearch]         = useState('')
+  const [partnerResults, setPartnerResults]       = useState([])
+  const [partnerSelected, setPartnerSelected]     = useState(null) // { member_id, name, club }
+  const [partnerSearching, setPartnerSearching]   = useState(false)
+  const [partnerSaving, setPartnerSaving]         = useState(false)
+
   useEffect(() => { fetchEvents() }, [])
   useEffect(() => { if (selectedEventId) fetchEntries() }, [selectedEventId])
 
@@ -187,6 +195,92 @@ export default function ApplyPage() {
           }
         : e
     ))
+  }
+
+  // ── 파트너 변경 ──
+  function openPartnerModal(entry) {
+    if (entry.entry_status === 'cancelled') { showToast('취소된 신청입니다.', 'error'); return }
+    if (entry.entry_close_at && new Date(entry.entry_close_at) < new Date()) {
+      showToast('접수 마감 후에는 변경할 수 없습니다.', 'error'); return
+    }
+    setPartnerSearch('')
+    setPartnerResults([])
+    setPartnerSelected(null)
+    setPartnerTarget(entry)
+  }
+
+  function closePartnerModal() {
+    setPartnerTarget(null)
+    setPartnerSearch('')
+    setPartnerResults([])
+    setPartnerSelected(null)
+  }
+
+  async function handlePartnerSearch() {
+    const q = partnerSearch.trim()
+    if (!q) return
+    setPartnerSearching(true)
+    const { data } = await supabase
+      .from('members')
+      .select('member_id, name, club, status')
+      .ilike('name', `%${q}%`)
+      .eq('status', '활성')
+      .limit(20)
+    setPartnerSearching(false)
+
+    // 같은 부서에 이미 신청한 member_id 수집 (프론트 체크)
+    // entries는 전체현황 탭 데이터 (event_entries + teams join)
+    const divisionEntries = entries.filter(e =>
+      (e.event_divisions?.division_name || '') === (partnerTarget?.division_name || '') &&
+      e.entry_id !== partnerTarget?.entry_id
+    )
+    const takenIds = new Set(
+      divisionEntries.flatMap(e => [e.teams?.member1_id, e.teams?.member2_id].filter(Boolean))
+    )
+    // 본인(신청자) ID — RPC 반환값에 member1_id 직접 포함
+    const selfId = partnerTarget?.member1_id
+
+    const results = (data || []).map(m => ({
+      ...m,
+      disabled: takenIds.has(m.member_id) || m.member_id === selfId,
+      disabledReason: takenIds.has(m.member_id) ? '이미 신청됨' : m.member_id === selfId ? '본인' : '',
+    }))
+    setPartnerResults(results)
+  }
+
+  async function handlePartnerSave() {
+    if (!partnerTarget || !partnerSelected) return
+    setPartnerSaving(true)
+
+    // team_id: RPC 반환값에 있으면 직접 사용, 없으면 entry_id로 조회
+    let teamId = partnerTarget.team_id
+    if (!teamId) {
+      const { data: entryData } = await supabase
+        .from('event_entries')
+        .select('team_id')
+        .eq('entry_id', partnerTarget.entry_id)
+        .single()
+      teamId = entryData?.team_id
+    }
+    if (!teamId) { showToast('팀 정보를 찾을 수 없습니다.', 'error'); setPartnerSaving(false); return }
+
+    const { error } = await supabase
+      .from('teams')
+      .update({ member2_id: partnerSelected.member_id })
+      .eq('team_id', teamId)
+
+    setPartnerSaving(false)
+    if (error) { showToast('변경 실패: ' + error.message, 'error'); return }
+
+    showToast('✅ 파트너가 변경되었습니다.')
+
+    // 낙관적 업데이트 — myEntries에서 partner_name 갱신
+    setMyEntries(prev => prev.map(e =>
+      e.entry_id === partnerTarget.entry_id
+        ? { ...e, partner_name: partnerSelected.name }
+        : e
+    ))
+    closePartnerModal()
   }
 
   // ── 표시 헬퍼 ──
@@ -449,27 +543,38 @@ export default function ApplyPage() {
                           <p className="text-[10px] text-gray-400 mt-1">환불 처리가 완료되었습니다.</p>
                         )}
 
-                        {/* 취소 버튼 영역 */}
+                        {/* 취소 버튼 / 파트너 변경 버튼 영역 */}
                         {showCancelBtn && (
-                          <div className="border-t border-line mt-3 pt-3 flex items-center justify-between">
+                          <div className="border-t border-line mt-3 pt-3 flex items-center justify-between gap-2">
                             <span className="text-[10px] text-sub">
                               {cancelStatus === 'closed'
                                 ? '🔴 마감 후 취소불가 · 관리자 문의'
                                 : closeDate ? `마감: ${closeDate}` : ''}
                             </span>
-                            {cancelStatus === 'ok' ? (
-                              <button
-                                onClick={() => openCancelModal(e)}
-                                className="text-xs text-red-500 border border-red-200 bg-red-50
-                                  hover:bg-red-100 rounded-lg px-3 py-1.5 transition-colors">
-                                신청 취소
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-gray-400 border border-gray-200
-                                bg-gray-50 rounded-lg px-3 py-1.5">
-                                취소불가
-                              </span>
-                            )}
+                            <div className="flex gap-1.5 shrink-0">
+                              {/* 파트너 변경 버튼 (마감 전만) */}
+                              {cancelStatus === 'ok' && (
+                                <button
+                                  onClick={() => openPartnerModal(e)}
+                                  className="text-xs text-blue-500 border border-blue-200 bg-blue-50
+                                    hover:bg-blue-100 rounded-lg px-3 py-1.5 transition-colors">
+                                  파트너 변경
+                                </button>
+                              )}
+                              {cancelStatus === 'ok' ? (
+                                <button
+                                  onClick={() => openCancelModal(e)}
+                                  className="text-xs text-red-500 border border-red-200 bg-red-50
+                                    hover:bg-red-100 rounded-lg px-3 py-1.5 transition-colors">
+                                  신청 취소
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-gray-400 border border-gray-200
+                                  bg-gray-50 rounded-lg px-3 py-1.5">
+                                  취소불가
+                                </span>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -557,6 +662,106 @@ export default function ApplyPage() {
                 className="flex-1 py-3 bg-red-500 text-white rounded-xl text-sm font-semibold
                   hover:bg-red-600 disabled:opacity-50 transition-colors">
                 {cancelling ? '처리 중...' : isPaid ? '취소 및 환불신청' : '신청 취소'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── 파트너 변경 모달 (Bottom Sheet) ── */}
+      {partnerTarget && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          <div className="absolute inset-0 bg-black/40" onClick={closePartnerModal} />
+          <div className="relative w-full max-w-lg bg-white rounded-t-2xl px-5 pt-4 pb-8 z-10">
+            {/* 핸들 */}
+            <div className="flex justify-center mb-4">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+
+            <h3 className="text-base font-semibold text-gray-900 mb-1">파트너 변경</h3>
+
+            {/* 현재 파트너 */}
+            <div className="bg-soft rounded-xl px-4 py-3 mb-4">
+              <p className="text-xs text-sub mb-0.5">현재 파트너</p>
+              <p className="text-sm font-semibold text-gray-900">
+                {partnerTarget.partner_name || '(없음)'}
+              </p>
+              <p className="text-xs text-sub mt-0.5">{partnerTarget.division_name} · {partnerTarget.event_name}</p>
+            </div>
+
+            {/* 검색 */}
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={partnerSearch}
+                onChange={e => setPartnerSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handlePartnerSearch()}
+                placeholder="회원 이름 검색"
+                className="flex-1 text-sm border border-line rounded-lg px-3 py-2.5" />
+              <button
+                onClick={handlePartnerSearch}
+                disabled={partnerSearching || !partnerSearch.trim()}
+                className="px-4 py-2.5 bg-accent text-white text-sm rounded-lg
+                  disabled:opacity-50 whitespace-nowrap">
+                {partnerSearching ? '검색 중' : '검색'}
+              </button>
+            </div>
+
+            {/* 검색 결과 */}
+            {partnerResults.length > 0 && (
+              <div className="border border-line rounded-xl overflow-hidden mb-4 max-h-48 overflow-y-auto">
+                {partnerResults.map(m => (
+                  <button
+                    key={m.member_id}
+                    disabled={m.disabled}
+                    onClick={() => !m.disabled && setPartnerSelected(m)}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 text-left
+                      border-b border-line last:border-0 transition-colors
+                      ${partnerSelected?.member_id === m.member_id
+                        ? 'bg-blue-50'
+                        : m.disabled
+                          ? 'opacity-40 cursor-not-allowed bg-gray-50'
+                          : 'hover:bg-soft'
+                      }`}>
+                    <div>
+                      <span className="text-sm font-medium">{m.name}</span>
+                      {m.club && <span className="text-xs text-sub ml-1.5">({m.club})</span>}
+                    </div>
+                    {m.disabled
+                      ? <span className="text-[10px] text-gray-400">{m.disabledReason}</span>
+                      : partnerSelected?.member_id === m.member_id
+                        ? <span className="text-xs text-blue-500 font-medium">✓ 선택됨</span>
+                        : null
+                    }
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 선택된 새 파트너 표시 */}
+            {partnerSelected && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 mb-4">
+                <p className="text-xs text-blue-600 mb-0.5">새 파트너</p>
+                <p className="text-sm font-semibold text-blue-800">
+                  {partnerSelected.name}
+                  {partnerSelected.club && <span className="font-normal text-blue-600 ml-1">({partnerSelected.club})</span>}
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={closePartnerModal}
+                className="flex-1 py-3 border border-line rounded-xl text-sm text-sub
+                  hover:bg-soft transition-colors">
+                닫기
+              </button>
+              <button
+                onClick={handlePartnerSave}
+                disabled={!partnerSelected || partnerSaving}
+                className="flex-1 py-3 bg-accent text-white rounded-xl text-sm font-semibold
+                  hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                {partnerSaving ? '저장 중...' : '변경 저장'}
               </button>
             </div>
           </div>

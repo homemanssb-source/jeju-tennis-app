@@ -21,6 +21,15 @@ export default function EntryAdmin() {
   const [refundModal, setRefundModal] = useState(null) // entry 객체 (_raw 포함)
   const [refunding, setRefunding]     = useState(false)
 
+  // ── 선수 변경 모달 ──
+  const [editModal, setEditModal]           = useState(null)   // entry 객체
+  const [editField, setEditField]           = useState(null)   // 'member1' | 'member2'
+  const [editSearch, setEditSearch]         = useState('')
+  const [editResults, setEditResults]       = useState([])
+  const [editSelected, setEditSelected]     = useState(null)   // { member_id, name, club }
+  const [editSearching, setEditSearching]   = useState(false)
+  const [editSaving, setEditSaving]         = useState(false)
+
   useEffect(() => { fetchEvents() }, [])
   useEffect(() => {
     if (selectedEventId) { fetchEntries(); fetchTeamEntries() }
@@ -195,6 +204,82 @@ export default function EntryAdmin() {
     fetchEntries()
   }
 
+  // ── 선수 변경 (관리자) ──
+  function openEditModal(entry, field) {
+    setEditModal(entry)
+    setEditField(field)
+    setEditSearch('')
+    setEditResults([])
+    setEditSelected(null)
+  }
+
+  function closeEditModal() {
+    setEditModal(null)
+    setEditField(null)
+    setEditSearch('')
+    setEditResults([])
+    setEditSelected(null)
+  }
+
+  async function handleEditSearch() {
+    const q = editSearch.trim()
+    if (!q) return
+    setEditSearching(true)
+    const { data } = await supabase
+      .from('members')
+      .select('member_id, name, club, status')
+      .ilike('name', `%${q}%`)
+      .eq('status', '활성')
+      .limit(20)
+    setEditSearching(false)
+
+    const raw = editModal?._raw
+    const divisionName = editModal?.division
+
+    // 같은 부서 기신청자 수집 (프론트 체크)
+    const divisionEntries = entries.filter(e =>
+      (e.event_divisions?.division_name || '') === divisionName &&
+      e.entry_id !== raw?.entry_id
+    )
+    const takenIds = new Set(
+      divisionEntries.flatMap(e => [e.teams?.member1_id, e.teams?.member2_id].filter(Boolean))
+    )
+    // 변경 대상이 아닌 쪽 member_id (같은 팀 내 다른 선수)
+    const sameTeamId = editField === 'member1'
+      ? raw?.teams?.member2_id
+      : raw?.teams?.member1_id
+
+    const results = (data || []).map(m => ({
+      ...m,
+      disabled: (takenIds.has(m.member_id) && m.member_id !== (editField === 'member1' ? raw?.teams?.member1_id : raw?.teams?.member2_id))
+                || m.member_id === sameTeamId,
+      disabledReason: m.member_id === sameTeamId ? '같은 팀' : takenIds.has(m.member_id) ? '이미 신청됨' : '',
+    }))
+    setEditResults(results)
+  }
+
+  async function handleEditSave() {
+    if (!editModal || !editSelected || !editField) return
+    setEditSaving(true)
+
+    const teamId = editModal._raw?.teams?.team_id
+    const updateData = editField === 'member1'
+      ? { member1_id: editSelected.member_id }
+      : { member2_id: editSelected.member_id }
+
+    const { error } = await supabase
+      .from('teams')
+      .update(updateData)
+      .eq('team_id', teamId)
+
+    setEditSaving(false)
+    if (error) { showToast?.('변경 실패: ' + error.message, 'error'); return }
+
+    showToast?.('✅ 선수가 변경되었습니다.')
+    closeEditModal()
+    fetchEntries()
+  }
+
   function formatDate(str) {
     if (!str) return '-'
     return new Date(str).toLocaleDateString('ko-KR')
@@ -364,6 +449,23 @@ export default function EntryAdmin() {
                         <span className="text-xs text-gray-400">완료</span>
                       ) : (
                         <>
+                          {/* 개인전만 선수 변경 버튼 */}
+                          {e._source === 'individual' && (
+                            <button
+                              onClick={() => openEditModal(e, 'member1')}
+                              className="text-xs text-purple-600 border border-purple-200 bg-purple-50
+                                hover:bg-purple-100 rounded px-2 py-0.5">
+                              신청자
+                            </button>
+                          )}
+                          {e._source === 'individual' && (
+                            <button
+                              onClick={() => openEditModal(e, 'member2')}
+                              className="text-xs text-blue-600 border border-blue-200 bg-blue-50
+                                hover:bg-blue-100 rounded px-2 py-0.5">
+                              파트너
+                            </button>
+                          )}
                           {e.payment_status !== '결제완료' && (
                             <button onClick={() => handlePaymentSet(e, '결제완료')}
                               className="text-xs text-green-600 hover:underline">결제확인</button>
@@ -470,6 +572,102 @@ export default function EntryAdmin() {
                 className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold
                   hover:bg-green-700 disabled:opacity-50">
                 {refunding ? '처리 중...' : '환불 완료 처리'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── 선수 변경 모달 (관리자) ── */}
+      {editModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/40" onClick={closeEditModal} />
+          <div className="relative bg-white rounded-2xl p-5 w-full max-w-sm z-10">
+            <h3 className="text-base font-semibold text-gray-900 mb-1">
+              {editField === 'member1' ? '신청자 변경' : '파트너 변경'}
+            </h3>
+
+            {/* 현재 선수 */}
+            <div className="bg-soft rounded-xl px-4 py-2.5 mb-4">
+              <p className="text-xs text-sub mb-0.5">현재 {editField === 'member1' ? '신청자' : '파트너'}</p>
+              <p className="text-sm font-semibold text-gray-900">
+                {editField === 'member1'
+                  ? (editModal._raw?._m1?.name || '-')
+                  : (editModal._raw?._m2?.name || '-')}
+              </p>
+              <p className="text-xs text-sub mt-0.5">{editModal.division} · {editModal.name}</p>
+            </div>
+
+            {/* 검색 */}
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={editSearch}
+                onChange={e => setEditSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleEditSearch()}
+                placeholder="회원 이름 검색"
+                className="flex-1 text-sm border border-line rounded-lg px-3 py-2" />
+              <button
+                onClick={handleEditSearch}
+                disabled={editSearching || !editSearch.trim()}
+                className="px-3 py-2 bg-accent text-white text-sm rounded-lg disabled:opacity-50">
+                {editSearching ? '...' : '검색'}
+              </button>
+            </div>
+
+            {/* 검색 결과 */}
+            {editResults.length > 0 && (
+              <div className="border border-line rounded-xl overflow-hidden mb-3 max-h-44 overflow-y-auto">
+                {editResults.map(m => (
+                  <button
+                    key={m.member_id}
+                    disabled={m.disabled}
+                    onClick={() => !m.disabled && setEditSelected(m)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-left
+                      border-b border-line last:border-0 transition-colors
+                      ${editSelected?.member_id === m.member_id
+                        ? 'bg-blue-50'
+                        : m.disabled
+                          ? 'opacity-40 cursor-not-allowed bg-gray-50'
+                          : 'hover:bg-soft'
+                      }`}>
+                    <div>
+                      <span className="text-sm font-medium">{m.name}</span>
+                      {m.club && <span className="text-xs text-sub ml-1.5">({m.club})</span>}
+                    </div>
+                    {m.disabled
+                      ? <span className="text-[10px] text-gray-400">{m.disabledReason}</span>
+                      : editSelected?.member_id === m.member_id
+                        ? <span className="text-xs text-blue-500 font-medium">✓</span>
+                        : null
+                    }
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 선택된 새 선수 */}
+            {editSelected && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 mb-4">
+                <p className="text-xs text-blue-600 mb-0.5">변경할 선수</p>
+                <p className="text-sm font-semibold text-blue-800">
+                  {editSelected.name}
+                  {editSelected.club && <span className="font-normal text-blue-600 ml-1">({editSelected.club})</span>}
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={closeEditModal}
+                className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft">
+                닫기
+              </button>
+              <button
+                onClick={handleEditSave}
+                disabled={!editSelected || editSaving}
+                className="flex-1 py-2.5 bg-accent text-white rounded-xl text-sm font-semibold
+                  hover:bg-blue-700 disabled:opacity-50">
+                {editSaving ? '저장 중...' : '변경 저장'}
               </button>
             </div>
           </div>
