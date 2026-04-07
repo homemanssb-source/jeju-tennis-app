@@ -1,4 +1,4 @@
-﻿// src/pages/admin/EntryAdmin.jsx
+// src/pages/admin/EntryAdmin.jsx
 import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
