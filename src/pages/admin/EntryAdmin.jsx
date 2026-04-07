@@ -6,19 +6,16 @@ import { ToastContext } from '../../App'
 export default function EntryAdmin() {
   const showToast = useContext(ToastContext)
   const [events, setEvents]           = useState([])
-  const [entries, setEntries]         = useState([])       // 개인전
-  const [teamEntries, setTeamEntries] = useState([])       // 단체전
-  const [selectedEventId, setSelectedEventId] = useState('')
+  const [entries, setEntries]         = useState([])       // 媛쒖씤??  const [teamEntries, setTeamEntries] = useState([])       // ?⑥껜??  const [selectedEventId, setSelectedEventId] = useState('')
   const [filterPayment, setFilterPayment]     = useState('')
   const [filterType, setFilterType]           = useState('')
-  const [filterName, setFilterName]           = useState('')  // ★ 이름 검색
-  const [loading, setLoading]                 = useState(false)
+  const [filterName, setFilterName]           = useState('')  // ???대쫫 寃??  const [loading, setLoading]                 = useState(false)
 
-  // ── 취소 확인 모달 (관리자) ──
+  // ?? 痍⑥냼 ?뺤씤 紐⑤떖 (愿由ъ옄) ??
   const [confirmModal, setConfirmModal] = useState(null) // { message, onConfirm }
 
-  // ── 환불 처리 모달 ──
-  const [refundModal, setRefundModal] = useState(null) // entry 객체 (_raw 포함)
+  // ?? ?섎텋 泥섎━ 紐⑤떖 ??
+  const [refundModal, setRefundModal] = useState(null) // entry 媛앹껜 (_raw ?ы븿)
   const [refunding, setRefunding]     = useState(false)
 
   useEffect(() => { fetchEvents() }, [])
@@ -34,21 +31,21 @@ export default function EntryAdmin() {
 
   async function fetchEntries() {
     setLoading(true)
-    // 일반 신청 건 (취소 제외)
+    // ?쇰컲 ?좎껌 嫄?(痍⑥냼 ?쒖쇅)
     const { data: normalData } = await supabase
       .from('event_entries')
       .select('*, teams ( team_id, team_name, member1_id, member2_id ), event_divisions ( division_name )')
       .eq('event_id', selectedEventId)
-      .neq('entry_status', '취소')
+      .neq('entry_status', '痍⑥냼')
       .order('applied_at', { ascending: false })
 
-    // 환불대기/환불완료 건 (취소됐지만 관리자가 처리해야 할 건)
+    // ?섎텋?湲??섎텋?꾨즺 嫄?(痍⑥냼?먯?留?愿由ъ옄媛 泥섎━?댁빞 ??嫄?
     const { data: refundData } = await supabase
       .from('event_entries')
       .select('*, teams ( team_id, team_name, member1_id, member2_id ), event_divisions ( division_name )')
       .eq('event_id', selectedEventId)
-      .eq('entry_status', '취소')
-      .in('payment_status', ['환불대기', '환불완료'])
+      .eq('entry_status', '痍⑥냼')
+      .in('payment_status', ['?섎텋?湲?, '?섎텋?꾨즺'])
       .order('applied_at', { ascending: false })
 
     const merged = [
@@ -56,7 +53,7 @@ export default function EntryAdmin() {
       ...(refundData || []),
     ]
 
-    // ★ member_id 목록 수집 → members 테이블에서 club 한번에 조회
+    // ??member_id 紐⑸줉 ?섏쭛 ??members ?뚯씠釉붿뿉??club ?쒕쾲??議고쉶
     const memberIds = [...new Set(
       merged.flatMap(e => [e.teams?.member1_id, e.teams?.member2_id].filter(Boolean))
     )]
@@ -70,7 +67,7 @@ export default function EntryAdmin() {
         memberClubMap[m.member_id] = { name: m.name, club: m.club }
       }
     }
-    // ★ 각 entry에 club 정보 첨부
+    // ??媛?entry??club ?뺣낫 泥⑤?
     for (const e of merged) {
       e._m1 = e.teams?.member1_id ? memberClubMap[e.teams.member1_id] : null
       e._m2 = e.teams?.member2_id ? memberClubMap[e.teams.member2_id] : null
@@ -90,16 +87,16 @@ export default function EntryAdmin() {
     setTeamEntries(data || [])
   }
 
-  // ── 통합 목록 ──
+  // ?? ?듯빀 紐⑸줉 ??
   const allEntries = [
     ...entries.map(e => {
-      // ★ "홍길동(제주하나)/홍길금(제주아라)" 형식 조합
+      // ??"?띻만???쒖＜?섎굹)/?띻만湲??쒖＜?꾨씪)" ?뺤떇 議고빀
       const p1 = e._m1 ? (e._m1.club ? `${e._m1.name}(${e._m1.club})` : e._m1.name) : ''
       const p2 = e._m2 ? (e._m2.club ? `${e._m2.name}(${e._m2.club})` : e._m2.name) : ''
       const displayName = p1 && p2 ? `${p1}/${p2}` : (p1 || e.teams?.team_name || '-')
       return {
         id:             e.entry_id,
-        type:           '개인',
+        type:           '媛쒖씤',
         name:           displayName,
         division:       e.event_divisions?.division_name || '-',
         status:         e.entry_status,
@@ -111,86 +108,86 @@ export default function EntryAdmin() {
     }),
     ...teamEntries.map(e => ({
       id:             e.id,
-      type:           '단체',
+      type:           '?⑥껜',
       name:           e.club_name || '-',
       division:       e.division_name || '-',
-      status:         e.status === 'confirmed' ? '확정' : e.status === 'pending' ? '대기' : e.status,
-      payment_status: e.payment_status || '미납',
+      status:         e.status === 'confirmed' ? '?뺤젙' : e.status === 'pending' ? '?湲? : e.status,
+      payment_status: e.payment_status || '誘몃궔',
       date:           e.created_at,
       _source:        'team',
       _raw:           e,
     })),
   ]
 
-  // 취소 건 제외한 카운트 기준 목록
+  // 痍⑥냼 嫄??쒖쇅??移댁슫??湲곗? 紐⑸줉
   const activeEntries = allEntries.filter(e =>
-    e.status !== '취소' && e.payment_status !== '환불완료'
+    e.status !== '痍⑥냼' && e.payment_status !== '?섎텋?꾨즺'
   )
 
   const totalCount   = activeEntries.length
-  const paidCount    = activeEntries.filter(e => e.payment_status === '결제완료').length
-  const unpaidCount  = activeEntries.filter(e => e.payment_status === '미납').length
-  const refundCount  = allEntries.filter(e => e.payment_status === '환불대기').length
+  const paidCount    = activeEntries.filter(e => e.payment_status === '寃곗젣?꾨즺').length
+  const unpaidCount  = activeEntries.filter(e => e.payment_status === '誘몃궔').length
+  const refundCount  = allEntries.filter(e => e.payment_status === '?섎텋?湲?).length
 
-  // ★ 필터 적용 (이름 검색 포함)
+  // ???꾪꽣 ?곸슜 (?대쫫 寃???ы븿)
   const filtered = allEntries.filter(e => {
     if (filterPayment && e.payment_status !== filterPayment) return false
-    if (filterType === '개인' && e.type !== '개인') return false
-    if (filterType === '단체' && e.type !== '단체') return false
+    if (filterType === '媛쒖씤' && e.type !== '媛쒖씤') return false
+    if (filterType === '?⑥껜' && e.type !== '?⑥껜') return false
     if (filterName.trim() && !e.name.toLowerCase().includes(filterName.trim().toLowerCase())) return false
     return true
   })
 
-  // ── 결제 상태 변경 ──
+  // ?? 寃곗젣 ?곹깭 蹂寃???
   async function handlePaymentSet(entry, status) {
     if (entry._source === 'individual') {
       await supabase.from('event_entries')
-        .update({ payment_status: status, paid_at: status === '결제완료' ? new Date().toISOString() : null })
+        .update({ payment_status: status, paid_at: status === '寃곗젣?꾨즺' ? new Date().toISOString() : null })
         .eq('entry_id', entry.id)
     } else {
       await supabase.from('team_event_entries')
-        .update({ payment_status: status, paid_at: status === '결제완료' ? new Date().toISOString() : null })
+        .update({ payment_status: status, paid_at: status === '寃곗젣?꾨즺' ? new Date().toISOString() : null })
         .eq('id', entry.id)
     }
-    showToast?.('결제 상태 변경: ' + status)
+    showToast?.('寃곗젣 ?곹깭 蹂寃? ' + status)
     fetchEntries(); fetchTeamEntries()
   }
 
-  // ── 신청 취소 (관리자) ──
+  // ?? ?좎껌 痍⑥냼 (愿由ъ옄) ??
   function handleCancelConfirm(entry) {
     setConfirmModal({
-      message: `"${entry.name}" 신청을 취소하시겠습니까?`,
+      message: `"${entry.name}" ?좎껌??痍⑥냼?섏떆寃좎뒿?덇퉴?`,
       onConfirm: async () => {
         if (entry._source === 'individual') {
           await supabase.from('event_entries')
-            .update({ entry_status: '취소', cancelled_at: new Date().toISOString() })
+            .update({ entry_status: '痍⑥냼', cancelled_at: new Date().toISOString() })
             .eq('entry_id', entry.id)
         } else {
           await supabase.from('team_event_entries')
             .update({ status: 'cancelled' })
             .eq('id', entry.id)
         }
-        showToast?.('신청 취소됨')
+        showToast?.('?좎껌 痍⑥냼??)
         setConfirmModal(null)
         fetchEntries(); fetchTeamEntries()
       }
     })
   }
 
-  // ── 환불 완료 처리 ──
+  // ?? ?섎텋 ?꾨즺 泥섎━ ??
   async function handleRefundComplete() {
     if (!refundModal) return
     setRefunding(true)
     const { error } = await supabase.from('event_entries')
       .update({
-        payment_status:      '환불완료',
+        payment_status:      '?섎텋?꾨즺',
         refund_completed_at: new Date().toISOString(),
       })
       .eq('entry_id', refundModal.id)
 
     setRefunding(false)
-    if (error) { showToast?.('환불 처리 실패: ' + error.message, 'error'); return }
-    showToast?.('✅ 환불 완료 처리되었습니다.')
+    if (error) { showToast?.('?섎텋 泥섎━ ?ㅽ뙣: ' + error.message, 'error'); return }
+    showToast?.('???섎텋 ?꾨즺 泥섎━?섏뿀?듬땲??')
     setRefundModal(null)
     fetchEntries()
   }
@@ -201,24 +198,24 @@ export default function EntryAdmin() {
   }
 
   function payBadgeClass(status) {
-    if (status === '결제완료') return 'bg-green-50 text-green-700'
-    if (status === '현장납부') return 'bg-yellow-50 text-yellow-700'
-    if (status === '환불대기') return 'bg-orange-50 text-orange-700'
-    if (status === '환불완료') return 'bg-gray-100 text-gray-500'
+    if (status === '寃곗젣?꾨즺') return 'bg-green-50 text-green-700'
+    if (status === '?꾩옣?⑸?') return 'bg-yellow-50 text-yellow-700'
+    if (status === '?섎텋?湲?) return 'bg-orange-50 text-orange-700'
+    if (status === '?섎텋?꾨즺') return 'bg-gray-100 text-gray-500'
     return 'bg-red-50 text-red-600'
   }
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4">📋 참가신청 관리</h2>
+      <h2 className="text-lg font-bold mb-4">?뱥 李멸??좎껌 愿由?/h2>
 
-      {/* 대회 선택 + 유형/결제 필터 */}
+      {/* ????좏깮 + ?좏삎/寃곗젣 ?꾪꽣 */}
       <div className="flex gap-2 mb-4 flex-wrap">
         <select
           value={selectedEventId}
           onChange={e => { setSelectedEventId(e.target.value); setEntries([]); setTeamEntries([]) }}
           className="flex-1 min-w-[200px] text-sm border border-line rounded-lg px-3 py-2">
-          <option value="">대회 선택</option>
+          <option value="">????좏깮</option>
           {events.map(ev => (
             <option key={ev.event_id} value={ev.event_id}>
               {ev.event_name} ({ev.event_date})
@@ -226,33 +223,33 @@ export default function EntryAdmin() {
           ))}
         </select>
 
-        {/* ★ 이름 검색 */}
+        {/* ???대쫫 寃??*/}
         <input
           type="text"
           value={filterName}
           onChange={e => setFilterName(e.target.value)}
-          placeholder="이름 검색..."
+          placeholder="?대쫫 寃??.."
           className="text-sm border border-line rounded-lg px-3 py-2 w-32"
         />
 
         <select value={filterType} onChange={e => setFilterType(e.target.value)}
           className="text-sm border border-line rounded-lg px-3 py-2">
-          <option value="">전체 유형</option>
-          <option value="개인">개인전만</option>
-          <option value="단체">단체전만</option>
+          <option value="">?꾩껜 ?좏삎</option>
+          <option value="媛쒖씤">媛쒖씤?꾨쭔</option>
+          <option value="?⑥껜">?⑥껜?꾨쭔</option>
         </select>
         <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)}
           className="text-sm border border-line rounded-lg px-3 py-2">
-          <option value="">전체 결제상태</option>
-          <option value="미납">미납만</option>
-          <option value="결제완료">결제완료만</option>
-          <option value="현장납부">현장납부</option>
-          <option value="환불대기">환불대기만</option>
-          <option value="환불완료">환불완료만</option>
+          <option value="">?꾩껜 寃곗젣?곹깭</option>
+          <option value="誘몃궔">誘몃궔留?/option>
+          <option value="寃곗젣?꾨즺">寃곗젣?꾨즺留?/option>
+          <option value="?꾩옣?⑸?">?꾩옣?⑸?</option>
+          <option value="?섎텋?湲?>?섎텋?湲곕쭔</option>
+          <option value="?섎텋?꾨즺">?섎텋?꾨즺留?/option>
         </select>
       </div>
 
-      {/* ── 카운트 탭 ── */}
+      {/* ?? 移댁슫?????? */}
       {selectedEventId && (
         <div className="flex gap-2 mb-4 flex-wrap">
           <button
@@ -260,73 +257,73 @@ export default function EntryAdmin() {
             className={`px-3 py-2 rounded-lg text-left transition-colors ${
               filterPayment === '' ? 'bg-accent text-white' : 'bg-soft text-gray-700 hover:bg-soft2'
             }`}>
-            <p className="text-[10px] opacity-80">전체</p>
-            <p className="text-lg font-bold">{totalCount}팀</p>
+            <p className="text-[10px] opacity-80">?꾩껜</p>
+            <p className="text-lg font-bold">{totalCount}?</p>
           </button>
           <button
-            onClick={() => setFilterPayment(filterPayment === '결제완료' ? '' : '결제완료')}
+            onClick={() => setFilterPayment(filterPayment === '寃곗젣?꾨즺' ? '' : '寃곗젣?꾨즺')}
             className={`px-3 py-2 rounded-lg text-left transition-colors ${
-              filterPayment === '결제완료' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'
+              filterPayment === '寃곗젣?꾨즺' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'
             }`}>
-            <p className="text-[10px] opacity-80">결제완료</p>
-            <p className="text-lg font-bold">{paidCount}팀</p>
+            <p className="text-[10px] opacity-80">寃곗젣?꾨즺</p>
+            <p className="text-lg font-bold">{paidCount}?</p>
           </button>
           <button
-            onClick={() => setFilterPayment(filterPayment === '미납' ? '' : '미납')}
+            onClick={() => setFilterPayment(filterPayment === '誘몃궔' ? '' : '誘몃궔')}
             className={`px-3 py-2 rounded-lg text-left transition-colors ${
-              filterPayment === '미납' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600 hover:bg-red-100'
+              filterPayment === '誘몃궔' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600 hover:bg-red-100'
             }`}>
-            <p className="text-[10px] opacity-80">미납</p>
-            <p className="text-lg font-bold">{unpaidCount}팀</p>
+            <p className="text-[10px] opacity-80">誘몃궔</p>
+            <p className="text-lg font-bold">{unpaidCount}?</p>
           </button>
           {refundCount > 0 && (
             <button
-              onClick={() => setFilterPayment(filterPayment === '환불대기' ? '' : '환불대기')}
+              onClick={() => setFilterPayment(filterPayment === '?섎텋?湲? ? '' : '?섎텋?湲?)}
               className={`px-3 py-2 rounded-lg text-left transition-colors ${
-                filterPayment === '환불대기'
+                filterPayment === '?섎텋?湲?
                   ? 'bg-orange-500 text-white'
                   : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
               }`}>
-              <p className="text-[10px] opacity-80">환불대기</p>
-              <p className="text-lg font-bold">{refundCount}팀</p>
+              <p className="text-[10px] opacity-80">?섎텋?湲?/p>
+              <p className="text-lg font-bold">{refundCount}?</p>
             </button>
           )}
         </div>
       )}
 
-      {/* ── 엔트리 목록 ── */}
+      {/* ?? ?뷀듃由?紐⑸줉 ?? */}
       {!selectedEventId ? (
-        <p className="text-center py-8 text-sub text-sm">대회를 선택해주세요.</p>
+        <p className="text-center py-8 text-sub text-sm">??뚮? ?좏깮?댁＜?몄슂.</p>
       ) : loading ? (
-        <p className="text-center py-8 text-sub text-sm">로딩 중...</p>
+        <p className="text-center py-8 text-sub text-sm">濡쒕뵫 以?..</p>
       ) : (
         <div className="bg-white rounded-r border border-line overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-soft2">
               <tr>
-                <th className="px-3 py-2 text-center text-sub font-medium">유형</th>
-                <th className="px-3 py-2 text-left text-sub font-medium">부서</th>
-                <th className="px-3 py-2 text-left text-sub font-medium">팀/클럽</th>
-                <th className="px-3 py-2 text-center text-sub font-medium">상태</th>
-                <th className="px-3 py-2 text-center text-sub font-medium">결제</th>
-                <th className="px-3 py-2 text-left text-sub font-medium">신청일</th>
-                <th className="px-3 py-2 text-center text-sub font-medium">액션</th>
+                <th className="px-3 py-2 text-center text-sub font-medium">?좏삎</th>
+                <th className="px-3 py-2 text-left text-sub font-medium">遺??/th>
+                <th className="px-3 py-2 text-left text-sub font-medium">?/?대읇</th>
+                <th className="px-3 py-2 text-center text-sub font-medium">?곹깭</th>
+                <th className="px-3 py-2 text-center text-sub font-medium">寃곗젣</th>
+                <th className="px-3 py-2 text-left text-sub font-medium">?좎껌??/th>
+                <th className="px-3 py-2 text-center text-sub font-medium">?≪뀡</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-sub">신청 내역 없음</td>
+                  <td colSpan={7} className="text-center py-8 text-sub">?좎껌 ?댁뿭 ?놁쓬</td>
                 </tr>
               ) : filtered.map(e => (
                 <tr
                   key={`${e._source}-${e.id}`}
                   className={`border-t border-line hover:bg-soft ${
-                    e.payment_status === '환불대기' ? 'bg-orange-50/40' : ''
+                    e.payment_status === '?섎텋?湲? ? 'bg-orange-50/40' : ''
                   }`}>
                   <td className="px-3 py-2 text-center">
                     <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      e.type === '단체' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'
+                      e.type === '?⑥껜' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'
                     }`}>{e.type}</span>
                   </td>
                   <td className="px-3 py-2">{e.division}</td>
@@ -338,10 +335,10 @@ export default function EntryAdmin() {
                   </td>
                   <td className="px-3 py-2 text-center">
                     <span className={`text-xs px-1.5 py-0.5 rounded ${payBadgeClass(e.payment_status)}`}>
-                      {e.payment_status || '미납'}
+                      {e.payment_status || '誘몃궔'}
                     </span>
-                    {/* 환불대기: 계좌 정보 미리보기 */}
-                    {e.payment_status === '환불대기' && e._raw && (
+                    {/* ?섎텋?湲? 怨꾩쥖 ?뺣낫 誘몃━蹂닿린 */}
+                    {e.payment_status === '?섎텋?湲? && e._raw && (
                       <div className="text-[10px] text-orange-700 mt-0.5 text-left">
                         {e._raw.refund_bank} {e._raw.refund_account}
                       </div>
@@ -352,28 +349,28 @@ export default function EntryAdmin() {
                   </td>
                   <td className="px-3 py-2 text-center">
                     <div className="flex gap-1 justify-center flex-wrap">
-                      {/* 환불대기 → 환불 처리 버튼만 표시 */}
-                      {e.payment_status === '환불대기' ? (
+                      {/* ?섎텋?湲????섎텋 泥섎━ 踰꾪듉留??쒖떆 */}
+                      {e.payment_status === '?섎텋?湲? ? (
                         <button
                           onClick={() => setRefundModal(e)}
                           className="text-xs text-orange-600 border border-orange-200 bg-orange-50
                             hover:bg-orange-100 rounded px-2 py-0.5 font-medium">
-                          환불 처리
+                          ?섎텋 泥섎━
                         </button>
-                      ) : e.payment_status === '환불완료' ? (
-                        <span className="text-xs text-gray-400">완료</span>
+                      ) : e.payment_status === '?섎텋?꾨즺' ? (
+                        <span className="text-xs text-gray-400">?꾨즺</span>
                       ) : (
                         <>
-                          {e.payment_status !== '결제완료' && (
-                            <button onClick={() => handlePaymentSet(e, '결제완료')}
-                              className="text-xs text-green-600 hover:underline">결제확인</button>
+                          {e.payment_status !== '寃곗젣?꾨즺' && (
+                            <button onClick={() => handlePaymentSet(e, '寃곗젣?꾨즺')}
+                              className="text-xs text-green-600 hover:underline">寃곗젣?뺤씤</button>
                           )}
-                          {e.payment_status !== '현장납부' && e.payment_status !== '결제완료' && (
-                            <button onClick={() => handlePaymentSet(e, '현장납부')}
-                              className="text-xs text-yellow-600 hover:underline">현장납부</button>
+                          {e.payment_status !== '?꾩옣?⑸?' && e.payment_status !== '寃곗젣?꾨즺' && (
+                            <button onClick={() => handlePaymentSet(e, '?꾩옣?⑸?')}
+                              className="text-xs text-yellow-600 hover:underline">?꾩옣?⑸?</button>
                           )}
                           <button onClick={() => handleCancelConfirm(e)}
-                            className="text-xs text-red-500 hover:underline">취소</button>
+                            className="text-xs text-red-500 hover:underline">痍⑥냼</button>
                         </>
                       )}
                     </div>
@@ -385,7 +382,7 @@ export default function EntryAdmin() {
         </div>
       )}
 
-      {/* ── 관리자 취소 확인 모달 ── */}
+      {/* ?? 愿由ъ옄 痍⑥냼 ?뺤씤 紐⑤떖 ?? */}
       {confirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmModal(null)} />
@@ -395,81 +392,81 @@ export default function EntryAdmin() {
               <button
                 onClick={() => setConfirmModal(null)}
                 className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft">
-                취소
+                痍⑥냼
               </button>
               <button
                 onClick={confirmModal.onConfirm}
                 className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600">
-                확인
+                ?뺤씤
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── 환불 처리 모달 ── */}
+      {/* ?? ?섎텋 泥섎━ 紐⑤떖 ?? */}
       {refundModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setRefundModal(null)} />
           <div className="relative bg-white rounded-2xl p-6 w-full max-w-sm z-10">
-            <h3 className="text-base font-semibold text-gray-900 mb-4">환불 처리 확인</h3>
+            <h3 className="text-base font-semibold text-gray-900 mb-4">?섎텋 泥섎━ ?뺤씤</h3>
 
-            {/* 신청 정보 */}
+            {/* ?좎껌 ?뺣낫 */}
             <div className="bg-soft rounded-xl px-4 py-3 mb-4 space-y-1.5">
               <div className="flex justify-between text-xs">
-                <span className="text-sub">회원</span>
+                <span className="text-sub">?뚯썝</span>
                 <span className="font-medium">{refundModal.name}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-sub">부서</span>
+                <span className="text-sub">遺??/span>
                 <span>{refundModal.division}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-sub">신청일</span>
+                <span className="text-sub">?좎껌??/span>
                 <span>{formatDate(refundModal.date)}</span>
               </div>
               {refundModal._raw?.refund_requested_at && (
                 <div className="flex justify-between text-xs">
-                  <span className="text-sub">취소 신청일</span>
+                  <span className="text-sub">痍⑥냼 ?좎껌??/span>
                   <span>{formatDate(refundModal._raw.refund_requested_at)}</span>
                 </div>
               )}
             </div>
 
-            {/* 환불 계좌 */}
+            {/* ?섎텋 怨꾩쥖 */}
             <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mb-5 space-y-1.5">
-              <p className="text-xs font-semibold text-orange-800 mb-1">환불 계좌 (회원 입력)</p>
+              <p className="text-xs font-semibold text-orange-800 mb-1">?섎텋 怨꾩쥖 (?뚯썝 ?낅젰)</p>
               <div className="flex justify-between text-xs">
-                <span className="text-orange-700">은행</span>
+                <span className="text-orange-700">???/span>
                 <span className="font-medium text-orange-900">{refundModal._raw?.refund_bank || '-'}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-orange-700">계좌번호</span>
+                <span className="text-orange-700">怨꾩쥖踰덊샇</span>
                 <span className="font-medium text-orange-900">{refundModal._raw?.refund_account || '-'}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-orange-700">예금주</span>
+                <span className="text-orange-700">?덇툑二?/span>
                 <span className="font-medium text-orange-900">{refundModal._raw?.refund_holder || '-'}</span>
               </div>
             </div>
 
             <p className="text-xs text-sub mb-5 leading-relaxed">
-              위 계좌로 환불 입금 후 "환불 완료" 버튼을 눌러주세요.
-              처리 후 결제 상태가 "환불완료"로 변경됩니다.
+              ??怨꾩쥖濡??섎텋 ?낃툑 ??"?섎텋 ?꾨즺" 踰꾪듉???뚮윭二쇱꽭??
+              泥섎━ ??寃곗젣 ?곹깭媛 "?섎텋?꾨즺"濡?蹂寃쎈맗?덈떎.
             </p>
 
             <div className="flex gap-3">
               <button
                 onClick={() => setRefundModal(null)}
                 className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft">
-                닫기
+                ?リ린
               </button>
               <button
                 onClick={handleRefundComplete}
                 disabled={refunding}
                 className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold
                   hover:bg-green-700 disabled:opacity-50">
-                {refunding ? '처리 중...' : '환불 완료 처리'}
+                {refunding ? '泥섎━ 以?..' : '?섎텋 ?꾨즺 泥섎━'}
               </button>
             </div>
           </div>
