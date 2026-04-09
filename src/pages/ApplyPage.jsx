@@ -893,7 +893,7 @@ export default function ApplyPage() {
                       <tr key={m.id || i} className="border-t border-line/30">
                         <td className="px-3 py-2.5 text-xs text-sub">{i + 1}</td>
                         <td className="px-3 py-2.5 font-medium">{m.member_name}</td>
-                        <td className="px-3 py-2.5 text-xs">{m.gender === 'M' ? '남' : m.gender === 'F' ? '여' : '-'}</td>
+                        <td className="px-3 py-2.5 text-xs">{m.gender === 'M' || m.gender === '남' ? '남' : m.gender === 'F' || m.gender === '여' ? '여' : '-'}</td>
                         <td className="px-3 py-2.5 text-xs text-accent">{m.grade || '-'}</td>
                       </tr>
                     ))}
@@ -987,7 +987,7 @@ export default function ApplyPage() {
                             <tr key={m.member_id || i} className="border-t border-line/30">
                               <td className="px-3 py-2 text-xs text-sub">{i + 1}</td>
                               <td className="px-3 py-2 font-medium">{m.member_name}</td>
-                              <td className="px-3 py-2 text-xs">{m.gender === 'M' ? '남' : m.gender === 'F' ? '여' : '-'}</td>
+                              <td className="px-3 py-2 text-xs">{m.gender === 'M' || m.gender === '남' ? '남' : m.gender === 'F' || m.gender === '여' ? '여' : '-'}</td>
                               <td className="px-3 py-2 text-xs text-accent">{m.grade || '-'}</td>
                               <td className="px-3 py-2 text-center">
                                 <button onClick={() => handleRosterEditRemove(m.member_id)}
