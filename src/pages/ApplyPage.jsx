@@ -273,25 +273,50 @@ export default function ApplyPage() {
     setMyLoading(true)
     setMySearched(false)
 
-    const { data, error } = await supabase.rpc('rpc_get_my_entries', {
-      p_phone: phone.replace(/[^0-9]/g, ''),
+    const cleanPhone = phone.replace(/[^0-9]/g, '')
+
+    // 1단계: 전화번호로 회원 조회 → 이름 확보 → PIN 검증
+    const { data: memberRow } = await supabase
+      .from('members')
+      .select('member_id, name')
+      .eq('phone', cleanPhone)
+      .single()
+
+    if (!memberRow) {
+      setMyLoading(false)
+      setMySearched(true)
+      setMyError('등록된 전화번호가 아닙니다.')
+      setMyEntries([])
+      setMyTeamEntries([])
+      return
+    }
+
+    const { data: pinData } = await supabase.rpc('rpc_verify_member_pin', {
+      p_name: memberRow.name,
       p_pin: pin,
     })
+
+    if (!pinData?.ok) {
+      setMyLoading(false)
+      setMySearched(true)
+      setMyError(pinData?.message || 'PIN이 올바르지 않습니다.')
+      setMyEntries([])
+      setMyTeamEntries([])
+      return
+    }
+
+    // 2단계: PIN 인증 성공 → 개인전 + 단체전 병렬 조회
+    const [entriesResult, teamResult] = await Promise.all([
+      supabase.rpc('rpc_get_my_entries', { p_phone: cleanPhone, p_pin: pin }),
+      fetchMyTeamEntries(cleanPhone, pin),
+    ])
 
     setMyLoading(false)
     setMySearched(true)
 
-    if (error || !data?.ok) {
-      setMyError(data?.message || error?.message || '조회 실패')
-      setMyEntries([])
-      setMyName('')
-      return
-    }
-
-    setMyName(data.member_name || '')
-    setMyEntries(data.entries || [])
-    // 단체전 신청 내역도 함께 조회
-    await fetchMyTeamEntries(phone.replace(/[^0-9]/g, ''), pin)
+    const { data: entriesData } = entriesResult
+    setMyName(entriesData?.member_name || memberRow.name || '')
+    setMyEntries(entriesData?.entries || [])
   }
 
   // ── 취소 가능 여부 판단 ──
