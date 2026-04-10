@@ -138,30 +138,61 @@ export default function ApplyPage() {
   function closeRosterView() { setRosterViewTarget(null); setRosterViewMembers([]) }
 
   // ── 내 단체전 신청 조회 ──
+  // 대표자(captain_name)이거나 선수 명단(member_id)에 포함된 팀 모두 조회
   async function fetchMyTeamEntries(cleanPhone, cleanPin) {
-    // captain_name + pin 으로 본인 소속 팀 찾기
-    // 전화번호로 member 조회 후 team_event_members에서 entry_id 검색
-    const { data: memberRows } = await supabase
+    // 1) 전화번호로 이름 조회
+    const { data: memberRow } = await supabase
       .from('members')
-      .select('member_id')
+      .select('member_id, name')
       .eq('phone', cleanPhone)
-    const memberId = memberRows?.[0]?.member_id
-    if (!memberId) { setMyTeamEntries([]); return }
+      .single()
 
-    const { data: memEntries } = await supabase
-      .from('team_event_members')
-      .select('entry_id')
-      .eq('member_id', memberId)
-    const entryIds = (memEntries || []).map(r => r.entry_id)
-    if (entryIds.length === 0) { setMyTeamEntries([]); return }
+    if (!memberRow) { setMyTeamEntries([]); return }
 
-    const { data: teamRows } = await supabase
-      .from('team_event_entries')
-      .select('*, events(event_name, event_date, entry_close_at)')
-      .in('id', entryIds)
-      .neq('status', 'cancelled')
-      .order('created_at', { ascending: false })
-    setMyTeamEntries((teamRows || []).map(r => ({ ...r, _my_member_id: memberId })))
+    const myName     = memberRow.name
+    const myMemberId = memberRow.member_id
+
+    // 2) captain_name으로 팀 조회 + member_id로 팀 조회 병렬
+    const [captainResult, memberResult] = await Promise.all([
+      // 대표자로 신청한 팀
+      supabase
+        .from('team_event_entries')
+        .select('*, events(event_name, event_date, entry_close_at)')
+        .eq('captain_name', myName)
+        .neq('status', 'cancelled')
+        .order('created_at', { ascending: false }),
+
+      // 선수 명단에 포함된 팀 (member_id로)
+      supabase
+        .from('team_event_members')
+        .select('entry_id')
+        .eq('member_id', myMemberId),
+    ])
+
+    const captainEntries = captainResult.data || []
+
+    // 3) member_id로 찾은 entry_id로 팀 조회
+    const entryIds = (memberResult.data || []).map(r => r.entry_id)
+    let memberEntries = []
+    if (entryIds.length > 0) {
+      const { data } = await supabase
+        .from('team_event_entries')
+        .select('*, events(event_name, event_date, entry_close_at)')
+        .in('id', entryIds)
+        .neq('status', 'cancelled')
+        .order('created_at', { ascending: false })
+      memberEntries = data || []
+    }
+
+    // 4) 중복 제거 후 합산
+    const seen = new Set()
+    const combined = [...captainEntries, ...memberEntries].filter(r => {
+      if (seen.has(r.id)) return false
+      seen.add(r.id)
+      return true
+    })
+
+    setMyTeamEntries(combined)
   }
 
   // ── 단체전 명단 수정 모달 열기 ──
