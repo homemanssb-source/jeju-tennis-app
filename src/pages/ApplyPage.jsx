@@ -55,7 +55,7 @@ export default function ApplyPage() {
   const [rosterEditSearch, setRosterEditSearch]   = useState('')
   const [rosterEditResults, setRosterEditResults] = useState([])
   const [rosterEditSearching, setRosterEditSearching] = useState(false)
-  // 주장 PIN 인증 (명단 수정)
+  // 대표자 PIN 인증 (명단 수정)
   const [rosterEditPin, setRosterEditPin]         = useState('')
   const [rosterEditPinVerified, setRosterEditPinVerified] = useState(false)
   const [rosterEditPinLoading, setRosterEditPinLoading] = useState(false)
@@ -190,7 +190,7 @@ export default function ApplyPage() {
     setRosterEditSearch(''); setRosterEditResults([])
   }
 
-  // 주장 PIN 인증
+  // 대표자 PIN 인증
   async function handleRosterEditPinVerify() {
     if (!rosterEditTarget || rosterEditPin.length !== 6) {
       showToast('PIN 6자리를 입력해주세요.', 'error'); return
@@ -246,7 +246,7 @@ export default function ApplyPage() {
   }
 
   async function handleRosterEditSave() {
-    if (!rosterEditPinVerified) { showToast('주장 PIN 인증이 필요합니다.', 'error'); return }
+    if (!rosterEditPinVerified) { showToast('대표자 PIN 인증이 필요합니다.', 'error'); return }
     if (rosterEditMembers.length === 0) { showToast('선수를 1명 이상 등록해주세요.', 'error'); return }
     setRosterEditSaving(true)
     const entryId = rosterEditTarget.id
@@ -674,7 +674,7 @@ export default function ApplyPage() {
                                   <p className="text-sm font-medium truncate">{team.club_name}</p>
                                   <p className="text-xs text-sub mt-0.5">
                                     {team.division_name || '부서 미지정'}
-                                    {team.captain_name && <span className="ml-2">주장: {team.captain_name}</span>}
+                                    {team.captain_name && <span className="ml-2">대표자: {team.captain_name}</span>}
                                   </p>
                                 </div>
                               </div>
@@ -896,7 +896,7 @@ export default function ApplyPage() {
               <div>
                 <h3 className="text-base font-semibold text-gray-900">{rosterViewTarget.club_name}</h3>
                 <p className="text-xs text-sub mt-0.5">
-                  {rosterViewTarget.division_name || '부서 미지정'} · 주장: {rosterViewTarget.captain_name}
+                  {rosterViewTarget.division_name || '부서 미지정'} · 대표자: {rosterViewTarget.captain_name}
                 </p>
               </div>
               <button onClick={closeRosterView} className="text-sub text-lg leading-none">✕</button>
@@ -957,15 +957,15 @@ export default function ApplyPage() {
             </div>
 
             {!rosterEditPinVerified ? (
-              /* STEP 1: 주장 PIN 인증 */
+              /* STEP 1: 대표자 PIN 인증 */
               <div className="space-y-3">
                 <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
                   <p className="text-xs text-amber-800">
-                    명단 수정은 주장({rosterEditTarget.captain_name}) 본인만 가능합니다.
+                    명단 수정은 대표자({rosterEditTarget.captain_name}) 본인만 가능합니다.
                   </p>
                 </div>
                 <div>
-                  <label className="block text-xs text-sub mb-1">주장 PIN (6자리)</label>
+                  <label className="block text-xs text-sub mb-1">대표자 PIN (6자리)</label>
                   <input type="password" inputMode="numeric" maxLength={6}
                     value={rosterEditPin}
                     onChange={e => setRosterEditPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
