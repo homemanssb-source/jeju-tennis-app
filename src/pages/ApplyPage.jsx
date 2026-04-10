@@ -15,7 +15,8 @@ export default function ApplyPage() {
   const [entries, setEntries]                 = useState([])
   const [teamEntries, setTeamEntries]         = useState([])
   const [loading, setLoading]                 = useState(false)
-  const [activeDivision, setActiveDivision]   = useState('전체')
+  const [activeDivision, setActiveDivision]     = useState('전체')
+  const [activeTeamDivision, setActiveTeamDivision] = useState('전체')
 
   // ── 내 신청 내역 ──
   const [phone, setPhone]           = useState('')
@@ -78,6 +79,7 @@ export default function ApplyPage() {
   async function fetchEntries() {
     setLoading(true)
     setActiveDivision('전체')
+    setActiveTeamDivision('전체')
     const { data } = await supabase
       .from('event_entries')
       .select('*, teams ( team_name, member1_id, member2_id ), event_divisions ( division_name )')
@@ -482,6 +484,10 @@ export default function ApplyPage() {
     ? entries
     : entries.filter(e => (e.event_divisions?.division_name || '기타') === activeDivision)
 
+  const filteredTeamEntries = activeTeamDivision === '전체'
+    ? teamEntries
+    : teamEntries.filter(t => (t.division_name || '미지정') === activeTeamDivision)
+
   function formatDate(str) {
     if (!str) return ''
     return new Date(str).toLocaleDateString('ko-KR')
@@ -593,7 +599,7 @@ export default function ApplyPage() {
 
               {loading ? (
                 <p className="text-center py-8 text-sub text-sm">로딩 중...</p>
-              ) : filteredEntries.length === 0 && teamEntries.length === 0 ? (
+              ) : filteredEntries.length === 0 && filteredTeamEntries.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-sm text-sub">신청 내역이 없습니다.</p>
                 </div>
@@ -636,8 +642,30 @@ export default function ApplyPage() {
                       <p className="text-xs font-semibold text-gray-500 mb-2">
                         👥 단체전 참가팀 ({teamEntries.length}팀)
                       </p>
+
+                      {/* 단체전 부서 필터 */}
+                      {Object.keys(teamDivCounts).length > 1 && (
+                        <div className="flex gap-2 mb-3 flex-wrap">
+                          <button onClick={() => setActiveTeamDivision('전체')}
+                            className={`px-3 py-2 rounded-lg transition-colors ${
+                              activeTeamDivision === '전체' ? 'bg-accent text-white' : 'bg-white border border-line hover:bg-soft'}`}>
+                            <p className="text-[10px] opacity-80">전체</p>
+                            <p className="text-lg font-bold">{teamEntries.length}팀</p>
+                          </button>
+                          {Object.entries(teamDivCounts).map(([div, count]) => (
+                            <button key={div}
+                              onClick={() => setActiveTeamDivision(activeTeamDivision === div ? '전체' : div)}
+                              className={`px-3 py-2 rounded-lg transition-colors ${
+                                activeTeamDivision === div ? 'bg-accent text-white' : 'bg-white border border-line hover:bg-soft'}`}>
+                              <p className={`text-[10px] ${activeTeamDivision === div ? 'opacity-80' : 'text-sub'}`}>{div}</p>
+                              <p className={`text-lg font-bold ${activeTeamDivision === div ? '' : 'text-gray-800'}`}>{count}팀</p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="space-y-2">
-                        {teamEntries.map((team, idx) => (
+                        {filteredTeamEntries.map((team, idx) => (
                           <div key={team.id} className="bg-white border border-line rounded-lg p-3">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3 flex-1 min-w-0">
