@@ -129,24 +129,23 @@ export default function EntryAdmin() {
 
     const rows = data || []
 
-    // roster의 member_id로 gender 한번에 조회
-    const memberIds = [...new Set(
-      rows.flatMap(e => (e.roster || []).map(r => r.member_id).filter(Boolean))
-    )]
-    let genderMap = {}
-    if (memberIds.length > 0) {
+    // team_event_members에서 gender 조회
+    const entryIds = rows.map(e => e.id)
+    let membersMap = {} // entry_id → [{ gender }]
+    if (entryIds.length > 0) {
       const { data: membersData } = await supabase
-        .from('members')
-        .select('member_id, gender')
-        .in('member_id', memberIds)
+        .from('team_event_members')
+        .select('entry_id, member_id, member_name, gender')
+        .in('entry_id', entryIds)
       for (const m of (membersData || [])) {
-        genderMap[m.member_id] = m.gender || ''
+        if (!membersMap[m.entry_id]) membersMap[m.entry_id] = []
+        membersMap[m.entry_id].push(m)
       }
     }
 
-    // 각 entry에 _genderMap 첨부
+    // 각 entry에 _members 첨부
     for (const e of rows) {
-      e._genderMap = genderMap
+      e._members = membersMap[e.id] || []
     }
 
     setTeamEntries(rows)
@@ -172,12 +171,11 @@ export default function EntryAdmin() {
       }
     }),
     ...teamEntries.map(e => {
-      // roster의 gender 집계 → 남/여 카운트
-      const roster = e.roster || []
-      const genderMap = e._genderMap || {}
-      const maleCount   = roster.filter(r => { const g = genderMap[r.member_id] || ''; return g === 'M' || g === '남' }).length
-      const femaleCount = roster.filter(r => { const g = genderMap[r.member_id] || ''; return g === 'F' || g === '여' }).length
-      const genderLabel = roster.length === 0 ? '-'
+      // team_event_members의 gender로 남/여 집계
+      const members = e._members || []
+      const maleCount   = members.filter(m => m.gender === 'M' || m.gender === '남').length
+      const femaleCount = members.filter(m => m.gender === 'F' || m.gender === '여').length
+      const genderLabel = members.length === 0 ? '-'
         : femaleCount === 0 ? `남 ${maleCount}`
         : maleCount === 0   ? `여 ${femaleCount}`
         : `남${maleCount}/여${femaleCount}`
