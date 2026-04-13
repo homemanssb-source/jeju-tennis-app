@@ -126,7 +126,30 @@ export default function EntryAdmin() {
       .eq('event_id', selectedEventId)
       .neq('status', 'cancelled')
       .order('created_at', { ascending: false })
-    setTeamEntries(data || [])
+
+    const rows = data || []
+
+    // roster의 member_id로 gender 한번에 조회
+    const memberIds = [...new Set(
+      rows.flatMap(e => (e.roster || []).map(r => r.member_id).filter(Boolean))
+    )]
+    let genderMap = {}
+    if (memberIds.length > 0) {
+      const { data: membersData } = await supabase
+        .from('members')
+        .select('member_id, gender')
+        .in('member_id', memberIds)
+      for (const m of (membersData || [])) {
+        genderMap[m.member_id] = m.gender || ''
+      }
+    }
+
+    // 각 entry에 _genderMap 첨부
+    for (const e of rows) {
+      e._genderMap = genderMap
+    }
+
+    setTeamEntries(rows)
   }
 
   // ── 통합 목록 ──
@@ -148,17 +171,29 @@ export default function EntryAdmin() {
         _raw:           e,
       }
     }),
-    ...teamEntries.map(e => ({
-      id:             e.id,
-      type:           '단체',
-      name:           e.club_name || '-',
-      division:       e.division_name || '-',
-      status:         e.status === 'confirmed' ? '확정' : e.status === 'pending' ? '대기' : e.status,
-      payment_status: e.payment_status || '미납',
-      date:           e.created_at,
-      _source:        'team',
-      _raw:           e,
-    })),
+    ...teamEntries.map(e => {
+      // roster의 gender 집계 → 남/여 카운트
+      const roster = e.roster || []
+      const genderMap = e._genderMap || {}
+      const maleCount   = roster.filter(r => { const g = genderMap[r.member_id] || ''; return g === 'M' || g === '남' }).length
+      const femaleCount = roster.filter(r => { const g = genderMap[r.member_id] || ''; return g === 'F' || g === '여' }).length
+      const genderLabel = roster.length === 0 ? '-'
+        : femaleCount === 0 ? `남 ${maleCount}`
+        : maleCount === 0   ? `여 ${femaleCount}`
+        : `남${maleCount}/여${femaleCount}`
+      return {
+        id:             e.id,
+        type:           '단체',
+        name:           e.club_name || '-',
+        division:       e.division_name || '-',
+        status:         e.status === 'confirmed' ? '확정' : e.status === 'pending' ? '대기' : e.status,
+        payment_status: e.payment_status || '미납',
+        date:           e.created_at,
+        gender:         genderLabel,
+        _source:        'team',
+        _raw:           e,
+      }
+    }),
   ]
 
   // 취소 건 제외한 카운트 기준 목록
@@ -592,6 +627,7 @@ export default function EntryAdmin() {
                 <th className="px-3 py-2 text-center text-sub font-medium">유형</th>
                 <th className="px-3 py-2 text-left text-sub font-medium">부서</th>
                 <th className="px-3 py-2 text-left text-sub font-medium">팀/클럽</th>
+                <th className="px-3 py-2 text-center text-sub font-medium">성별</th>
                 <th className="px-3 py-2 text-center text-sub font-medium">상태</th>
                 <th className="px-3 py-2 text-center text-sub font-medium">결제</th>
                 <th className="px-3 py-2 text-left text-sub font-medium">신청일</th>
@@ -601,7 +637,7 @@ export default function EntryAdmin() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-sub">신청 내역 없음</td>
+                  <td colSpan={8} className="text-center py-8 text-sub">신청 내역 없음</td>
                 </tr>
               ) : filtered.map(e => (
                 <tr
@@ -616,6 +652,12 @@ export default function EntryAdmin() {
                   </td>
                   <td className="px-3 py-2">{e.division}</td>
                   <td className="px-3 py-2 font-medium">{e.name}</td>
+                  <td className="px-3 py-2 text-center">
+                    {e._source === 'team'
+                      ? <span className="text-xs text-gray-600">{e.gender || '-'}</span>
+                      : <span className="text-xs text-gray-400">-</span>
+                    }
+                  </td>
                   <td className="px-3 py-2 text-center">
                     <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
                       {e.status}
