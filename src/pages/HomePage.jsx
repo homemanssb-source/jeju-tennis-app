@@ -77,17 +77,6 @@ export default function HomePage() {
       {/* 상단 헤더 */}
       <div style={{ background: '#fff8f3', padding: '22px 20px 18px', borderBottom: '1px solid #f0e8e0' }}>
         <div style={{ maxWidth: 512, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 14, overflow: 'hidden' }}>
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <div style={{
-              width: 52, height: 52, background: '#c0612b', borderRadius: 18,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26
-            }}>🎾</div>
-            <div style={{
-              position: 'absolute', bottom: -3, right: -3,
-              width: 16, height: 16, background: '#fbbf24',
-              borderRadius: 6, border: '2.5px solid #fff8f3'
-            }} />
-          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#2d1a0e', letterSpacing: -0.8, lineHeight: 1 }}>
               J.T.A <span style={{ color: '#c0612b' }}>제주</span>
