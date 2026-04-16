@@ -51,7 +51,7 @@ export default function EntryAdmin() {
   const [addClubName, setAddClubName]         = useState('')
   const [addCaptainName, setAddCaptainName]   = useState('')
   const [addTeamDivision, setAddTeamDivision] = useState('')
-  const [addTeamMembers, setAddTeamMembers]   = useState([]) // [{ member_id, name, club }]
+  const [addTeamMembers, setAddTeamMembers]   = useState([]) // [{ member_id, name, club, gender, grade }]
   const [addTmSearch, setAddTmSearch]         = useState('')
   const [addTmResults, setAddTmResults]       = useState([])
   const [addTmSearching, setAddTmSearching]   = useState(false)
@@ -407,7 +407,7 @@ export default function EntryAdmin() {
       setAddTmSearching(true)
       const { data } = await supabase
         .from('members')
-        .select('member_id, name, club, status')
+        .select('member_id, name, club, gender, grade, status')
         .ilike('name', `%${val.trim()}%`)
         .eq('status', '활성')
         .limit(15)
@@ -418,7 +418,10 @@ export default function EntryAdmin() {
 
   function handleTmAddMember(m) {
     if (addTeamMembers.find(x => x.member_id === m.member_id)) return
-    setAddTeamMembers(prev => [...prev, { member_id: m.member_id, name: m.name, club: m.club }])
+    setAddTeamMembers(prev => [...prev, {
+      member_id: m.member_id, name: m.name, club: m.club,
+      gender: m.gender || '', grade: m.grade || '',
+    }])
     setAddTmSearch('')
     setAddTmResults([])
   }
@@ -478,19 +481,35 @@ export default function EntryAdmin() {
 
     setAddSubmitting(true)
     try {
-      const { error } = await supabase
+      const { data: entry, error: entryErr } = await supabase
         .from('team_event_entries')
         .insert({
           event_id:      selectedEventId,
           club_name:     addClubName.trim(),
           captain_name:  addCaptainName.trim(),
           division_name: addTeamDivision || null,
-          roster:        addTeamMembers,
           status:        'confirmed',
           payment_status:'미납',
           created_at:    new Date().toISOString(),
         })
-      if (error) throw error
+        .select('id')
+        .single()
+      if (entryErr) throw entryErr
+
+      const { error: memberErr } = await supabase
+        .from('team_event_members')
+        .insert(addTeamMembers.map((m, i) => ({
+          entry_id:     entry.id,
+          member_id:    m.member_id || null,
+          member_name:  m.name,
+          gender:       m.gender || '',
+          grade:        m.grade || '',
+          member_order: i + 1,
+        })))
+      if (memberErr) {
+        await supabase.from('team_event_entries').delete().eq('id', entry.id)
+        throw memberErr
+      }
 
       showToast?.('✅ 단체전 직접 등록 완료!')
       closeAddModal()
