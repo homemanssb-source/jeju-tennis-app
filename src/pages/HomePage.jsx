@@ -27,7 +27,7 @@ export default function HomePage() {
     const { data } = await supabase.from('events')
       .select('event_name, event_date, event_date_end, status, event_type, entry_open_at, entry_close_at')
       .gte('event_date', today)
-      .eq('status', 'OPEN')
+      .in('status', ['OPEN', 'CLOSED'])
       .order('event_date')
       .limit(2)
     setUpcomingEvents(data || [])
