@@ -487,6 +487,7 @@ export default function EntryAdmin() {
           event_id:      selectedEventId,
           club_name:     addClubName.trim(),
           captain_name:  addCaptainName.trim(),
+          captain_pin:   '',
           division_name: addTeamDivision || null,
           status:        'confirmed',
           payment_status:'미납',
