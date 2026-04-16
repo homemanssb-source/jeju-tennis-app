@@ -30,6 +30,15 @@ export default function EntryAdmin() {
   const [editSearching, setEditSearching]   = useState(false)
   const [editSaving, setEditSaving]         = useState(false)
 
+  // ── 단체전 명단 수정 모달 ──
+  const [teamEditModal, setTeamEditModal]         = useState(null)  // team entry _raw
+  const [teamEditMembers, setTeamEditMembers]     = useState([])    // [{ member_id, member_name, gender, grade }]
+  const [teamEditSearch, setTeamEditSearch]       = useState('')
+  const [teamEditResults, setTeamEditResults]     = useState([])
+  const [teamEditSearching, setTeamEditSearching] = useState(false)
+  const [teamEditSaving, setTeamEditSaving]       = useState(false)
+  const teTimer = useRef(null)
+
   // ── 관리자 직접 등록 모달 ──
   const [addModal, setAddModal]           = useState(false)
   const [addTab, setAddTab]               = useState('individual') // 'individual' | 'team'
@@ -341,6 +350,86 @@ export default function EntryAdmin() {
     showToast?.('✅ 선수가 변경되었습니다.')
     closeEditModal()
     fetchEntries()
+  }
+
+  // ── 단체전 명단 수정 (관리자) ──
+  async function openTeamEditModal(teamEntry) {
+    setTeamEditModal(teamEntry)
+    setTeamEditSearch('')
+    setTeamEditResults([])
+    const { data } = await supabase
+      .from('team_event_members')
+      .select('member_id, member_name, gender, grade')
+      .eq('entry_id', teamEntry.id)
+      .order('member_order')
+    setTeamEditMembers(data || [])
+  }
+
+  function closeTeamEditModal() {
+    setTeamEditModal(null)
+    setTeamEditMembers([])
+    setTeamEditSearch('')
+    setTeamEditResults([])
+  }
+
+  function handleTeamEditSearchChange(val) {
+    setTeamEditSearch(val)
+    if (teTimer.current) clearTimeout(teTimer.current)
+    if (!val.trim()) { setTeamEditResults([]); return }
+    teTimer.current = setTimeout(async () => {
+      setTeamEditSearching(true)
+      const { data } = await supabase
+        .from('members')
+        .select('member_id, name, club, gender, grade, status')
+        .ilike('name', `%${val.trim()}%`)
+        .eq('status', '활성')
+        .limit(15)
+      setTeamEditSearching(false)
+      setTeamEditResults(data || [])
+    }, 350)
+  }
+
+  function handleTeamEditAdd(m) {
+    if (teamEditMembers.find(x => x.member_id === m.member_id)) return
+    setTeamEditMembers(prev => [...prev, {
+      member_id: m.member_id, member_name: m.name,
+      gender: m.gender || '', grade: m.grade || '',
+      _club: m.club,
+    }])
+    setTeamEditSearch('')
+    setTeamEditResults([])
+  }
+
+  function handleTeamEditRemove(id) {
+    setTeamEditMembers(prev => prev.filter(x => x.member_id !== id))
+  }
+
+  async function handleTeamEditSave() {
+    if (!teamEditModal) return
+    if (teamEditMembers.length === 0) { showToast?.('선수를 1명 이상 등록해주세요.', 'error'); return }
+    setTeamEditSaving(true)
+    const entryId = teamEditModal.id
+    const { error: delErr } = await supabase
+      .from('team_event_members').delete().eq('entry_id', entryId)
+    if (delErr) {
+      setTeamEditSaving(false)
+      showToast?.('저장 실패: ' + delErr.message, 'error'); return
+    }
+    const { error: insErr } = await supabase
+      .from('team_event_members')
+      .insert(teamEditMembers.map((m, i) => ({
+        entry_id:     entryId,
+        member_id:    m.member_id || null,
+        member_name:  m.member_name,
+        gender:       m.gender || '',
+        grade:        m.grade || '',
+        member_order: i + 1,
+      })))
+    setTeamEditSaving(false)
+    if (insErr) { showToast?.('저장 실패: ' + insErr.message, 'error'); return }
+    showToast?.('✅ 선수명단이 수정되었습니다.')
+    closeTeamEditModal()
+    fetchTeamEntries()
   }
 
   // ── 직접 등록 모달 열기/닫기 ──
@@ -726,6 +815,15 @@ export default function EntryAdmin() {
                               파트너
                             </button>
                           )}
+                          {/* 단체전 명단 수정 */}
+                          {e._source === 'team' && (
+                            <button
+                              onClick={() => openTeamEditModal(e._raw)}
+                              className="text-xs text-indigo-600 border border-indigo-200 bg-indigo-50
+                                hover:bg-indigo-100 rounded px-2 py-0.5">
+                              명단수정
+                            </button>
+                          )}
                           {e.payment_status !== '결제완료' && (
                             <button onClick={() => handlePaymentSet(e, '결제완료')}
                               className="text-xs text-green-600 hover:underline">결제확인</button>
@@ -933,6 +1031,111 @@ export default function EntryAdmin() {
           </div>
         </div>
       )}
+      {/* ── 단체전 명단 수정 모달 (관리자) ── */}
+      {teamEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/40" onClick={closeTeamEditModal} />
+          <div className="relative bg-white rounded-2xl w-full max-w-md z-10 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+              <div>
+                <h3 className="text-base font-bold text-gray-900">👥 단체전 명단 수정</h3>
+                <p className="text-xs text-sub mt-0.5">
+                  {teamEditModal.club_name} · {teamEditModal.division_name || '-'} · 주장 {teamEditModal.captain_name}
+                </p>
+              </div>
+              <button onClick={closeTeamEditModal}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-soft text-sub text-lg">
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">선수 추가</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={teamEditSearch}
+                    onChange={e => handleTeamEditSearchChange(e.target.value)}
+                    placeholder="이름으로 검색하여 추가..."
+                    className="w-full text-sm border border-line rounded-lg px-3 py-2.5 pr-8" />
+                  {teamEditSearching && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-sub">⏳</span>
+                  )}
+                </div>
+                {teamEditResults.length > 0 && (
+                  <div className="border border-line rounded-xl mt-1 overflow-hidden max-h-36 overflow-y-auto">
+                    {teamEditResults.map(m => {
+                      const already = teamEditMembers.some(x => x.member_id === m.member_id)
+                      return (
+                        <button
+                          key={m.member_id}
+                          onClick={() => !already && handleTeamEditAdd(m)}
+                          disabled={already}
+                          className={`w-full flex items-center justify-between px-3 py-2 text-left
+                            border-b border-line last:border-0 transition-colors
+                            ${already ? 'opacity-40 cursor-not-allowed bg-gray-50' : 'hover:bg-soft'}`}>
+                          <span className="text-sm font-medium">{m.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-sub">{m.club || ''}</span>
+                            {already
+                              ? <span className="text-xs text-gray-400">추가됨</span>
+                              : <span className="text-xs text-accent font-medium">+ 추가</span>
+                            }
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {teamEditMembers.length > 0 && (
+                <div className="border border-line rounded-xl overflow-hidden">
+                  <div className="px-3 py-2 bg-soft border-b border-line">
+                    <span className="text-xs font-medium text-gray-700">
+                      선수 명단 ({teamEditMembers.length}명)
+                    </span>
+                  </div>
+                  {teamEditMembers.map((m, i) => (
+                    <div key={m.member_id || `r-${i}`}
+                      className="flex items-center justify-between px-3 py-2 border-b border-line last:border-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-sub w-5">{i + 1}</span>
+                        <span className="text-sm font-medium">{m.member_name}</span>
+                        {m.gender && (
+                          <span className="text-[10px] text-sub">
+                            ({m.gender === 'M' || m.gender === '남' ? '남' : m.gender === 'F' || m.gender === '여' ? '여' : m.gender})
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleTeamEditRemove(m.member_id)}
+                        className="text-red-400 hover:text-red-600 text-xs px-1">✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 pb-5 pt-3 border-t border-line flex gap-3">
+              <button
+                onClick={closeTeamEditModal}
+                className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft">
+                닫기
+              </button>
+              <button
+                onClick={handleTeamEditSave}
+                disabled={teamEditSaving}
+                className="flex-1 py-2.5 bg-accent text-white rounded-xl text-sm font-semibold
+                  hover:bg-blue-700 disabled:opacity-50">
+                {teamEditSaving ? '저장 중...' : '✅ 저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── 관리자 직접 등록 모달 ── */}
       {addModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
