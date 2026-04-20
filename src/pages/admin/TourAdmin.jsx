@@ -17,10 +17,12 @@ export default function TourAdmin() {
   const [selectedTour, setSelectedTour] = useState(null) // { tournament_name, date, ... }
   const [selectedEvent, setSelectedEvent] = useState(null) // 원본 events row (event_type 포함)
   const [teamDivisions, setTeamDivisions] = useState([])   // 단체전 부서 목록
-  const [resultForm, setResultForm] = useState({ member_id: '', rank: '', division: '' })
+  const [teamEntries, setTeamEntries] = useState([])       // 선택 대회의 단체전 참가팀
+  const [resultForm, setResultForm] = useState({ member_id: '', team_entry_id: '', rank: '', division: '' })
   const [memberSearch, setMemberSearch] = useState('')
   const [autoPoints, setAutoPoints] = useState(null)
   const [loadingTour, setLoadingTour] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -73,19 +75,23 @@ export default function TourAdmin() {
     setLoadingTour(true)
     setSelectedEvent(ev)
 
-    // 단체전/both 대회인 경우 team_event_entries에서 실제 쓰인 부서 목록 로드
+    // 단체전/both 대회인 경우 team_event_entries에서 실제 쓰인 부서 + 팀 목록 로드
     if (ev.event_type === 'team' || ev.event_type === 'both') {
-      const { data: teamEntries } = await supabase
+      const { data: teams } = await supabase
         .from('team_event_entries')
-        .select('division_name')
+        .select('id, club_name, division_name, captain_name')
         .eq('event_id', ev.event_id)
         .neq('status', 'cancelled')
-      const uniq = [...new Set((teamEntries || [])
+        .order('division_name')
+        .order('club_name')
+      setTeamEntries(teams || [])
+      const uniq = [...new Set((teams || [])
         .map(r => r.division_name)
         .filter(Boolean))]
       setTeamDivisions(uniq)
     } else {
       setTeamDivisions([])
+      setTeamEntries([])
     }
 
     // 1) event에 tournament_id가 연결되어 있으면 해당 레코드 조회
@@ -152,19 +158,73 @@ export default function TourAdmin() {
     setLoadingTour(false)
   }
 
+  // 선택된 부서가 단체전 부서인지
+  const isTeamDivision = !!resultForm.division && teamDivisions.includes(resultForm.division)
+
   async function handleAddResult() {
-    if (!selectedTour || !resultForm.member_id || !resultForm.rank || !resultForm.division) {
-      showToast?.('대회, 회원, 부서, 순위를 모두 선택해주세요.', 'error'); return
+    if (!selectedTour || !resultForm.rank || !resultForm.division) {
+      showToast?.('대회, 부서, 순위를 선택해주세요.', 'error'); return
     }
-    const member = members.find(m => m.member_id === resultForm.member_id)
     const points = autoPoints || 0
     const seasonYear = new Date(selectedTour.date).getFullYear()
 
+    // ── 단체전: 팀 선택 → 팀 모든 멤버에게 결과 insert ──
+    if (isTeamDivision) {
+      if (!resultForm.team_entry_id) {
+        showToast?.('팀(클럽)을 선택해주세요.', 'error'); return
+      }
+      setSubmitting(true)
+      const team = teamEntries.find(t => t.id === resultForm.team_entry_id)
+      const { data: tmembers, error: memErr } = await supabase
+        .from('team_event_members')
+        .select('member_id, member_name')
+        .eq('entry_id', resultForm.team_entry_id)
+      if (memErr) { setSubmitting(false); showToast?.(memErr.message, 'error'); return }
+      if (!tmembers || tmembers.length === 0) {
+        setSubmitting(false); showToast?.('팀에 등록된 선수가 없습니다.', 'error'); return
+      }
+
+      // member_id 있는 선수만 members 테이블에서 현재 등급 조회 (당시 등급 저장용)
+      const memberIds = tmembers.map(m => m.member_id).filter(Boolean)
+      const gradeMap = {}
+      if (memberIds.length > 0) {
+        const { data: ms } = await supabase.from('members')
+          .select('member_id, grade').in('member_id', memberIds)
+        for (const m of (ms || [])) gradeMap[m.member_id] = m.grade
+      }
+
+      const rows = tmembers.map(m => ({
+        tournament_name: selectedTour.tournament_name,
+        date:            selectedTour.date,
+        member_id:       m.member_id || null,
+        member_name:     m.member_name || '',
+        division:        resultForm.division,
+        rank:            resultForm.rank,
+        points,
+        season_year:     seasonYear,
+        grade:           m.member_id ? (gradeMap[m.member_id] || null) : null,
+      }))
+      const { error } = await supabase.from('tournament_results').insert(rows)
+      setSubmitting(false)
+      if (error) { showToast?.(error.message, 'error'); return }
+      showToast?.(`${team?.club_name} ${resultForm.rank} — ${rows.length}명 입력완료`)
+      setResultForm({ ...resultForm, team_entry_id: '', rank: '' })
+      fetchResults(selectedTour.tournament_name)
+      return
+    }
+
+    // ── 개인전: 기존 로직 ──
+    if (!resultForm.member_id) {
+      showToast?.('회원을 선택해주세요.', 'error'); return
+    }
+    const member = members.find(m => m.member_id === resultForm.member_id)
+    setSubmitting(true)
     const { error } = await supabase.from('tournament_results').insert([{
       tournament_name: selectedTour.tournament_name, date: selectedTour.date,
       member_id: resultForm.member_id, member_name: member?.display_name || member?.name || '',
       division: resultForm.division, rank: resultForm.rank, points, season_year: seasonYear,
     }])
+    setSubmitting(false)
     if (error) { showToast?.(error.message, 'error'); return }
     showToast?.(`${member?.name} ${resultForm.rank} +${points}점 입력완료`)
     setResultForm({ ...resultForm, member_id: '', rank: '' }); setMemberSearch('')
@@ -258,32 +318,54 @@ export default function TourAdmin() {
                 )}
               </select>
             </div>
-            <div className="relative">
-              <label className="block text-xs text-sub mb-1">회원 검색</label>
-              <input type="text" value={memberSearch}
-                onChange={e => setMemberSearch(e.target.value)}
-                placeholder="이름 또는 ID 입력..."
-                className="w-full text-sm border border-line rounded-lg px-3 py-2" />
-              {resultForm.member_id && (
-                <p className="text-xs text-accent mt-1">
-                  선택: {members.find(m => m.member_id === resultForm.member_id)?.name}
+            {isTeamDivision ? (
+              <div>
+                <label className="block text-xs text-sub mb-1">팀(클럽) 선택</label>
+                <select
+                  value={resultForm.team_entry_id}
+                  onChange={e => setResultForm({ ...resultForm, team_entry_id: e.target.value })}
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2">
+                  <option value="">팀 선택</option>
+                  {teamEntries
+                    .filter(t => (t.division_name || '') === resultForm.division)
+                    .map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.club_name} (주장 {t.captain_name})
+                      </option>
+                    ))}
+                </select>
+                <p className="text-[11px] text-sub mt-1">
+                  선택한 팀의 모든 선수에게 동일한 순위/부서로 결과가 입력됩니다.
                 </p>
-              )}
-              {filteredMembers.length > 0 && (
-                <div className="absolute left-0 right-0 top-full bg-white border border-line rounded-lg shadow-lg mt-1 z-10 max-h-40 overflow-y-auto">
-                  {filteredMembers.map(m => (
-                    <button key={m.member_id}
-                      onClick={() => {
-                        setResultForm({ ...resultForm, member_id: m.member_id })
-                        setMemberSearch(m.display_name || m.name)
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-soft border-b border-line/50">
-                      {m.display_name || m.name} <span className="text-sub">({m.member_id})</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <label className="block text-xs text-sub mb-1">회원 검색</label>
+                <input type="text" value={memberSearch}
+                  onChange={e => setMemberSearch(e.target.value)}
+                  placeholder="이름 또는 ID 입력..."
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+                {resultForm.member_id && (
+                  <p className="text-xs text-accent mt-1">
+                    선택: {members.find(m => m.member_id === resultForm.member_id)?.name}
+                  </p>
+                )}
+                {filteredMembers.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full bg-white border border-line rounded-lg shadow-lg mt-1 z-10 max-h-40 overflow-y-auto">
+                    {filteredMembers.map(m => (
+                      <button key={m.member_id}
+                        onClick={() => {
+                          setResultForm({ ...resultForm, member_id: m.member_id })
+                          setMemberSearch(m.display_name || m.name)
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-soft border-b border-line/50">
+                        {m.display_name || m.name} <span className="text-sub">({m.member_id})</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               <label className="block text-xs text-sub mb-1">순위</label>
               <select value={resultForm.rank}
@@ -299,8 +381,9 @@ export default function TourAdmin() {
               </div>
             )}
             <button onClick={handleAddResult}
-              className="w-full bg-accent text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
-              결과 입력
+              disabled={submitting}
+              className="w-full bg-accent text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              {submitting ? '입력 중...' : (isTeamDivision ? '팀 결과 일괄 입력' : '결과 입력')}
             </button>
           </div>
         </div>
