@@ -15,6 +15,8 @@ export default function TourAdmin() {
   const [results, setResults] = useState([])
   const [members, setMembers] = useState([])
   const [selectedTour, setSelectedTour] = useState(null) // { tournament_name, date, ... }
+  const [selectedEvent, setSelectedEvent] = useState(null) // 원본 events row (event_type 포함)
+  const [teamDivisions, setTeamDivisions] = useState([])   // 단체전 부서 목록
   const [resultForm, setResultForm] = useState({ member_id: '', rank: '', division: '' })
   const [memberSearch, setMemberSearch] = useState('')
   const [autoPoints, setAutoPoints] = useState(null)
@@ -25,7 +27,7 @@ export default function TourAdmin() {
   async function fetchAll() {
     const [{ data: evs }, { data: rules }, { data: mems }] = await Promise.all([
       supabase.from('events')
-        .select('event_id, event_name, event_date, tournament_id')
+        .select('event_id, event_name, event_date, tournament_id, event_type')
         .order('event_date', { ascending: false }),
       supabase.from('point_rules').select('*'),
       supabase.from('members')
@@ -58,6 +60,8 @@ export default function TourAdmin() {
   async function handleEventSelect(eventId) {
     if (!eventId) {
       setSelectedTour(null)
+      setSelectedEvent(null)
+      setTeamDivisions([])
       setResults([])
       setResultForm({ member_id: '', rank: '', division: '' })
       return
@@ -67,6 +71,22 @@ export default function TourAdmin() {
     if (!ev) return
 
     setLoadingTour(true)
+    setSelectedEvent(ev)
+
+    // 단체전/both 대회인 경우 team_event_entries에서 실제 쓰인 부서 목록 로드
+    if (ev.event_type === 'team' || ev.event_type === 'both') {
+      const { data: teamEntries } = await supabase
+        .from('team_event_entries')
+        .select('division_name')
+        .eq('event_id', ev.event_id)
+        .neq('status', 'cancelled')
+      const uniq = [...new Set((teamEntries || [])
+        .map(r => r.division_name)
+        .filter(Boolean))]
+      setTeamDivisions(uniq)
+    } else {
+      setTeamDivisions([])
+    }
 
     // 1) event에 tournament_id가 연결되어 있으면 해당 레코드 조회
     if (ev.tournament_id) {
@@ -205,12 +225,37 @@ export default function TourAdmin() {
           <h3 className="text-sm font-semibold mb-3">결과 입력: {selectedTour.tournament_name}</h3>
           <div className="space-y-3">
             <div>
-              <label className="block text-xs text-sub mb-1">부서</label>
+              <label className="block text-xs text-sub mb-1">
+                부서
+                {selectedEvent?.event_type === 'team' && (
+                  <span className="ml-1.5 text-[10px] text-blue-600 font-medium">단체전 부서</span>
+                )}
+                {selectedEvent?.event_type === 'both' && (
+                  <span className="ml-1.5 text-[10px] text-purple-600 font-medium">개인+단체 통합</span>
+                )}
+              </label>
               <select value={resultForm.division}
                 onChange={e => setResultForm({ ...resultForm, division: e.target.value })}
                 className="w-full text-sm border border-line rounded-lg px-3 py-2">
                 <option value="">부서 선택</option>
-                {pointRules.map(r => <option key={r.id} value={r.division}>{r.division}</option>)}
+                {selectedEvent?.event_type === 'team' ? (
+                  teamDivisions.length > 0
+                    ? teamDivisions.map(d => <option key={d} value={d}>{d}</option>)
+                    : <option disabled>등록된 단체전 부서가 없습니다</option>
+                ) : selectedEvent?.event_type === 'both' ? (
+                  <>
+                    {teamDivisions.length > 0 && (
+                      <optgroup label="단체전 부서">
+                        {teamDivisions.map(d => <option key={`t-${d}`} value={d}>{d}</option>)}
+                      </optgroup>
+                    )}
+                    <optgroup label="개인전 부서">
+                      {pointRules.map(r => <option key={`i-${r.id}`} value={r.division}>{r.division}</option>)}
+                    </optgroup>
+                  </>
+                ) : (
+                  pointRules.map(r => <option key={r.id} value={r.division}>{r.division}</option>)
+                )}
               </select>
             </div>
             <div className="relative">
