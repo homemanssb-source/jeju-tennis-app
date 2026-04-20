@@ -151,20 +151,36 @@ export default function UploadAdmin() {
         }
         // 이름+클럽으로 매칭 (동명이인 해결)
         if (!memberId && memberClub) {
-          const { data: found } = await supabase.from('members')
+          let { data: found } = await supabase.from('members')
             .select('member_id, grade')
             .eq('name', memberName)
             .eq('club', memberClub)
+          if (!found || found.length === 0) {
+            const nameNorm = memberName.replace(/[^가-힣a-zA-Z0-9]/g, '').toLowerCase()
+            const { data: foundNorm } = await supabase.from('members')
+              .select('member_id, grade')
+              .eq('name_norm', nameNorm)
+              .eq('club', memberClub)
+            if (foundNorm && foundNorm.length > 0) found = foundNorm
+          }
           if (found && found.length === 1) {
             memberId = found[0].member_id
             memberGrade = found[0].grade || null
           }
         }
-        // 이름만으로 매칭 (최후 fallback)
+        // 이름만으로 매칭 (최후 fallback: name → name_norm)
         if (!memberId) {
-          const { data: found } = await supabase.from('members')
+          let { data: found } = await supabase.from('members')
             .select('member_id, grade, club')
             .eq('name', memberName)
+          if (!found || found.length === 0) {
+            // 공백/특수문자 제거한 정규화 이름으로 재시도
+            const nameNorm = memberName.replace(/[^가-힣a-zA-Z0-9]/g, '').toLowerCase()
+            const { data: foundNorm } = await supabase.from('members')
+              .select('member_id, grade, club')
+              .eq('name_norm', nameNorm)
+            if (foundNorm && foundNorm.length > 0) found = foundNorm
+          }
           if (found && found.length === 1) {
             memberId = found[0].member_id
             memberGrade = found[0].grade || null
