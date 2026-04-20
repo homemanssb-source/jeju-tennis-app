@@ -94,18 +94,22 @@ export default function UploadAdmin() {
     const RANK_MAP = {
       '우승': 'points_1', '준우승': 'points_2',
       '4강': 'points_3', '8강': 'points_4', '16강': 'points_5',
-      '32강': 'points_6', '64강': 'points_7', '참가': 'points_7',
+      '32강': 'points_6', '참가': 'points_7',
     }
-    // "N-M위" 형식을 "M강" 표기로 변환 (33-64위 → 64강)
+    // "N-M위" → "M강", 단 64강 이상(M>=64)은 "참가"
     function normalizeRank(raw) {
       const r = (raw || '').toString().trim().replace(/\s/g, '')
       if (!r) return ''
       if (r === '우승' || r === '준우승' || r === '참가') return r
-      if (/^\d+강$/.test(r)) return r
+      const nOnly = r.match(/^(\d+)강$/)
+      if (nOnly) {
+        const n = parseInt(nOnly[1], 10)
+        return n >= 64 ? '참가' : r
+      }
       const m = r.match(/^(\d+)[-~](\d+)(위)?$/)
       if (m) {
         const high = parseInt(m[2], 10)
-        return `${high}강`
+        return high >= 64 ? '참가' : `${high}강`
       }
       return r
     }
