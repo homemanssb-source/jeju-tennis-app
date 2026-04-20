@@ -41,7 +41,7 @@ export default function UploadAdmin() {
         return r
       })
 
-      setPreview(normalized.slice(0, 200))
+      setPreview(normalized)
     }
     reader.readAsArrayBuffer(f)
   }
@@ -92,8 +92,12 @@ export default function UploadAdmin() {
 
     const { data: pointRules } = await supabase.from('point_rules').select('*')
     const RANK_MAP = {
-      '우승': 'points_1', '준우승': 'points_2', '4강': 'points_3',
-      '8강': 'points_4', '16강': 'points_5', '32강': 'points_6', '참가': 'points_7'
+      '우승': 'points_1', '준우승': 'points_2',
+      '4강': 'points_3', '3-4위': 'points_3', '3-4': 'points_3',
+      '8강': 'points_4', '5-8위': 'points_4', '5-8': 'points_4',
+      '16강': 'points_5', '9-16위': 'points_5', '9-16': 'points_5',
+      '32강': 'points_6', '17-32위': 'points_6', '17-32': 'points_6',
+      '참가': 'points_7', '33-64위': 'points_7', '33-64': 'points_7',
     }
 
     function autoCalcPoints(division, rank, manualPoints) {
@@ -106,10 +110,10 @@ export default function UploadAdmin() {
     }
 
     for (const row of preview) {
-      const memberName = (row['회원이름'] || '').toString().trim()
+      const memberName = (row['회원이름'] || row['선수명'] || row['이름'] || '').toString().trim()
       const phone = (row['전화번호'] || row['휴대폰'] || '').toString().trim()
       const tournamentName = (row['대회명'] || '').toString().trim()
-      const dateStr = (row['대회일자(YYYY-MM-DD)'] || row['대회일자'] || '').toString().trim()
+      const dateStr = (row['대회일자(YYYY-MM-DD)'] || row['대회일자'] || row['일시'] || row['일자'] || '').toString().trim()
       const division = (row['부서'] || '').toString().trim()
       const rank = (row['순위(우승/준우승/4강/8강/참가)'] || row['순위'] || '').toString().trim()
       const manualPoints = parseInt(row['포인트'] || '0') || 0
