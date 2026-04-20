@@ -93,11 +93,21 @@ export default function UploadAdmin() {
     const { data: pointRules } = await supabase.from('point_rules').select('*')
     const RANK_MAP = {
       '우승': 'points_1', '준우승': 'points_2',
-      '4강': 'points_3', '3-4위': 'points_3', '3-4': 'points_3',
-      '8강': 'points_4', '5-8위': 'points_4', '5-8': 'points_4',
-      '16강': 'points_5', '9-16위': 'points_5', '9-16': 'points_5',
-      '32강': 'points_6', '17-32위': 'points_6', '17-32': 'points_6',
-      '참가': 'points_7', '33-64위': 'points_7', '33-64': 'points_7',
+      '4강': 'points_3', '8강': 'points_4', '16강': 'points_5',
+      '32강': 'points_6', '64강': 'points_7', '참가': 'points_7',
+    }
+    // "N-M위" 형식을 "M강" 표기로 변환 (33-64위 → 64강)
+    function normalizeRank(raw) {
+      const r = (raw || '').toString().trim().replace(/\s/g, '')
+      if (!r) return ''
+      if (r === '우승' || r === '준우승' || r === '참가') return r
+      if (/^\d+강$/.test(r)) return r
+      const m = r.match(/^(\d+)[-~](\d+)(위)?$/)
+      if (m) {
+        const high = parseInt(m[2], 10)
+        return `${high}강`
+      }
+      return r
     }
 
     function autoCalcPoints(division, rank, manualPoints) {
@@ -116,7 +126,7 @@ export default function UploadAdmin() {
       const tournamentName = (row['대회명'] || '').toString().trim()
       const dateStr = (row['대회일자(YYYY-MM-DD)'] || row['대회일자'] || row['일시'] || row['일자'] || '').toString().trim()
       const division = (row['부서'] || '').toString().trim()
-      const rank = (row['순위(우승/준우승/4강/8강/참가)'] || row['순위'] || '').toString().trim()
+      const rank = normalizeRank(row['순위(우승/준우승/4강/8강/참가)'] || row['순위'] || '')
       const manualPoints = parseInt(row['포인트'] || '0') || 0
       const points = autoCalcPoints(division, rank, manualPoints)
 
