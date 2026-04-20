@@ -185,15 +185,35 @@ export default function UploadAdmin() {
             memberId = found[0].member_id
             memberGrade = found[0].grade || null
           } else if (found && found.length > 1) {
-            // 클럽명이 있으면 부분일치로 한번 더 좁히기 (띄어쓰기/오타 완화)
+            // 클럽명이 있으면 정확 → 부분일치 → 중복 → 에러 순으로 좁히기
             if (memberClub) {
               const normClub = memberClub.replace(/\s+/g, '').toLowerCase()
-              const byClub = found.filter(m =>
+              // 1) 공백/대소문자 무시 정확 일치
+              let byClub = found.filter(m =>
                 (m.club || '').replace(/\s+/g, '').toLowerCase() === normClub
               )
+              // 2) 부분 포함 (CSV 클럽이 DB 클럽에 포함 또는 그 반대)
+              if (byClub.length === 0) {
+                byClub = found.filter(m => {
+                  const dbClub = (m.club || '').replace(/\s+/g, '').toLowerCase()
+                  return dbClub && (dbClub.includes(normClub) || normClub.includes(dbClub))
+                })
+              }
               if (byClub.length === 1) {
                 memberId = byClub[0].member_id
                 memberGrade = byClub[0].grade || null
+              } else if (byClub.length > 1) {
+                // 모두 같은 클럽이면 실제 중복 레코드로 간주하고 첫 번째 선택
+                const uniqueClubs = new Set(byClub.map(m =>
+                  (m.club || '').replace(/\s+/g, '').toLowerCase()
+                ))
+                if (uniqueClubs.size === 1) {
+                  memberId = byClub[0].member_id
+                  memberGrade = byClub[0].grade || null
+                } else {
+                  const clubList = byClub.map(m => m.club || '(무소속)').join(', ')
+                  errorList.push(`${memberName} (${memberClub}): 동명이인 ${byClub.length}명 - 클럽 좁혔으나 여전히 다중 [${clubList}]`); continue
+                }
               } else {
                 const clubList = found.map(m => m.club || '(무소속)').join(', ')
                 errorList.push(`${memberName} (${memberClub}): 동명이인 ${found.length}명 중 클럽 매칭 실패 [후보: ${clubList}]`); continue
