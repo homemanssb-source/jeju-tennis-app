@@ -240,16 +240,52 @@ export default function EntryAdmin() {
   // ── 신청 취소 (관리자) ──
   function handleCancelConfirm(entry) {
     setConfirmModal({
-      message: `"${entry.name}" 신청을 취소하시겠습니까?`,
+      message: `"${entry.name}" 신청을 취소하시겠습니까?` +
+        (entry._source === 'team' ? '\n(해당 팀의 대회결과도 함께 삭제됩니다)' : ''),
       onConfirm: async () => {
         if (entry._source === 'individual') {
           await supabase.from('event_entries')
             .update({ entry_status: '취소', cancelled_at: new Date().toISOString() })
             .eq('entry_id', entry.id)
         } else {
+          // 팀 정보 + 대회명 먼저 확보 (tournament_results 삭제용)
+          const { data: team } = await supabase
+            .from('team_event_entries')
+            .select('id, club_name, division_name, event_id')
+            .eq('id', entry.id)
+            .single()
+          let tournamentName = null
+          let memberIds = []
+          if (team) {
+            const [{ data: ev }, { data: tmembers }] = await Promise.all([
+              supabase.from('events').select('event_name').eq('event_id', team.event_id).single(),
+              supabase.from('team_event_members').select('member_id').eq('entry_id', team.id),
+            ])
+            tournamentName = ev?.event_name || null
+            memberIds = (tmembers || []).map(m => m.member_id).filter(Boolean)
+          }
+
           await supabase.from('team_event_entries')
             .update({ status: 'cancelled' })
             .eq('id', entry.id)
+
+          // tournament_results 자동 정리: club_name 매치 우선, 안 되면 member_ids로 fallback
+          if (team && tournamentName) {
+            await supabase.from('tournament_results')
+              .delete()
+              .eq('tournament_name', tournamentName)
+              .eq('division', team.division_name || '')
+              .eq('club_name', team.club_name)
+            if (memberIds.length > 0) {
+              // club_name이 NULL인 과거 행도 member + 부서 + 대회 기준으로 추가 정리
+              await supabase.from('tournament_results')
+                .delete()
+                .eq('tournament_name', tournamentName)
+                .eq('division', team.division_name || '')
+                .is('club_name', null)
+                .in('member_id', memberIds)
+            }
+          }
         }
         showToast?.('신청 취소됨')
         setConfirmModal(null)
