@@ -13,6 +13,15 @@ export default function TournamentPage() {
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedMember, setSelectedMember] = useState(null)
+  const [expandedClubs, setExpandedClubs] = useState(new Set())
+
+  function toggleClub(key) {
+    setExpandedClubs(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key); else next.add(key)
+      return next
+    })
+  }
 
   useEffect(() => { fetchTournaments() }, [seasonYear])
   useEffect(() => { if (selectedTournament) fetchResults() }, [selectedTournament, selectedDivision])
@@ -53,10 +62,28 @@ export default function TournamentPage() {
   }
 
   const rankOrder = { '우승': 1, '준우승': 2, '4강': 3, '8강': 4, '16강': 5, '32강': 6, '참가': 7 }
-  const sortedResults = [...results].sort((a, b) => {
-    if (a.division !== b.division) return (a.division || '').localeCompare(b.division || '')
-    return (rankOrder[a.rank] || 99) - (rankOrder[b.rank] || 99)
-  })
+
+  // club_name이 있는 행은 (division, rank, club_name) 단위로 묶고,
+  // 없는 행은 개별 표시 (개인전). 정렬은 division → rank 순.
+  const displayItems = (() => {
+    const groups = {}
+    const individuals = []
+    for (const r of results) {
+      if (r.club_name) {
+        const key = `${r.division}|${r.rank}|${r.club_name}`
+        if (!groups[key]) groups[key] = { type: 'team', key, division: r.division, rank: r.rank, club_name: r.club_name, points: r.points, members: [] }
+        groups[key].members.push(r)
+      } else {
+        individuals.push({ type: 'individual', ...r })
+      }
+    }
+    const all = [...Object.values(groups), ...individuals]
+    all.sort((a, b) => {
+      if ((a.division || '') !== (b.division || '')) return (a.division || '').localeCompare(b.division || '')
+      return (rankOrder[a.rank] || 99) - (rankOrder[b.rank] || 99)
+    })
+    return all
+  })()
 
   return (
     <div className="pb-20">
@@ -97,38 +124,76 @@ export default function TournamentPage() {
           </div>
         ) : loading ? (
           <SkeletonList count={8} />
-        ) : sortedResults.length === 0 ? (
+        ) : displayItems.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-sm text-sub">등록된 결과가 없습니다.</p>
           </div>
         ) : (
           <div className="px-4">
-            <p className="text-xs text-sub px-1 mb-2">총 {sortedResults.length}건</p>
-            {sortedResults.map((r, i) => {
-              const showDivHeader = i === 0 || sortedResults[i - 1].division !== r.division
+            <p className="text-xs text-sub px-1 mb-2">총 {displayItems.length}건</p>
+            {displayItems.map((item, i) => {
+              const showDivHeader = i === 0 || displayItems[i - 1].division !== item.division
               return (
-                <div key={r.id || i}>
+                <div key={item.type === 'team' ? item.key : (item.id || i)}>
                   {showDivHeader && (
                     <div className="bg-soft2 px-3 py-1.5 mt-3 first:mt-0 rounded-lg mb-1">
-                      <span className="text-xs font-semibold text-gray-700">{r.division}</span>
+                      <span className="text-xs font-semibold text-gray-700">{item.division}</span>
                     </div>
                   )}
-                  <button onClick={() => setSelectedMember(r.member_id)}
-                    className="w-full flex items-center justify-between py-2.5 px-3
-                      hover:bg-soft transition-colors text-left border-b border-line/30">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded
-                        ${r.rank === '우승' ? 'bg-yellow-100 text-yellow-700' :
-                          r.rank === '준우승' ? 'bg-gray-100 text-gray-700' :
-                          'bg-soft2 text-sub'}`}>
-                        {r.rank}
-                      </span>
-                      <span className="text-sm font-medium text-gray-900">
-                        {r.member_name || r.member_id}
-                      </span>
+
+                  {item.type === 'team' ? (
+                    <div className="border-b border-line/30">
+                      <button onClick={() => toggleClub(item.key)}
+                        className="w-full flex items-center justify-between py-2.5 px-3 hover:bg-soft transition-colors text-left">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded
+                            ${item.rank === '우승' ? 'bg-yellow-100 text-yellow-700' :
+                              item.rank === '준우승' ? 'bg-gray-100 text-gray-700' :
+                              'bg-soft2 text-sub'}`}>
+                            {item.rank}
+                          </span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {item.club_name}
+                          </span>
+                          <span className="text-[10px] text-sub">({item.members.length}명)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-accent">+{item.points}</span>
+                          <span className={`text-xs text-sub transition-transform ${expandedClubs.has(item.key) ? 'rotate-90' : ''}`}>›</span>
+                        </div>
+                      </button>
+                      {expandedClubs.has(item.key) && (
+                        <div className="bg-soft/50 pb-1">
+                          {item.members.map(m => (
+                            <button key={m.id}
+                              onClick={() => setSelectedMember(m.member_id)}
+                              className="w-full flex items-center justify-between py-2 pl-10 pr-3
+                                hover:bg-soft transition-colors text-left border-t border-line/20">
+                              <span className="text-sm text-gray-800">{m.member_name || m.member_id}</span>
+                              <span className="text-xs text-accent">+{m.points}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <span className="text-sm font-bold text-accent">+{r.points}</span>
-                  </button>
+                  ) : (
+                    <button onClick={() => setSelectedMember(item.member_id)}
+                      className="w-full flex items-center justify-between py-2.5 px-3
+                        hover:bg-soft transition-colors text-left border-b border-line/30">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded
+                          ${item.rank === '우승' ? 'bg-yellow-100 text-yellow-700' :
+                            item.rank === '준우승' ? 'bg-gray-100 text-gray-700' :
+                            'bg-soft2 text-sub'}`}>
+                          {item.rank}
+                        </span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {item.member_name || item.member_id}
+                        </span>
+                      </div>
+                      <span className="text-sm font-bold text-accent">+{item.points}</span>
+                    </button>
+                  )}
                 </div>
               )
             })}

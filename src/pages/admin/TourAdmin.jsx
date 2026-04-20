@@ -203,6 +203,7 @@ export default function TourAdmin() {
         points,
         season_year:     seasonYear,
         grade:           m.member_id ? (gradeMap[m.member_id] || null) : null,
+        club_name:       team?.club_name || null,
       }))
       const { error } = await supabase.from('tournament_results').insert(rows)
       setSubmitting(false)
