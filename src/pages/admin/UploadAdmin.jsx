@@ -112,6 +112,7 @@ export default function UploadAdmin() {
     for (const row of preview) {
       const memberName = (row['회원이름'] || row['선수명'] || row['이름'] || '').toString().trim()
       const phone = (row['전화번호'] || row['휴대폰'] || '').toString().trim()
+      const memberClub = (row['클럽명'] || row['소속클럽'] || row['클럽'] || '').toString().trim()
       const tournamentName = (row['대회명'] || '').toString().trim()
       const dateStr = (row['대회일자(YYYY-MM-DD)'] || row['대회일자'] || row['일시'] || row['일자'] || '').toString().trim()
       const division = (row['부서'] || '').toString().trim()
@@ -148,18 +149,44 @@ export default function UploadAdmin() {
             memberGrade = found[0].grade || null
           }
         }
-        // 이름만으로 매칭
-        if (!memberId) {
+        // 이름+클럽으로 매칭 (동명이인 해결)
+        if (!memberId && memberClub) {
           const { data: found } = await supabase.from('members')
             .select('member_id, grade')
+            .eq('name', memberName)
+            .eq('club', memberClub)
+          if (found && found.length === 1) {
+            memberId = found[0].member_id
+            memberGrade = found[0].grade || null
+          }
+        }
+        // 이름만으로 매칭 (최후 fallback)
+        if (!memberId) {
+          const { data: found } = await supabase.from('members')
+            .select('member_id, grade, club')
             .eq('name', memberName)
           if (found && found.length === 1) {
             memberId = found[0].member_id
             memberGrade = found[0].grade || null
           } else if (found && found.length > 1) {
-            errorList.push(`${memberName}: 동명이인 ${found.length}명 - 전화번호 또는 회원ID 필요`); continue
+            // 클럽명이 있으면 부분일치로 한번 더 좁히기 (띄어쓰기/오타 완화)
+            if (memberClub) {
+              const normClub = memberClub.replace(/\s+/g, '').toLowerCase()
+              const byClub = found.filter(m =>
+                (m.club || '').replace(/\s+/g, '').toLowerCase() === normClub
+              )
+              if (byClub.length === 1) {
+                memberId = byClub[0].member_id
+                memberGrade = byClub[0].grade || null
+              } else {
+                const clubList = found.map(m => m.club || '(무소속)').join(', ')
+                errorList.push(`${memberName} (${memberClub}): 동명이인 ${found.length}명 중 클럽 매칭 실패 [후보: ${clubList}]`); continue
+              }
+            } else {
+              errorList.push(`${memberName}: 동명이인 ${found.length}명 - 전화번호/클럽명/회원ID 필요`); continue
+            }
           } else {
-            errorList.push(`${memberName}: 회원을 찾을 수 없음`); continue
+            errorList.push(`${memberName}${memberClub ? ` (${memberClub})` : ''}: 회원을 찾을 수 없음`); continue
           }
         }
       }
