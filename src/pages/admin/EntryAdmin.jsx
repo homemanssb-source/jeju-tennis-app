@@ -764,17 +764,17 @@ export default function EntryAdmin() {
         <p className="text-center py-8 text-sub text-sm">로딩 중...</p>
       ) : (
         <div className="bg-white rounded-r border border-line overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[860px]">
             <thead className="bg-soft2">
               <tr>
-                <th className="px-3 py-2 text-center text-sub font-medium">유형</th>
-                <th className="px-3 py-2 text-left text-sub font-medium">부서</th>
-                <th className="px-3 py-2 text-left text-sub font-medium">팀/클럽</th>
-                <th className="px-3 py-2 text-center text-sub font-medium">성별</th>
-                <th className="px-3 py-2 text-center text-sub font-medium">상태</th>
-                <th className="px-3 py-2 text-center text-sub font-medium">결제</th>
-                <th className="px-3 py-2 text-left text-sub font-medium">신청일</th>
-                <th className="px-3 py-2 text-center text-sub font-medium">액션</th>
+                <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">유형</th>
+                <th className="px-3 py-2 text-left text-sub font-medium whitespace-nowrap">부서</th>
+                <th className="px-3 py-2 text-left text-sub font-medium whitespace-nowrap">팀/클럽</th>
+                <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">성별</th>
+                <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">상태</th>
+                <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">결제</th>
+                <th className="px-3 py-2 text-left text-sub font-medium whitespace-nowrap">신청일</th>
+                <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">액션</th>
               </tr>
             </thead>
             <tbody>
@@ -788,25 +788,25 @@ export default function EntryAdmin() {
                   className={`border-t border-line hover:bg-soft ${
                     e.payment_status === '환불대기' ? 'bg-orange-50/40' : ''
                   }`}>
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-3 py-2 text-center whitespace-nowrap">
                     <span className={`text-xs px-1.5 py-0.5 rounded ${
                       e.type === '단체' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'
                     }`}>{e.type}</span>
                   </td>
-                  <td className="px-3 py-2">{e.division}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">{e.division}</td>
                   <td className="px-3 py-2 font-medium">{e.name}</td>
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-3 py-2 text-center whitespace-nowrap">
                     {e._source === 'team'
                       ? <span className="text-xs text-gray-600">{e.gender || '-'}</span>
                       : <span className="text-xs text-gray-400">-</span>
                     }
                   </td>
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-3 py-2 text-center whitespace-nowrap">
                     <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
                       {e.status}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-3 py-2 text-center whitespace-nowrap">
                     <span className={`text-xs px-1.5 py-0.5 rounded ${payBadgeClass(e.payment_status)}`}>
                       {e.payment_status || '미납'}
                     </span>
@@ -817,11 +817,11 @@ export default function EntryAdmin() {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-xs text-sub">
+                  <td className="px-3 py-2 text-xs text-sub whitespace-nowrap">
                     {e.date ? new Date(e.date).toLocaleDateString('ko-KR') : '-'}
                   </td>
-                  <td className="px-3 py-2 text-center">
-                    <div className="flex gap-1 justify-center flex-wrap">
+                  <td className="px-3 py-2 text-center whitespace-nowrap">
+                    <div className="flex gap-1 justify-center items-center flex-nowrap">
                       {/* 환불대기 → 환불 처리 버튼만 표시 */}
                       {e.payment_status === '환불대기' ? (
                         <button
