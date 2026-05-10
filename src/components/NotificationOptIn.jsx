@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { isPushSupported, getPushSubscription, subscribePush } from '../lib/push'
 
-const STORAGE_KEY = 'jta_notification_optin_dismissed_at'
+const STORAGE_KEY_INSTALL   = 'jta_notification_optin_install_dismissed_at'
+const STORAGE_KEY_SUBSCRIBE = 'jta_notification_optin_subscribe_dismissed_at'
+const STORAGE_KEY_LEGACY    = 'jta_notification_optin_dismissed_at'
 const SUPPRESS_DAYS = 7
 const SHOW_DELAY_MS = 1200
 
-function suppressedRecently() {
+function suppressedRecently(key) {
   try {
-    const ts = Number(localStorage.getItem(STORAGE_KEY) || 0)
+    const ts = Number(localStorage.getItem(key) || 0)
     if (!ts) return false
     return (Date.now() - ts) / 86400000 < SUPPRESS_DAYS
   } catch { return false }
@@ -32,12 +34,17 @@ export default function NotificationOptIn() {
   const platform = detectPlatform()
 
   useEffect(() => {
-    if (suppressedRecently()) return
-
     const standalone = isStandalone()
+
+    // 과거 단일 키(legacy) 흔적은 standalone으로 진입했을 때 제거
+    // (브라우저에서 닫은 게 PWA에서 재차 막지 않도록)
+    if (standalone) {
+      try { localStorage.removeItem(STORAGE_KEY_LEGACY) } catch {}
+    }
 
     // ── iOS Safari (브라우저 모드): PWA 설치를 먼저 해야 알림 가능 ──
     if (platform.isIOS && !standalone) {
+      if (suppressedRecently(STORAGE_KEY_INSTALL)) return
       const t = setTimeout(() => {
         setVariant('iosInstall')
         setShow(true)
@@ -46,6 +53,7 @@ export default function NotificationOptIn() {
     }
 
     // ── Android / iOS standalone: 표준 푸시 구독 흐름 ──
+    if (suppressedRecently(STORAGE_KEY_SUBSCRIBE)) return
     if (!isPushSupported()) return
     if (typeof Notification === 'undefined') return
     if (Notification.permission === 'denied') return
@@ -62,7 +70,10 @@ export default function NotificationOptIn() {
   }, [platform.isIOS])
 
   function dismiss() {
-    try { localStorage.setItem(STORAGE_KEY, String(Date.now())) } catch {}
+    try {
+      const key = variant === 'iosInstall' ? STORAGE_KEY_INSTALL : STORAGE_KEY_SUBSCRIBE
+      localStorage.setItem(key, String(Date.now()))
+    } catch {}
     setShow(false)
   }
 
