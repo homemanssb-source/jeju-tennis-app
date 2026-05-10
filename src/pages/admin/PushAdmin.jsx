@@ -24,7 +24,10 @@ export default function PushAdmin() {
   const [sending, setSending]           = useState(false)
   const [confirmModal, setConfirmModal] = useState(false)
   const [history, setHistory]           = useState([])
-  const [subCount, setSubCount]         = useState(null)
+  const [subCount, setSubCount]         = useState(null)        // 관리자 구독
+  const [userSubCount, setUserSubCount] = useState(null)        // 일반 사용자 구독
+  const [countRefreshing, setCountRefreshing] = useState(false)
+  const [countRefreshedAt, setCountRefreshedAt] = useState(null)
 
   // ── 관리자 구독 상태 ──
   const [adminSubscribed, setAdminSubscribed] = useState(false)
@@ -37,6 +40,18 @@ export default function PushAdmin() {
     checkAdminSubscribed()
   }, [])
 
+  // 탭 포커스 시 자동 갱신
+  useEffect(() => {
+    const onFocus = () => fetchSubCount()
+    const onVisible = () => { if (!document.hidden) fetchSubCount() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
+
   async function fetchEvents() {
     const { data } = await supabase.from('events').select('event_id, event_name, event_date, status').order('event_date', { ascending: false }).limit(30)
     setEvents(data || [])
@@ -46,8 +61,15 @@ export default function PushAdmin() {
     setNotices(data || [])
   }
   async function fetchSubCount() {
-    const { count } = await supabase.from('push_subscriptions').select('*', { count: 'exact', head: true }).eq('is_admin', true)
-    setSubCount(count ?? 0)
+    setCountRefreshing(true)
+    const [{ count: adminCount }, { count: totalCount }] = await Promise.all([
+      supabase.from('push_subscriptions').select('*', { count: 'exact', head: true }).eq('is_admin', true),
+      supabase.from('push_subscriptions').select('*', { count: 'exact', head: true }),
+    ])
+    setSubCount(adminCount ?? 0)
+    setUserSubCount(Math.max(0, (totalCount ?? 0) - (adminCount ?? 0)))
+    setCountRefreshedAt(new Date())
+    setCountRefreshing(false)
   }
 
   // 이 기기가 이미 관리자 구독 중인지 확인
@@ -137,9 +159,27 @@ export default function PushAdmin() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
         <h2 className="text-lg font-bold">🔔 푸시 알림 발송</h2>
-        {subCount !== null && <span className="text-xs text-sub bg-soft px-3 py-1 rounded-full">관리자 구독 {subCount}기기</span>}
+        <div className="flex items-center gap-2">
+          {userSubCount !== null && (
+            <span className="text-xs text-sub bg-soft px-3 py-1 rounded-full">
+              일반 구독 <strong className="text-gray-800">{userSubCount}</strong>기기
+            </span>
+          )}
+          {subCount !== null && (
+            <span className="text-xs text-sub bg-soft px-3 py-1 rounded-full">
+              관리자 구독 <strong className="text-gray-800">{subCount}</strong>기기
+            </span>
+          )}
+          <button
+            onClick={fetchSubCount}
+            disabled={countRefreshing}
+            title={countRefreshedAt ? `최근 갱신: ${countRefreshedAt.toLocaleTimeString('ko-KR')}` : '구독 수 새로고침'}
+            className="text-xs px-2.5 py-1 rounded-full border border-line bg-white hover:bg-soft2 disabled:opacity-50">
+            {countRefreshing ? '⏳' : '↻ 새로고침'}
+          </button>
+        </div>
       </div>
 
       {/* ── 관리자 구독 섹션 ── */}
@@ -224,7 +264,7 @@ export default function PushAdmin() {
 
           <button onClick={() => setConfirmModal(true)} disabled={sending || !hasVapid}
             className="w-full py-3 bg-accent text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-            {sending ? '발송 중...' : `🔔 전체 구독자(${subCount ?? '?'}기기)에게 발송`}
+            {sending ? '발송 중...' : `🔔 전체 구독자(${(subCount ?? 0) + (userSubCount ?? 0)}기기)에게 발송`}
           </button>
         </div>
 
@@ -272,7 +312,7 @@ export default function PushAdmin() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
             <h3 className="text-base font-bold mb-1">🔔 푸시 알림 발송</h3>
-            <p className="text-xs text-sub mb-4">관리자 구독 기기({subCount}개)에게 아래 알림을 발송합니다.</p>
+            <p className="text-xs text-sub mb-4">전체 구독 기기({(subCount ?? 0) + (userSubCount ?? 0)}개)에게 아래 알림을 발송합니다.</p>
             <div className="bg-soft rounded-xl p-3 mb-5 space-y-1">
               <p className="text-sm font-semibold">{preview.title}</p>
               <p className="text-xs text-sub">{preview.body}</p>
