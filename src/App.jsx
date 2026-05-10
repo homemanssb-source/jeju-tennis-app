@@ -3,6 +3,7 @@ import React, { useState, createContext, useCallback } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import TabBar from './components/TabBar'
 import Toast from './components/Toast'
+import InstallPrompt from './components/InstallPrompt'
 import HomePage from './pages/HomePage'
 import RankingPage from './pages/RankingPage'
 import SearchPage from './pages/SearchPage'
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/admin/*"     element={<AdminLayout />} />
         </Routes>
         {!isAdmin && !isHome && <TabBar />}
+        {!isAdmin && <InstallPrompt />}
         <Toast toast={toast} onClose={() => setToast(null)} />
       </div>
     </ToastContext.Provider>
