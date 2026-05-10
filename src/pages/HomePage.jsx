@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import NotificationBell from '../components/NotificationBell'
+import NotificationOptIn from '../components/NotificationOptIn'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -95,6 +96,9 @@ export default function HomePage() {
 
       {/* 본문 */}
       <div style={{ maxWidth: 512, margin: '0 auto', padding: '16px 16px 80px' }}>
+
+        {/* 알림 미설정 사용자에게 노출 */}
+        <NotificationOptIn />
 
         {/* 다가오는 대회 */}
         {upcomingEvents.length > 0 && (
