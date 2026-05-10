@@ -3,6 +3,7 @@ import { isPushSupported, getPushSubscription, subscribePush } from '../lib/push
 
 const STORAGE_KEY = 'jta_notification_optin_dismissed_at'
 const SUPPRESS_DAYS = 7
+const SHOW_DELAY_MS = 1200  // 홈 진입 후 잠깐 기다렸다가 표시
 
 function suppressedRecently() {
   try {
@@ -22,9 +23,13 @@ export default function NotificationOptIn() {
     if (typeof Notification === 'undefined') return
     if (Notification.permission === 'denied') return
     if (suppressedRecently()) return
+
+    let timer = null
     getPushSubscription().then(sub => {
-      if (!sub) setShow(true)
+      if (sub) return
+      timer = setTimeout(() => setShow(true), SHOW_DELAY_MS)
     })
+    return () => { if (timer) clearTimeout(timer) }
   }, [])
 
   function dismiss() {
@@ -50,48 +55,88 @@ export default function NotificationOptIn() {
   if (!show) return null
 
   return (
-    <div style={{
-      background: 'linear-gradient(135deg, #fff 0%, #fef3ec 100%)',
-      border: '1px solid #f5d4b8', borderRadius: 18,
-      padding: '14px 16px', marginBottom: 14,
-      display: 'flex', alignItems: 'center', gap: 12,
-      boxShadow: '0 2px 12px rgba(192,97,43,0.08)',
-      position: 'relative',
-    }}>
-      <div style={{
-        width: 42, height: 42, borderRadius: 14,
-        background: '#c0612b', flexShrink: 0,
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 80,
+        background: 'rgba(0,0,0,0.5)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 22,
-      }}>🔔</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#2d1a0e' }}>
-          알림 받기
-        </p>
-        <p style={{ margin: '2px 0 0', fontSize: 11, color: '#7a6a62', lineHeight: 1.4 }}>
-          {tip || '대회 공지·접수 시작·결과 등록 알림을 즉시 받아보세요'}
-        </p>
-      </div>
-      <button
-        onClick={handleEnable}
-        disabled={loading}
+        padding: 20,
+        animation: 'jtaFadeIn 200ms ease-out',
+      }}
+      onClick={dismiss}
+    >
+      <style>{`
+        @keyframes jtaFadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes jtaPop {
+          from { opacity: 0; transform: scale(0.92) translateY(6px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
+      <div
+        onClick={e => e.stopPropagation()}
         style={{
-          background: '#c0612b', color: '#fff', border: 'none',
-          padding: '8px 14px', borderRadius: 12,
-          fontSize: 12, fontWeight: 700,
-          cursor: loading ? 'wait' : 'pointer',
-          flexShrink: 0, opacity: loading ? 0.6 : 1,
+          background: '#fff', borderRadius: 22,
+          padding: '24px 22px 18px',
+          maxWidth: 340, width: '100%',
+          boxShadow: '0 24px 48px rgba(0,0,0,0.25)',
+          fontFamily: "'Nunito', 'Noto Sans KR', sans-serif",
+          animation: 'jtaPop 220ms ease-out',
+          textAlign: 'center',
         }}>
-        {loading ? '설정 중...' : '알림 켜기'}
-      </button>
-      <button
-        onClick={dismiss}
-        aria-label="닫기"
-        style={{
-          background: 'transparent', border: 'none', color: '#bdb1a8',
-          fontSize: 18, cursor: 'pointer', padding: '4px 6px',
-          flexShrink: 0,
-        }}>×</button>
+        <div style={{
+          width: 64, height: 64, borderRadius: 20,
+          background: '#fef3ec', margin: '0 auto 14px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 34,
+        }}>🔔</div>
+
+        <h3 style={{
+          margin: 0, fontSize: 18, fontWeight: 900, color: '#2d1a0e',
+          letterSpacing: -0.3,
+        }}>알림을 받으시겠어요?</h3>
+
+        <p style={{
+          margin: '8px 0 0', fontSize: 12.5, color: '#7a6a62',
+          lineHeight: 1.55,
+        }}>
+          {tip || (
+            <>
+              대회 공지·접수 시작·결과 등록을<br/>
+              <strong style={{ color: '#c0612b' }}>실시간 알림</strong>으로 받아볼 수 있어요.
+            </>
+          )}
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 18 }}>
+          <button
+            onClick={handleEnable}
+            disabled={loading}
+            style={{
+              background: '#c0612b', color: '#fff', border: 'none',
+              padding: '13px', borderRadius: 14,
+              fontSize: 14, fontWeight: 800,
+              cursor: loading ? 'wait' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+            }}>
+            {loading ? '설정 중...' : '🔔 알림 켜기'}
+          </button>
+          <button
+            onClick={dismiss}
+            disabled={loading}
+            style={{
+              background: 'transparent', color: '#94857c', border: 'none',
+              padding: '8px', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer',
+            }}>
+            나중에 (7일 동안 안 보기)
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
