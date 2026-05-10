@@ -69,6 +69,19 @@ export default function NotificationOptIn() {
     return () => { if (timer) clearTimeout(timer) }
   }, [platform.isIOS])
 
+  // 구독 모달이 떠있는 동안 외부(헤더 종 등)에서 구독 켰는지 폴링 → 자동 닫기
+  useEffect(() => {
+    if (!show || variant !== 'subscribe') return
+    const id = setInterval(async () => {
+      const sub = await getPushSubscription()
+      if (sub) {
+        setShow(false)
+        clearInterval(id)
+      }
+    }, 1000)
+    return () => clearInterval(id)
+  }, [show, variant])
+
   function dismiss() {
     try {
       const key = variant === 'iosInstall' ? STORAGE_KEY_INSTALL : STORAGE_KEY_SUBSCRIBE
