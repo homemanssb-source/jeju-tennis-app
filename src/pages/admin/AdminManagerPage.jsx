@@ -196,7 +196,7 @@ export default function AdminManagerPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-bold">⚙️ 관리자 계정 관리</h2>
+        <h2 className="text-lg font-bold">⚙️ 관리자 계정 관리</h2>
         <button
           onClick={() => {
             setForm({ email: '', name: '', is_super: false, permissions: { ...DEFAULT_PERMISSIONS } })

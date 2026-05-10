@@ -181,7 +181,7 @@ export default function AdminLogin() {
     <div className="min-h-screen flex items-center justify-center bg-soft p-4">
       <div className="bg-white rounded-2xl p-8 w-full max-w-xs shadow-sm border border-line">
         <h1 className="text-xl font-bold text-center mb-1">🎾 관리자</h1>
-        <p className="text-sm text-sub text-center mb-6">제주도 테니스 협회</p>
+        <p className="text-sm text-sub text-center mb-6">제주시 테니스 협회</p>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>

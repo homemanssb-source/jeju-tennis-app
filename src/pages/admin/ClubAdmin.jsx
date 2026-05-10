@@ -137,7 +137,7 @@ export default function ClubAdmin() {
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-bold">🏢 클럽 관리</h2>
+          <h2 className="text-lg font-bold">🏢 클럽 관리</h2>
           <p className="text-xs text-sub mt-0.5">클럽명 병합 · 이름 통일</p>
         </div>
         <div className="text-right">

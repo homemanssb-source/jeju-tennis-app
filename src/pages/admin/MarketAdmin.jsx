@@ -146,7 +146,7 @@ export default function MarketAdmin() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-bold text-gray-900">🛒 용품 거래 관리</h2>
+        <h2 className="text-lg font-bold text-gray-900">🛒 용품 거래 관리</h2>
         <div className="flex gap-1">
           {TABS.map((t, i) => (
             <button key={i} onClick={() => setTab(i)}

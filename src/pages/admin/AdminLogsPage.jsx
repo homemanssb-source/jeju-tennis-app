@@ -54,7 +54,7 @@ export default function AdminLogsPage() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-base font-bold">📋 수정 로그</h2>
+      <h2 className="text-lg font-bold">📋 수정 로그</h2>
 
       {/* 필터 */}
       <div className="flex gap-2 flex-wrap">

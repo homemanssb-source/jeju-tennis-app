@@ -172,7 +172,7 @@ export default function AccessLogAdmin() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-bold text-gray-900">접속 통계</h2>
+        <h2 className="text-lg font-bold text-gray-900">📈 접속 통계</h2>
         <div className="flex gap-1">
           {PERIODS.map(p => (
             <button
