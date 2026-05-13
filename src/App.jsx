@@ -16,6 +16,7 @@ import TeamEntryPage from './pages/TeamEntryPage'
 import BoardPage from './pages/BoardPage'
 import PinChangePage from './pages/PinChangePage'
 import MarketPage from './pages/MarketPage'
+import ExternalReportPage from './pages/ExternalReportPage'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
 import { usePageView } from './hooks/usePageView'
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/register"    element={<RegisterPage />} />
           <Route path="/notice"      element={<NoticePage />} />
           <Route path="/market"      element={<MarketPage />} />
+          <Route path="/external-report" element={<ExternalReportPage />} />
           <Route path="/admin"       element={<AdminLogin />} />
           <Route path="/admin/*"     element={<AdminLayout />} />
         </Routes>
