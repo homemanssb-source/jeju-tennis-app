@@ -2,13 +2,17 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { SkeletonCard } from '../components/Skeleton'
+import { markNoticesRead } from '../hooks/useNoticeBadge'
 
 export default function NoticePage() {
   const [notices, setNotices] = useState([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
 
-  useEffect(() => { fetchNotices() }, [])
+  useEffect(() => {
+    fetchNotices()
+    markNoticesRead()
+  }, [])
 
   async function fetchNotices() {
     setLoading(true)

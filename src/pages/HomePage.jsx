@@ -4,11 +4,13 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import NotificationBell from '../components/NotificationBell'
 import NotificationOptIn from '../components/NotificationOptIn'
+import { useNoticeBadge } from '../hooks/useNoticeBadge'
 
 export default function HomePage() {
   const navigate = useNavigate()
   const [banners, setBanners] = useState([])
   const [upcomingEvents, setUpcomingEvents] = useState([])
+  const noticeBadge = useNoticeBadge()
 
   useEffect(() => {
     fetchBanners()
@@ -189,7 +191,7 @@ export default function HomePage() {
             onTouchStart={e => e.currentTarget.style.transform = 'scale(0.98)'}
             onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}>
             <div style={{
-              width: 44, height: 44, borderRadius: 16, background: '#fef3ec',
+              width: 44, height: 44, borderRadius: 16, background: '#fceadd',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, marginBottom: 12
             }}>🏆</div>
             <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: '#2d1a0e' }}>랭킹 / 참가</p>
@@ -206,18 +208,18 @@ export default function HomePage() {
               transition: 'transform 0.15s'
             }}>
             <div style={{
-              width: 44, height: 44, borderRadius: 16, background: '#fffbeb',
+              width: 44, height: 44, borderRadius: 16, background: '#fdf2d3',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, marginBottom: 12
             }}>🎯</div>
             <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: '#2d1a0e' }}>대회 운영</p>
-            <p style={{ margin: '3px 0 0', fontSize: 10, color: '#d97706' }}>대진표·결과표·조편성</p>
+            <p style={{ margin: '3px 0 0', fontSize: 10, color: '#b8851b' }}>대진표·결과·조편성</p>
           </a>
         </div>
 
-        {/* 퀵 버튼 4칸 — 건의문의·신청확인·회원등록·선수검색 */}
+        {/* 퀵 버튼 4칸 — JTA공지·신청확인·회원등록·선수검색 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 28 }}>
           {[
-            { icon: '💬', label: '건의\n문의',   path: '/board' },
+            { icon: '📢', label: 'JTA\n공지',   path: '/notice',   badge: noticeBadge },
             { icon: '📋', label: '신청\n확인',   path: '/apply' },
             { icon: '👤', label: '회원\n등록',   path: '/register' },
             { icon: '🔍', label: '선수\n검색',   path: '/search' },
@@ -226,6 +228,7 @@ export default function HomePage() {
               key={item.path}
               onClick={() => navigate(item.path)}
               style={{
+                position: 'relative',
                 background: '#fff', borderRadius: 18, padding: '14px 6px', textAlign: 'center',
                 border: 'none', cursor: 'pointer',
                 boxShadow: '0 2px 0 rgba(192,97,43,0.05), 0 4px 14px rgba(192,97,43,0.05)',
@@ -237,6 +240,17 @@ export default function HomePage() {
               onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}>
               <span style={{ fontSize: 22, display: 'block', marginBottom: 5 }}>{item.icon}</span>
               <span style={{ fontSize: 9, color: '#c8a898', whiteSpace: 'pre-line', lineHeight: 1.4 }}>{item.label}</span>
+              {item.badge > 0 && (
+                <span style={{
+                  position: 'absolute', top: 5, right: 7,
+                  background: '#c0612b', color: '#fff',
+                  fontSize: 7.5, fontWeight: 800,
+                  minWidth: 14, height: 14, padding: '0 4px',
+                  borderRadius: 7,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  lineHeight: 1,
+                }}>N</span>
+              )}
             </button>
           ))}
         </div>
