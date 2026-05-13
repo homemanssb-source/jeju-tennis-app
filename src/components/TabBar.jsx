@@ -16,7 +16,7 @@ const moreTabs = [
   { path: '/apply',           label: '신청확인',       icon: '📋' },
   { path: '/external-report', label: '외부대회 신고',   icon: '🏅' },
   { path: '/register',        label: '회원/팀등록',     icon: '👤' },
-  { path: '/suggestions',     label: '건의/문의',       icon: '💬' },
+  { path: '/board',           label: '건의/문의',       icon: '💬' },
   { path: '/pin',             label: 'PIN 변경',        icon: '🔑' },
 ]
 
