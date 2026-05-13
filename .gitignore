@@ -3,3 +3,20 @@ dist
 .env
 .env.local
 .env.production
+
+# 루트의 src/ 사본 / 작업 파일 (실제 빌드와 무관)
+/AdminLayout.jsx
+/App.jsx
+/HomePage.jsx
+/MarketAdmin.jsx
+/MarketPage.jsx
+/TabBar.jsx
+/_index.txt
+/appA_structure.txt
+/combined_output.txt
+/combined_output2.txt
+/files.zip
+/marketStorage.js
+/sw.js
+/usePageView.js
+/tsconfig.tsbuildinfo
