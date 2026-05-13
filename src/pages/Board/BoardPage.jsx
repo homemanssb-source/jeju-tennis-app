@@ -6,6 +6,7 @@ import { useAdmin } from '../../hooks/useAdmin'
 import BoardTabBar from '../../components/Board/TabBar'
 import PostCard from '../../components/Board/PostCard'
 import PinnedCard from '../../components/Board/PinnedCard'
+import { NoticeList } from '../../components/Notice/NoticeContent'
 import { ToastContext } from '../../App'
 import { markNoticesRead } from '../../hooks/useNoticeBadge'
 
@@ -22,21 +23,11 @@ export default function BoardPage() {
   const load = useCallback(async () => {
     setLoading(true)
     if (category === 'notice') {
-      // 기존 관리자 공지사항(notices 테이블) 사용
-      const { data } = await supabase.from('notices')
-        .select('id, title, content, pinned, created_at, link, image_url')
+      const { data } = await supabase.from('notices').select('*')
         .order('pinned', { ascending: false })
         .order('created_at', { ascending: false })
-      setItems((data || []).map(n => ({
-        ...n,
-        category: 'notice',
-        sub_category: null,
-        view_count: 0,
-        post_attachments: [],
-        _source: 'notice',
-      })))
+      setItems(data || [])
     } else {
-      // club / shop / lesson은 posts 테이블
       const { data } = await supabase.from('posts')
         .select('id, category, sub_category, title, content, pinned, view_count, created_at, post_attachments(id)')
         .eq('category', category)
@@ -49,32 +40,19 @@ export default function BoardPage() {
 
   useEffect(() => { load() }, [load])
 
-  // 공지사항 탭 진입 시 last_read_at 갱신
   useEffect(() => {
     if (category === 'notice') markNoticesRead()
   }, [category])
 
   function setTab(t) { setSearchParams({ tab: t }) }
 
-  function handleCardClick(item) {
-    if (item._source === 'notice') navigate(`/board/notice/${item.id}`)
-    else navigate(`/board/post/${item.id}`)
+  function handlePostClick(item) {
+    navigate(`/board/post/${item.id}`)
   }
 
-  function handleEdit(item) {
-    if (item._source === 'notice') {
-      // 공지사항은 관리자 페이지에서 편집
-      navigate('/admin/notices')
-    } else {
-      navigate(`/board/edit/${item.id}`)
-    }
-  }
+  function handleEdit(item) { navigate(`/board/edit/${item.id}`) }
 
   async function handleDelete(item) {
-    if (item._source === 'notice') {
-      showToast?.('공지사항은 관리자 페이지(/admin/notices)에서 삭제해주세요.', 'error')
-      return
-    }
     if (!confirm(`"${item.title}" 글을 삭제하시겠습니까?`)) return
     const { error } = await supabase.from('posts').delete().eq('id', item.id)
     if (error) { showToast?.('삭제 실패: ' + error.message, 'error'); return }
@@ -83,17 +61,14 @@ export default function BoardPage() {
   }
 
   function handleFab() {
-    if (category === 'notice') {
-      // 공지사항은 기존 관리자 페이지로
-      navigate('/admin/notices')
-    } else {
-      navigate(`/board/write?tab=${category}`)
-    }
+    if (category === 'notice') navigate('/admin/notices')
+    else navigate(`/board/write?tab=${category}`)
   }
 
-  const pinnedItems  = items.filter(p => p.pinned)
-  const regularItems = items.filter(p => !p.pinned)
-  const showDisclaimer = category !== 'notice'
+  const isNotice       = category === 'notice'
+  const pinnedItems    = isNotice ? [] : items.filter(p => p.pinned)
+  const regularItems   = isNotice ? items : items.filter(p => !p.pinned)
+  const showDisclaimer = !isNotice
 
   return (
     <div style={{ background: colors.bg, minHeight: '100vh', paddingBottom: 90 }}>
@@ -124,7 +99,7 @@ export default function BoardPage() {
       {/* 메인 탭 */}
       <BoardTabBar value={category} onChange={setTab} />
 
-      {/* 카드 리스트 */}
+      {/* 목록 */}
       <div style={{ maxWidth: 500, margin: '0 auto', padding: '12px 16px' }}>
         {loading ? (
           <p style={{ textAlign: 'center', color: colors.textLight, fontSize: 13, padding: 40 }}>
@@ -132,22 +107,29 @@ export default function BoardPage() {
           </p>
         ) : items.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-            <p style={{ fontSize: 36, margin: 0 }}>🎾</p>
+            <p style={{ fontSize: 36, margin: 0 }}>{isNotice ? '📭' : '🎾'}</p>
             <p style={{ margin: '12px 0 0', fontSize: 13, color: colors.textMid }}>
-              아직 등록된 글이 없습니다
+              {isNotice ? '등록된 공지가 없습니다' : '아직 등록된 글이 없습니다'}
             </p>
           </div>
+        ) : isNotice ? (
+          // 공지사항: 기존 NoticePage와 동일한 카드 디자인
+          <NoticeList
+            notices={items}
+            onSelectTournament={n => navigate(`/board/notice/${n.id}`)}
+          />
         ) : (
+          // 클럽/용품/레슨: posts 테이블 + 기본 카드
           <>
             {pinnedItems.map(p => (
-              <PinnedCard key={`${p._source}-${p.id}`} post={p} isAdmin={isAdmin}
-                onClick={() => handleCardClick(p)}
+              <PinnedCard key={p.id} post={p} isAdmin={isAdmin}
+                onClick={() => handlePostClick(p)}
                 onEdit={handleEdit}
                 onDelete={handleDelete} />
             ))}
             {regularItems.map(p => (
-              <PostCard key={`${p._source}-${p.id}`} post={p} isAdmin={isAdmin}
-                onClick={() => handleCardClick(p)}
+              <PostCard key={p.id} post={p} isAdmin={isAdmin}
+                onClick={() => handlePostClick(p)}
                 onEdit={handleEdit}
                 onDelete={handleDelete} />
             ))}
