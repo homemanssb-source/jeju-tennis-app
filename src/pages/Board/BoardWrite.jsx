@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase, getSession } from '../../lib/supabase'
-import { colors, MAIN_TABS, SUB_CATS } from '../../lib/boardTheme'
+import { colors, MAIN_TABS } from '../../lib/boardTheme'
 import { useAdmin } from '../../hooks/useAdmin'
 import { uploadAttachment } from '../../lib/supabaseStorage'
 import AttachmentUploader from '../../components/Board/AttachmentUploader'
@@ -13,7 +13,7 @@ export default function BoardWrite() {
   const showToast = useContext(ToastContext)
   const { isAdmin, loading: adminLoading } = useAdmin()
 
-  const [category, setCategory]       = useState('notice')
+  const [category, setCategory]       = useState('club')
   const [subCategory, setSubCategory] = useState('association')
   const [pinned, setPinned]           = useState(false)
   const [title, setTitle]             = useState('')
@@ -127,35 +127,16 @@ export default function BoardWrite() {
       </div>
 
       <div style={{ maxWidth: 500, margin: '0 auto', padding: 16 }}>
-        {/* 카테고리 */}
+        {/* 카테고리 (공지사항 제외 — 공지사항은 /admin/notices에서 작성) */}
         <label style={labelStyle}>카테고리</label>
         <select value={category} onChange={e => setCategory(e.target.value)} style={inputStyle}>
-          {MAIN_TABS.map(t => (
+          {MAIN_TABS.filter(t => t.key !== 'notice').map(t => (
             <option key={t.key} value={t.key}>{t.icon} {t.label}</option>
           ))}
         </select>
-
-        {/* 서브카테고리 */}
-        {category === 'notice' && (
-          <>
-            <label style={labelStyle}>세부 분류</label>
-            <select value={subCategory} onChange={e => setSubCategory(e.target.value)} style={inputStyle}>
-              {SUB_CATS.map(s => (
-                <option key={s.key} value={s.key}>{s.icon} {s.label}</option>
-              ))}
-            </select>
-
-            {/* 고정 */}
-            <label style={{
-              marginTop: 14, display: 'flex', alignItems: 'center', gap: 8,
-              fontSize: 13, color: colors.textDark, cursor: 'pointer',
-            }}>
-              <input type="checkbox" checked={pinned} onChange={e => setPinned(e.target.checked)}
-                style={{ width: 16, height: 16 }} />
-              <span>📌 상단 고정 (공지사항만 가능)</span>
-            </label>
-          </>
-        )}
+        <p style={{ margin: '6px 2px 0', fontSize: 11, color: colors.textMid }}>
+          ℹ️ 공지사항은 <strong>관리자 → 공지 관리</strong> 페이지에서 작성/수정합니다.
+        </p>
 
         {/* 제목 */}
         <label style={labelStyle}>제목</label>

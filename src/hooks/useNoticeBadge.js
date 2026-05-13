@@ -27,9 +27,8 @@ export function useNoticeBadge() {
   useEffect(() => {
     let active = true
     const lastRead = getLastReadAt()
-    supabase.from('posts')
+    supabase.from('notices')
       .select('*', { count: 'exact', head: true })
-      .eq('category', 'notice')
       .gt('created_at', lastRead)
       .then(({ count: c }) => { if (active) setCount(c || 0) })
     return () => { active = false }

@@ -1,0 +1,86 @@
+﻿# 앱A (jeju-tennis-app) 소스 인덱스
+# 생성: 2026-04-13 15:44
+
+## config
+  package.json
+  postcss.config.js
+  tailwind.config.js
+  vercel.json
+  vite.config.js
+
+## hooks
+  src\hooks\usePageView.js
+
+## lib
+  src\lib\marketStorage.js
+  src\lib\push.js
+  src\lib\supabase.js
+
+## components
+  src\components\BottomSheet.jsx
+  src\components\NotificationBell.jsx
+  src\components\PageHeader.jsx
+  src\components\PlayerDetail.jsx
+  src\components\Skeleton.jsx
+  src\components\TabBar.jsx
+  src\components\Toast.jsx
+
+## pages
+  src\pages\ApplyPage.jsx
+  src\pages\BoardPage.jsx
+  src\pages\EventEntryPage.jsx
+  src\pages\EventEntryPage_check.jsx
+  src\pages\ExternalReportPage.jsx
+  src\pages\HomePage.jsx
+  src\pages\MarketPage.jsx
+  src\pages\NoticePage.jsx
+  src\pages\PinChangePage.jsx
+  src\pages\RankingPage.jsx
+  src\pages\RegisterPage.jsx
+  src\pages\SearchPage.jsx
+  src\pages\TeamEntryPage.jsx
+  src\pages\TournamentPage.jsx
+
+## pages/admin
+  src\pages\admin\AccessLogAdmin.jsx
+  src\pages\admin\AdminBoardPage.jsx
+  src\pages\admin\AdminLayout.jsx
+  src\pages\admin\AdminLogin.jsx
+  src\pages\admin\AdminLogsPage.jsx
+  src\pages\admin\AdminManagerPage.jsx
+  src\pages\admin\AdminTeamEntryPage.jsx
+  src\pages\admin\ClubAdmin.jsx
+  src\pages\admin\EntryAdmin.jsx
+  src\pages\admin\EventAdmin.jsx
+  src\pages\admin\EventEntryPage.jsx
+  src\pages\admin\ExternalReportAdmin.jsx
+  src\pages\admin\GradeAdmin.jsx
+  src\pages\admin\MarketAdmin.jsx
+  src\pages\admin\MemberAdmin.jsx
+  src\pages\admin\NoticeAdmin.jsx
+  src\pages\admin\PaymentAdmin.jsx
+  src\pages\admin\PointAdjAdmin.jsx
+  src\pages\admin\PointRulesAdmin.jsx
+  src\pages\admin\PromotionAdmin.jsx
+  src\pages\admin\PromotionRulesAdmin.jsx
+  src\pages\admin\PushAdmin.jsx
+  src\pages\admin\RankingPage.jsx
+  src\pages\admin\RegisterPage.jsx
+  src\pages\admin\SearchPage.jsx
+  src\pages\admin\SponsorAdmin.jsx
+  src\pages\admin\TourAdmin.jsx
+  src\pages\admin\UploadAdmin.jsx
+
+## public
+  public\manifest.json
+  public\sw.js
+
+## supabase
+  supabase\functions\push-send\index.ts
+  supabase\functions\push-subscribe\index.ts
+
+## misc
+  src\index.css
+  sw.js
+
+
