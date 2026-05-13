@@ -219,7 +219,7 @@ export default function HomePage() {
         {/* 퀵 버튼 4칸 — JTA공지·신청확인·회원등록·선수검색 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 28 }}>
           {[
-            { icon: '📢', label: 'JTA\n공지',   path: '/notice',   badge: noticeBadge },
+            { icon: '📢', label: 'JTA\n공지',   path: '/board',    badge: noticeBadge },
             { icon: '📋', label: '신청\n확인',   path: '/apply' },
             { icon: '👤', label: '회원\n등록',   path: '/register' },
             { icon: '🔍', label: '선수\n검색',   path: '/search' },

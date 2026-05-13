@@ -13,7 +13,10 @@ import NoticePage from './pages/NoticePage'
 import RegisterPage from './pages/RegisterPage'
 import EventEntryPage from './pages/EventEntryPage'
 import TeamEntryPage from './pages/TeamEntryPage'
-import BoardPage from './pages/BoardPage'
+import BoardPage from './pages/Board/BoardPage'
+import BoardDetail from './pages/Board/BoardDetail'
+import BoardWrite from './pages/Board/BoardWrite'
+import SuggestionsPage from './pages/BoardPage'  // 기존 건의/문의 (경로 이전)
 import PinChangePage from './pages/PinChangePage'
 import MarketPage from './pages/MarketPage'
 import ExternalReportPage from './pages/ExternalReportPage'
@@ -44,8 +47,12 @@ export default function App() {
           <Route path="/search"      element={<SearchPage />} />
           <Route path="/tournament"  element={<TournamentPage />} />
           <Route path="/entry"       element={<EventEntryPage />} />
-          <Route path="/entry/team"  element={<TeamEntryPage />} />
-          <Route path="/board"       element={<BoardPage />} />
+          <Route path="/entry/team"   element={<TeamEntryPage />} />
+          <Route path="/board"        element={<BoardPage />} />
+          <Route path="/board/write"  element={<BoardWrite />} />
+          <Route path="/board/edit/:postId" element={<BoardWrite />} />
+          <Route path="/board/:postId" element={<BoardDetail />} />
+          <Route path="/suggestions" element={<SuggestionsPage />} />
           <Route path="/pin"         element={<PinChangePage />} />
           <Route path="/apply"       element={<ApplyPage />} />
           <Route path="/register"    element={<RegisterPage />} />
