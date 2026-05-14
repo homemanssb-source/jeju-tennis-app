@@ -684,7 +684,7 @@ export default function ApplyPage() {
                               </p>
                             </div>
                           </div>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${getPayStyle(entry.payment_status)}`}>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap ${getPayStyle(entry.payment_status)}`}>
                             {entry.payment_status || '미납'}
                           </span>
                         </div>
@@ -735,12 +735,12 @@ export default function ApplyPage() {
                                 </div>
                               </div>
                               <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap ${
                                   team.status === 'confirmed' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
                                 }`}>
                                   {team.status === 'confirmed' ? '확정' : '대기'}
                                 </span>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${getPayStyle(team.payment_status)}`}>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap ${getPayStyle(team.payment_status)}`}>
                                   {team.payment_status || '미납'}
                                 </span>
                               </div>
@@ -824,10 +824,10 @@ export default function ApplyPage() {
                             <p className="text-xs text-sub mt-0.5">📅 {e.event_date}</p>
                           </div>
                           <div className="flex flex-col gap-1 items-end shrink-0">
-                            <span className={`text-[10px] px-2 py-0.5 rounded ${getStatusStyle(e.entry_status)}`}>
+                            <span className={`text-[10px] px-2 py-0.5 rounded whitespace-nowrap ${getStatusStyle(e.entry_status)}`}>
                               {getStatusLabel(e.entry_status)}
                             </span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded ${getPayStyle(e.payment_status)}`}>
+                            <span className={`text-[10px] px-2 py-0.5 rounded whitespace-nowrap ${getPayStyle(e.payment_status)}`}>
                               {e.payment_status || '미납'}
                             </span>
                           </div>
@@ -898,12 +898,12 @@ export default function ApplyPage() {
                                 <p className="text-xs text-sub mt-0.5">📅 {evDate}</p>
                               </div>
                               <div className="flex flex-col gap-1 items-end shrink-0">
-                                <span className={`text-[10px] px-2 py-0.5 rounded ${
+                                <span className={`text-[10px] px-2 py-0.5 rounded whitespace-nowrap ${
                                   t.status === 'confirmed' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
                                 }`}>
                                   {t.status === 'confirmed' ? '확정' : '대기'}
                                 </span>
-                                <span className={`text-[10px] px-2 py-0.5 rounded ${getPayStyle(t.payment_status)}`}>
+                                <span className={`text-[10px] px-2 py-0.5 rounded whitespace-nowrap ${getPayStyle(t.payment_status)}`}>
                                   {t.payment_status || '미납'}
                                 </span>
                               </div>
