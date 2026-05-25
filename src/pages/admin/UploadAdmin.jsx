@@ -11,6 +11,7 @@ export default function UploadAdmin() {
   const [uploading, setUploading] = useState(false)
   const [result, setResult] = useState(null)
   const [detailModal, setDetailModal] = useState(null)
+  const [fallbackDate, setFallbackDate] = useState('')   // CSV에 일자 없을 때 공통 대회일자
 
   function handleFileChange(e) {
     const f = e.target.files[0]
@@ -128,7 +129,7 @@ export default function UploadAdmin() {
       const phone = (row['전화번호'] || row['휴대폰'] || '').toString().trim()
       const memberClub = (row['클럽명'] || row['소속클럽'] || row['클럽'] || '').toString().trim()
       const tournamentName = (row['대회명'] || '').toString().trim()
-      const dateStr = (row['대회일자(YYYY-MM-DD)'] || row['대회일자'] || row['일시'] || row['일자'] || '').toString().trim()
+      const dateStr = (row['대회일자(YYYY-MM-DD)'] || row['대회일자'] || row['일시'] || row['일자'] || fallbackDate || '').toString().trim()
       const division = (row['부서'] || '').toString().trim()
       const rank = normalizeRank(row['순위(우승/준우승/4강/8강/참가)'] || row['순위'] || '')
       const manualPoints = parseInt(row['포인트'] || '0') || 0
@@ -328,6 +329,24 @@ export default function UploadAdmin() {
           </>
         )}
       </div>
+
+      {tab === 'result' && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            📅 공통 대회일자 (CSV에 일자 컬럼 없을 때 사용)
+          </label>
+          <input
+            type="date"
+            value={fallbackDate}
+            onChange={e => setFallbackDate(e.target.value)}
+            className="w-full text-sm border border-line rounded-lg px-3 py-2"
+          />
+          <p className="text-[11px] text-gray-600 mt-1">
+            CSV에 <code>일시/일자/대회일자</code> 컬럼이 없으면 이 날짜로 일괄 적용됩니다.
+            컬럼이 있으면 해당 값이 우선.
+          </p>
+        </div>
+      )}
 
       <div className="mb-4">
         <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileChange}
