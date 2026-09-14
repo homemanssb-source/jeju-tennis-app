@@ -216,10 +216,21 @@ export default function MemberAdmin() {
     else if (m.status === '\uD734\uBA74') clubStats[c].dormant++
   })
 
+  const totalCount   = members.filter(m => m.status !== '\uC0AD\uC81C').length
+  const activeCount  = members.filter(m => m.status === '\uD65C\uC131').length
+  const dormantCount = members.filter(m => m.status === '\uD734\uBA74').length
+  const isFiltered   = filtered.length !== members.length
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold">\uD83D\uDC65 \uB3D9\uD638\uC778 \uAD00\uB9AC</h2>
+        <div>
+          <h2 className="text-lg font-bold">{'\uD83D\uDC65 \uB3D9\uD638\uC778 \uAD00\uB9AC'}</h2>
+          <p className="text-xs text-sub mt-0.5">
+            {'\uC804\uCCB4 ' + totalCount + '\uBA85 \u00B7 \uD65C\uC131 ' + activeCount + ' \u00B7 \uD734\uBA74 ' + dormantCount}
+            {isFiltered && <span className="ml-1 text-accent font-medium">{'\u00B7 \uAC80\uC0C9\uACB0\uACFC ' + filtered.length + '\uBA85'}</span>}
+          </p>
+        </div>
         <button onClick={openAdd}
           className="bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
           + {'\uD68C\uC6D0 \uCD94\uAC00'}
@@ -326,8 +337,6 @@ export default function MemberAdmin() {
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-sub mt-2">{'\uCD4C ' + filtered.length + '\uBA85'}</p>
-
       {/* \uCD94\uAC00/\uC218\uC815 \uBAA8\uB2EC */}
       {(modal === 'add' || modal === 'edit') && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
