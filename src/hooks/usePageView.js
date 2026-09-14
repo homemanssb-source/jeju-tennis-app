@@ -26,7 +26,7 @@ const PAGE_NAMES = {
   '/board':       '건의/문의',
   '/pin':         'PIN변경',
   '/apply':       '가입신청',
-  '/register':    '선수등록',
+  '/register':    '동호인/선수등록',
   '/notice':      '공지사항',
   '/market':      '용품거래',
 }

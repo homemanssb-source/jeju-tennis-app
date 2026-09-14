@@ -52,7 +52,7 @@ export default function TeamEntryPage() {
   async function fetchActiveMembers() {
     const { data } = await supabase.from('members_public')
       .select('member_id, name, display_name, club, grade, gender, status')
-      .eq('status', '활성').order('name')
+      .eq('status', '활성').eq('member_type', '동호인').order('name')
     setAllMembers(data || [])
   }
 

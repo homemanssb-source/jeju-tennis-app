@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
+import { ageGroupOf } from '../lib/ageGroups'
 
 export default function EventEntryPage() {
   const showToast = useContext(ToastContext)
@@ -30,11 +31,26 @@ export default function EventEntryPage() {
   }
 
   async function fetchMembers() {
+    // 동호인·선수 모두 불러오고, 선택한 대회의 대상(target_type)에 따라 필터링
     const { data } = await supabase.from('members_public')
-      .select('member_id, name, display_name, club, division, grade, status')
+      .select('member_id, name, display_name, club, division, grade, status, member_type, birthdate')
       .eq('status', '활성')  // ← 활성만 조회
       .order('name')
     setMembers(data || [])
+  }
+
+  // 대회 대상: '동호인'(기본) | '선수' | '전체'
+  const targetType = selectedEvent?.target_type || '동호인'
+  const eventYear = selectedEvent?.event_date ? Number(String(selectedEvent.event_date).slice(0, 4)) : new Date().getFullYear()
+  function matchesTarget(m) {
+    if (targetType === '전체') return true
+    return (m.member_type || '동호인') === targetType
+  }
+  // 드롭다운/선택 정보에 표시할 부가 정보: 동호인은 등급, 선수는 연령부서
+  function memberMeta(m) {
+    if (!m) return ''
+    if (m.member_type === '선수') return ageGroupOf(m.birthdate, eventYear) || '선수'
+    return m.grade || '-'
   }
 
   async function fetchDivisions(eventId) {
@@ -66,10 +82,11 @@ export default function EventEntryPage() {
     if (!query.trim()) return []
     const q = query.trim().toLowerCase()
     return members.filter(m =>
+      matchesTarget(m) && (
       (m.name || '').toLowerCase().includes(q) ||
       (m.display_name || '').toLowerCase().includes(q) ||
       (m.member_id || '').toLowerCase().includes(q)
-    ).slice(0, 8)
+    )).slice(0, 8)
   }
 
   function getMemberInfo(memberId) {
@@ -148,7 +165,7 @@ export default function EventEntryPage() {
             <option value="">대회를 선택하세요</option>
             {events.map(ev => (
               <option key={ev.event_id} value={ev.event_id}>
-                {ev.event_name} ({ev.event_date}){ev.entry_fee_team ? ` - ${ev.entry_fee_team.toLocaleString()}원` : ''}
+                {ev.target_type === '선수' ? '🏅 ' : ''}{ev.event_name} ({ev.event_date}){ev.entry_fee_team ? ` - ${ev.entry_fee_team.toLocaleString()}원` : ''}
               </option>
             ))}
           </select>
@@ -160,7 +177,9 @@ export default function EventEntryPage() {
           <div className={`rounded-lg p-3 ${entryAvail.ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
             <p className="text-sm font-semibold text-gray-800">{selectedEvent.event_name}</p>
             <p className="text-xs text-sub mt-1">📅 {selectedEvent.event_date}
-              {selectedEvent.entry_fee_team > 0 && ` · 💰 ${selectedEvent.entry_fee_team.toLocaleString()}원`}</p>
+              {selectedEvent.entry_fee_team > 0 && ` · 💰 ${selectedEvent.entry_fee_team.toLocaleString()}원`}
+              {targetType === '선수' && ' · 🏅 선수 대회 (등록 선수만 신청 가능)'}
+              {targetType === '전체' && ' · 동호인·선수 모두 신청 가능'}</p>
             {!entryAvail.ok ? (
               <p className={`text-xs mt-1 font-medium ${entryAvail.type === 'notYet' ? 'text-amber-600' : 'text-red-600'}`}>
                 {entryAvail.type === 'notYet' ? '⏳' : '🔒'} {entryAvail.message}
@@ -195,7 +214,7 @@ export default function EventEntryPage() {
                     className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
                   {member1Info && (
                     <div className="mt-1 px-3 py-1.5 rounded-lg text-xs bg-green-50 text-green-700">
-                      {member1Info.name} · {member1Info.club || '-'} · {member1Info.grade || '-'} ✅활성
+                      {member1Info.name} · {member1Info.club || '-'} · {memberMeta(member1Info)} ✅활성
                     </div>
                   )}
                   {showDropdown1 && filterMembers(member1Search).length > 0 && (
@@ -205,7 +224,7 @@ export default function EventEntryPage() {
                           onClick={() => { setMember1Id(m.member_id); setMember1Search(m.display_name || m.name); setShowDropdown1(false); setMember1Pin('') }}
                           className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30">
                           <span className="font-medium">{m.display_name || m.name}</span>
-                          <span className="text-sub text-xs ml-2">{m.club || ''} · {m.grade || ''}</span>
+                          <span className="text-sub text-xs ml-2">{m.club || ''} · {memberMeta(m)}</span>
                           <span className="text-xs ml-2 text-green-600">✅</span>
                         </button>
                       ))}
@@ -237,7 +256,7 @@ export default function EventEntryPage() {
                     className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
                   {member2Info && (
                     <div className="mt-1 px-3 py-1.5 rounded-lg text-xs bg-green-50 text-green-700">
-                      {member2Info.name} · {member2Info.club || '-'} · {member2Info.grade || '-'} ✅활성
+                      {member2Info.name} · {member2Info.club || '-'} · {memberMeta(member2Info)} ✅활성
                     </div>
                   )}
                   {showDropdown2 && filterMembers(member2Search).length > 0 && (
@@ -247,7 +266,7 @@ export default function EventEntryPage() {
                           onClick={() => { setMember2Id(m.member_id); setMember2Search(m.display_name || m.name); setShowDropdown2(false) }}
                           className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30">
                           <span className="font-medium">{m.display_name || m.name}</span>
-                          <span className="text-sub text-xs ml-2">{m.club || ''} · {m.grade || ''}</span>
+                          <span className="text-sub text-xs ml-2">{m.club || ''} · {memberMeta(m)}</span>
                           <span className="text-xs ml-2 text-green-600">✅</span>
                         </button>
                       ))}

@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { getSession, adminLogout, getAdminUser, supabase } from '../../lib/supabase'
 
 import MemberAdmin from './MemberAdmin'
+import PlayerAdmin from './PlayerAdmin'
 import TourAdmin from './TourAdmin'
 import PointAdjAdmin from './PointAdjAdmin'
 import PointRulesAdmin from './PointRulesAdmin'
@@ -35,7 +36,8 @@ const TAB_GROUPS = [
     key: 'members',
     label: '👥 회원',
     subs: [
-      { path: '/admin/members', label: '회원 목록' },
+      { path: '/admin/members', label: '동호인 목록' },
+      { path: '/admin/players', label: '🏅 선수 목록' },
       { path: '/admin/upload', label: '데이터 업로드' },
     ],
   },
@@ -247,6 +249,7 @@ export default function AdminLayout() {
         <div className="max-w-5xl mx-auto p-4">
           <Routes>
             <Route path="members"          element={<MemberAdmin />} />
+            <Route path="players"          element={<PlayerAdmin />} />
             <Route path="upload"           element={<UploadAdmin />} />
             <Route path="events"           element={<EventAdmin />} />
             <Route path="entries"          element={<EntryAdmin />} />

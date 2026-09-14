@@ -116,7 +116,8 @@ export default function MemberAdmin() {
 
   async function fetchMembers() {
     setLoading(true)
-    const { data } = await supabase.from('members').select('*').order('name')
+    // 선수(member_type='선수')는 선수 관리 탭에서 별도 관리
+    const { data } = await supabase.from('members').select('*').eq('member_type', '동호인').order('name')
     if (data) {
       setMembers(data)
       setDivisions([...new Set(data.map(m => m.division).filter(Boolean))])
@@ -167,7 +168,7 @@ export default function MemberAdmin() {
   }
 
   function openAdd() {
-    setForm({ member_id: 'M' + Date.now().toString().slice(-8), name: '', display_name: '', phone: '', club: '', division: '', grade: '', gender: '', status: '\uD65C\uC131' })
+    setForm({ member_id: 'M' + Date.now().toString().slice(-8), name: '', display_name: '', phone: '', club: '', division: '', grade: '', gender: '', status: '\uD65C\uC131', member_type: '\uB3D9\uD638\uC778' })
     setModal('add')
   }
 
@@ -218,7 +219,7 @@ export default function MemberAdmin() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold">{'\uD83D\uDC65 \uD68C\uC6D0 \uAD00\uB9AC'}</h2>
+        <h2 className="text-lg font-bold">\uD83D\uDC65 \uB3D9\uD638\uC778 \uAD00\uB9AC</h2>
         <button onClick={openAdd}
           className="bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
           + {'\uD68C\uC6D0 \uCD94\uAC00'}

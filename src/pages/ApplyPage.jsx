@@ -249,6 +249,7 @@ export default function ApplyPage() {
       .select('member_id, name, club, grade, gender, status')
       .ilike('name', `%${q}%`)
       .eq('status', '활성')
+      .eq('member_type', '동호인')
       .limit(20)
     setRosterEditSearching(false)
     const currentIds = new Set(rosterEditMembers.map(m => m.member_id).filter(Boolean))
@@ -462,6 +463,7 @@ export default function ApplyPage() {
       .select('member_id, name, club, status')
       .ilike('name', `%${q}%`)
       .eq('status', '활성')
+      .eq('member_type', '동호인')
       .limit(20)
     setPartnerSearching(false)
 

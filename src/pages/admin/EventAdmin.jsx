@@ -1,6 +1,20 @@
 import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
+import { AGE_GROUPS } from '../../lib/ageGroups'
+
+// 대회 대상: 동호인(랭킹부서) / 선수(연령부서) / 전체
+const TARGET_TYPES = [
+  { value: '동호인', label: '🎾 동호인 대회', desc: '랭킹부서·등급 기준' },
+  { value: '선수',   label: '🏅 선수 대회',   desc: '연령부서(생년월일) 기준' },
+  { value: '전체',   label: '🎾+🏅 전체',     desc: '동호인·선수 모두 신청' },
+]
+
+function getTargetBadge(target) {
+  if (target === '선수') return { label: '🏅 선수', color: 'bg-amber-50 text-amber-700' }
+  if (target === '전체') return { label: '전체', color: 'bg-purple-50 text-purple-700' }
+  return null
+}
 
 export default function EventAdmin() {
   const showToast = useContext(ToastContext)
@@ -12,7 +26,7 @@ export default function EventAdmin() {
     entry_open_at: '', entry_close_at: '', description: '', tournament_id: '',
     event_type: 'individual', team_match_type: '3_doubles', team_division_id: '',
     account_number: '', account_holder: '', account_bank: '',
-    qualification_image_url: '',
+    qualification_image_url: '', target_type: '동호인',
   })
   const [tournaments, setTournaments] = useState([])
   const [pointRuleDivisions, setPointRuleDivisions] = useState([])
@@ -86,6 +100,7 @@ export default function EventAdmin() {
       account_holder: form.account_holder || null,
       account_bank: form.account_bank || null,
       qualification_image_url: form.qualification_image_url || null,
+      target_type: form.target_type || '동호인',
     }
     const { error } = await supabase.from('events').insert([insertData])
     if (error) { showToast?.(error.message, 'error'); return }
@@ -94,7 +109,7 @@ export default function EventAdmin() {
     setForm({
       event_name: '', event_date: '', event_date_end: '', entry_fee_team: '', entry_open_at: '', entry_close_at: '',
       description: '', tournament_id: '', event_type: 'individual', team_match_type: '3_doubles', team_division_id: '',
-      account_number: '', account_holder: '', account_bank: '', qualification_image_url: '',
+      account_number: '', account_holder: '', account_bank: '', qualification_image_url: '', target_type: '동호인',
     })
     fetchAll()
   }
@@ -121,6 +136,7 @@ export default function EventAdmin() {
       account_holder: ev.account_holder || '',
       account_bank: ev.account_bank || '',
       qualification_image_url: ev.qualification_image_url || '',
+      target_type: ev.target_type || '동호인',
     })
     setShowEditModal(true)
   }
@@ -142,6 +158,7 @@ export default function EventAdmin() {
       account_holder: editForm.account_holder || null,
       account_bank: editForm.account_bank || null,
       qualification_image_url: editForm.qualification_image_url || null,
+      target_type: editForm.target_type || '동호인',
     }
     const { error } = await supabase.from('events').update(updates).eq('event_id', editingEvent.event_id)
     if (error) { showToast?.(error.message, 'error'); return }
@@ -309,6 +326,23 @@ export default function EventAdmin() {
               </div>
             </div>
 
+            {/* 대회 대상 */}
+            <div className="col-span-2">
+              <label className="block text-xs text-sub mb-1">대회 대상 *</label>
+              <div className="flex gap-2">
+                {TARGET_TYPES.map(opt => (
+                  <button key={opt.value} type="button"
+                    onClick={() => setForm({ ...form, target_type: opt.value })}
+                    className={`flex-1 p-3 rounded-lg border text-left transition-colors ${
+                      form.target_type === opt.value ? 'border-amber-500 bg-amber-50' : 'border-line hover:bg-soft'
+                    }`}>
+                    <div className="text-sm font-medium">{opt.label}</div>
+                    <div className="text-xs text-sub mt-0.5">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {(form.event_type === 'team' || form.event_type === 'both') && (
               <div>
                 <label className="block text-xs text-sub mb-1">경기 방식 *</label>
@@ -423,6 +457,11 @@ export default function EventAdmin() {
                   <td className="px-3 py-2 font-medium">
                     {ev.event_name}
                     {ev.qualification_image_url && <span className="ml-1 text-xs text-green-500">🖼</span>}
+                    {getTargetBadge(ev.target_type) && (
+                      <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded ${getTargetBadge(ev.target_type).color}`}>
+                        {getTargetBadge(ev.target_type).label}
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-sub">{ev.event_date}</td>
                   <td className="px-3 py-2 text-xs text-sub">
@@ -538,7 +577,20 @@ export default function EventAdmin() {
         <div className="bg-white rounded-r border border-line p-4">
           <h3 className="text-sm font-bold mb-1">📋 {selectedEvent.event_name} - 부서 관리</h3>
 
-          {(selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') ? (
+          {selectedEvent.target_type === '선수' ? (
+            <div className="mb-3">
+              <p className="text-xs text-amber-700 mb-1.5">🏅 선수 대회 부서 — 연령부서를 직접 입력하거나 아래에서 눌러 추가하세요.</p>
+              <div className="flex gap-1 flex-wrap">
+                {AGE_GROUPS.map(g => (
+                  <button key={g.label} type="button"
+                    onClick={() => setDivForm({ ...divForm, division_name: g.label })}
+                    className="text-xs px-2 py-1 rounded-full border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100">
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') ? (
             <p className="text-xs text-blue-600 mb-3">👥 클럽대항전 부서 — 직접 입력하세요. (예: 남성부, 여성부, 혼성부)</p>
           ) : (
             <p className="text-xs text-sub mb-3">📊 개인전 부서 — 포인트 규정 목록에서 선택하세요.</p>
@@ -547,7 +599,7 @@ export default function EventAdmin() {
           {/* 부서 추가 */}
           <div className="flex gap-2 mb-3">
             <div className="flex-1">
-              {(selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') ? (
+              {(selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both' || selectedEvent.target_type === '선수') ? (
                 <input type="text" value={divForm.division_name}
                   onChange={e => setDivForm({ ...divForm, division_name: e.target.value })}
                   placeholder="부서명 직접 입력 (예: 남성부, 여성부)"
@@ -572,7 +624,7 @@ export default function EventAdmin() {
               className="bg-accent text-white px-3 py-2 rounded-lg text-sm shrink-0">추가</button>
           </div>
 
-          {selectedEvent.event_type === 'individual' && pointRuleDivisions.length === 0 && (
+          {selectedEvent.event_type === 'individual' && selectedEvent.target_type !== '선수' && pointRuleDivisions.length === 0 && (
             <p className="text-xs text-amber-600 mb-3">⚠️ 포인트 규정에 부서가 없습니다. 먼저 포인트 규정에서 부서를 추가해주세요.</p>
           )}
 
@@ -648,6 +700,14 @@ export default function EventAdmin() {
                   <input type="number" value={editForm.entry_fee_team}
                     onChange={e => setEditForm({ ...editForm, entry_fee_team: e.target.value })}
                     className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-xs text-sub mb-1">대회 대상</label>
+                  <select value={editForm.target_type || '동호인'}
+                    onChange={e => setEditForm({ ...editForm, target_type: e.target.value })}
+                    className="w-full text-sm border border-line rounded-lg px-3 py-2">
+                    {TARGET_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
                 </div>
               </div>
 

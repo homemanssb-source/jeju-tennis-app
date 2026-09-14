@@ -5,19 +5,25 @@ import { ToastContext } from '../App'
 
 const DIVISIONS = ['지도자부','마스터부','베테랑부','신인부','여자마스터부','여자베테랑부','여자신인부']
 
+// 등록 구분 — 동호인(랭킹부서/등급) · 선수(생년월일)
+const MEMBER_TYPES = [
+  { key: '동호인', icon: '🎾', title: '동호인', desc: '클럽 동호인 · 랭킹부서/등급 운영' },
+  { key: '선수',   icon: '🏅', title: '선수',   desc: '선수 등록 · 생년월일 기준 관리' },
+]
+
 // ✅ 계좌 정보 — 여기만 수정하면 전체 반영됩니다
 const BANK_INFO = {
   bank: '제주은행',
   account: '57-01-027381',
   holder: '제주시테니스협회',
-  fee: 10000,              // 등록비 금액 (원) — 필요시 수정
+  fee: { 동호인: 10000, 선수: 10000 },   // 등록비 (원) — 구분별로 다르면 여기서 수정
 }
 
 // 금액 포맷 (예: 30000 → 30,000원)
 const formatFee = (n) => n.toLocaleString('ko-KR') + '원'
 
 // 계좌 안내 박스 (폼 안 + 완료 화면 공통)
-function BankInfoBox({ compact = false }) {
+function BankInfoBox({ fee, compact = false }) {
   return (
     <div className={`bg-blue-50 border border-blue-200 rounded-lg ${compact ? 'p-3' : 'p-4'}`}>
       <p className={`font-semibold text-blue-800 mb-2 ${compact ? 'text-xs' : 'text-sm'}`}>
@@ -38,7 +44,7 @@ function BankInfoBox({ compact = false }) {
         </div>
         <div className="flex items-center gap-2 pt-1 border-t border-blue-200 mt-1">
           <span className="text-blue-500 w-12 shrink-0">금액</span>
-          <span className="font-bold text-blue-700">{formatFee(BANK_INFO.fee)}</span>
+          <span className="font-bold text-blue-700">{formatFee(fee)}</span>
         </div>
       </div>
       <p className={`mt-2 text-blue-600 ${compact ? 'text-xs' : 'text-xs'}`}>
@@ -49,7 +55,7 @@ function BankInfoBox({ compact = false }) {
 }
 
 // ── 클럽 콤보박스 ─────────────────────────────────────
-function ClubComboBox({ value, onChange }) {
+function ClubComboBox({ value, onChange, placeholder = '클럽명 선택 또는 직접 입력' }) {
   const [open, setOpen] = useState(false)
   const [inputVal, setInputVal] = useState(value || '')
   const [clubs, setClubs] = useState([])
@@ -98,7 +104,7 @@ function ClubComboBox({ value, onChange }) {
           value={inputVal}
           onChange={handleInput}
           onFocus={() => setOpen(true)}
-          placeholder="클럽명 선택 또는 직접 입력"
+          placeholder={placeholder}
           className="w-full text-sm border border-line rounded-lg px-3 py-2.5 pr-8
             focus:border-accent focus:ring-2 focus:ring-accentSoft"
         />
@@ -120,7 +126,7 @@ function ClubComboBox({ value, onChange }) {
             </button>
           )}
           {filtered.length === 0 && inputVal.trim() && (
-            <p className="px-3 py-2 text-xs text-sub">일치하는 클럽 없음 — 직접 입력하세요</p>
+            <p className="px-3 py-2 text-xs text-sub">일치하는 소속 없음 — 직접 입력하세요</p>
           )}
           {filtered.length === 0 && !inputVal.trim() && clubs.length === 0 && (
             <p className="px-3 py-2 text-xs text-sub">불러오는 중...</p>
@@ -142,8 +148,11 @@ function ClubComboBox({ value, onChange }) {
   )
 }
 
+const EMPTY_FORM = { name: '', gender: '', phone: '', guardian_phone: '', club: '', division: '', grade: '', birthdate: '' }
+
 export default function RegisterPage() {
   const showToast = useContext(ToastContext)
+  const [memberType, setMemberType] = useState('동호인')
   const [grades, setGrades] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -152,9 +161,10 @@ export default function RegisterPage() {
   const [phoneChecking, setPhoneChecking] = useState(false)
   const [phoneDupError, setPhoneDupError] = useState('')
   const [phoneOk, setPhoneOk] = useState(false)
-  const [form, setForm] = useState({
-    name: '', gender: '', phone: '', club: '', division: '', grade: '',
-  })
+  const [form, setForm] = useState(EMPTY_FORM)
+
+  const isPlayer = memberType === '선수'
+  const fee = BANK_INFO.fee[memberType]
 
   useEffect(() => { fetchGrades() }, [])
 
@@ -215,37 +225,56 @@ export default function RegisterPage() {
     }
   }
 
+  function validate() {
+    if (!form.name || !form.gender || !form.club) {
+      return '이름, 성별, 소속은 필수입니다.'
+    }
+    if (isPlayer) {
+      // 선수: 보호자 연락처 필수, 본인 연락처는 선택 (형제 선수가 보호자 번호를 공유할 수 있음)
+      if (normalizePhone(form.guardian_phone).length < 10) return '보호자 연락처를 입력해주세요.'
+      if (form.phone && normalizePhone(form.phone).length < 10) return '선수 연락처를 확인해주세요.'
+      if (!form.birthdate) return '생년월일을 입력해주세요.'
+      const d = new Date(form.birthdate)
+      if (isNaN(d.getTime()) || d > new Date() || d.getFullYear() < 1900) return '생년월일을 확인해주세요.'
+    } else {
+      if (!form.phone) return '전화번호는 필수입니다.'
+      if (!form.division || !form.grade) return '랭킹부서, 등급은 필수입니다.'
+    }
+    return null
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.name || !form.gender || !form.phone || !form.club || !form.division || !form.grade) {
-      showToast?.('이름, 성별, 전화번호, 소속클럽, 랭킹부서, 등급은 필수입니다.', 'error')
-      return
-    }
+    const invalid = validate()
+    if (invalid) { showToast?.(invalid, 'error'); return }
     if (!agreed) { showToast?.('약관에 동의해주세요.', 'error'); return }
     // ✅ 중복 에러 있으면 제출 차단
     if (phoneDupError) { showToast?.('전화번호를 확인해주세요.', 'error'); return }
 
     setSubmitting(true)
 
-    // ✅ 제출 직전 최종 이중 방어 체크
+    // ✅ 제출 직전 최종 이중 방어 체크 (본인 연락처가 있을 때만)
     const phoneNorm = normalizePhone(form.phone)
-    const phoneWithDash = formatPhoneWithDash(phoneNorm)
-    const { data: existing } = await supabase
-      .from('members')
-      .select('member_id, name, status')
-      .or(`phone.eq.${phoneNorm},phone.eq.${phoneWithDash}`)
-      .neq('status', '삭제')
-      .limit(1)
+    const guardianNorm = normalizePhone(form.guardian_phone)
+    if (phoneNorm) {
+      const phoneWithDash = formatPhoneWithDash(phoneNorm)
+      const { data: existing } = await supabase
+        .from('members')
+        .select('member_id, name, status')
+        .or(`phone.eq.${phoneNorm},phone.eq.${phoneWithDash}`)
+        .neq('status', '삭제')
+        .limit(1)
 
-    if (existing && existing.length > 0) {
-      const m = existing[0]
-      const statusLabel =
-        m.status === '활성' ? '활성 회원' :
-        m.status === '휴면' ? '가입 대기 중' : m.status
-      setPhoneDupError(`이미 등록된 전화번호입니다. (${m.name} · ${statusLabel})`)
-      showToast?.('이미 등록된 전화번호입니다.', 'error')
-      setSubmitting(false)
-      return
+      if (existing && existing.length > 0) {
+        const m = existing[0]
+        const statusLabel =
+          m.status === '활성' ? '활성 회원' :
+          m.status === '휴면' ? '가입 대기 중' : m.status
+        setPhoneDupError(`이미 등록된 전화번호입니다. (${m.name} · ${statusLabel})`)
+        showToast?.('이미 등록된 전화번호입니다.', 'error')
+        setSubmitting(false)
+        return
+      }
     }
 
     const memberId = 'M' + Date.now().toString().slice(-8)
@@ -257,10 +286,16 @@ export default function RegisterPage() {
       display_name: form.name,
       name_norm: nameNorm,
       gender: form.gender,
-      phone: phoneNorm,   // ✅ 항상 하이픈 없이 저장 (통일)
+      phone: phoneNorm || null,   // ✅ 항상 하이픈 없이 저장 (통일), 선수는 없을 수 있음
+      guardian_phone: isPlayer ? (guardianNorm || null) : null,
+      // 선수 본인 번호가 없으면 PIN 이 자동 생성되지 않으므로 보호자 번호 뒷 6자리로 지정
+      ...(isPlayer && { pin_code: (phoneNorm || guardianNorm).slice(-6) }),
       club: form.club,
-      division: form.division,
-      grade: form.grade.replace(/점$/, ''),
+      member_type: memberType,
+      // 선수는 랭킹부서/등급 없음, 동호인은 생년월일 없음
+      division: isPlayer ? null : form.division,
+      grade: isPlayer ? null : form.grade.replace(/점$/, ''),
+      birthdate: isPlayer ? form.birthdate : null,
       status: '휴면',
       grade_source: 'auto',
       registered_at: new Date().toISOString(),
@@ -276,40 +311,47 @@ export default function RegisterPage() {
       }
     } else {
       setSubmitted(true)
-      showToast?.('동호인 등록 신청이 완료되었습니다!')
+      showToast?.(`${memberType} 등록 신청이 완료되었습니다!`)
     }
     setSubmitting(false)
+  }
+
+  function resetAll() {
+    setSubmitted(false)
+    setForm(EMPTY_FORM)
+    setAgreed(false)
+    setPhoneDupError('')
+    setPhoneOk(false)
+  }
+
+  function switchType(key) {
+    if (key === memberType) return
+    setMemberType(key)
+    // 구분 전용 필드만 초기화 (공통 입력값은 유지)
+    setForm(f => ({ ...f, division: '', grade: '', birthdate: '' }))
   }
 
   // ── 완료 화면 ──────────────────────────────────────────
   if (submitted) {
     return (
       <div className="pb-20">
-        <PageHeader title="👤 동호인등록" />
+        <PageHeader title="👤 동호인/선수 등록" />
         <div className="max-w-lg mx-auto px-5 py-10 text-center">
           <p className="text-5xl mb-4">🎉</p>
-          <h2 className="text-lg font-bold text-gray-900 mb-1">등록 신청 완료!</h2>
-          <p className="text-sm text-sub mb-5">등록비 납부 후 회원 활성화됩니다.</p>
+          <h2 className="text-lg font-bold text-gray-900 mb-1">{memberType} 등록 신청 완료!</h2>
+          <p className="text-sm text-sub mb-5">등록비 납부 후 활성화됩니다.</p>
 
-          <BankInfoBox />
+          <BankInfoBox fee={fee} />
 
           <div className="bg-soft rounded-lg p-3 mt-3 text-left">
             <p className="text-xs text-sub">
               입금 확인 후 관리자가 활성화합니다. 문의는 협회로 연락해주세요.
+              {isPlayer && ' PIN 초기값은 선수 본인(없으면 보호자) 연락처 뒷 6자리입니다.'}
             </p>
           </div>
 
-          <button
-            onClick={() => {
-              setSubmitted(false)
-              setForm({ name: '', gender: '', phone: '', club: '', division: '', grade: '' })
-              setAgreed(false)
-              setPhoneDupError('')
-              setPhoneOk(false)
-            }}
-            className="mt-6 text-sm text-accent hover:underline"
-          >
-            다른 동호인 등록하기
+          <button onClick={resetAll} className="mt-6 text-sm text-accent hover:underline">
+            다른 {memberType} 등록하기
           </button>
         </div>
       </div>
@@ -319,11 +361,30 @@ export default function RegisterPage() {
   // ── 등록 폼 ────────────────────────────────────────────
   return (
     <div className="pb-20">
-      <PageHeader title="👤 동호인등록" subtitle="동호인회 회원 등록 신청" />
+      <PageHeader title="👤 동호인/선수 등록" subtitle="제주시테니스협회 등록 신청" />
       <div className="max-w-lg mx-auto px-5 py-4">
 
+        {/* 등록 구분 선택 */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {MEMBER_TYPES.map(t => {
+            const active = memberType === t.key
+            return (
+              <button key={t.key} type="button" onClick={() => switchType(t.key)}
+                className={`rounded-xl border-2 p-3 text-left transition-colors
+                  ${active ? 'border-accent bg-accentSoft' : 'border-line bg-white hover:bg-soft'}`}>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-lg">{t.icon}</span>
+                  <span className={`text-sm font-bold ${active ? 'text-accent' : 'text-gray-800'}`}>{t.title}</span>
+                  {active && <span className="ml-auto text-accent text-xs">✓</span>}
+                </div>
+                <p className="text-[11px] text-sub mt-1 leading-snug">{t.desc}</p>
+              </button>
+            )
+          })}
+        </div>
+
         {/* 등록비 안내 — 폼 상단 */}
-        <BankInfoBox compact />
+        <BankInfoBox fee={fee} compact />
         <div className="mt-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
           <p className="text-xs text-amber-700">
             ⚠️ 등록 후 <b>등록비 납부</b>가 확인되면 관리자가 활성화합니다.
@@ -357,10 +418,42 @@ export default function RegisterPage() {
             </div>
           </div>
 
+          {/* 선수 전용: 생년월일 */}
+          {isPlayer && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                생년월일 <span className="text-red-500">*</span>
+              </label>
+              <input type="date" value={form.birthdate}
+                onChange={e => handleChange('birthdate', e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                className="w-full text-sm border border-line rounded-lg px-3 py-2.5 focus:border-accent focus:ring-2 focus:ring-accentSoft" />
+              <p className="text-xs text-sub mt-1">연령별 부서 편성 기준으로 사용됩니다.</p>
+            </div>
+          )}
+
+          {/* 선수 전용: 보호자 연락처 (필수) — 형제 선수가 같은 번호를 써도 됨 */}
+          {isPlayer && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                보호자 연락처 <span className="text-red-500">*</span>
+              </label>
+              <input type="tel" value={form.guardian_phone}
+                onChange={e => handleChange('guardian_phone', e.target.value)}
+                placeholder="010-0000-0000"
+                className="w-full text-sm border border-line rounded-lg px-3 py-2.5 focus:border-accent focus:ring-2 focus:ring-accentSoft" />
+              <p className="text-xs text-sub mt-1">성인 선수는 본인 번호를 입력해도 됩니다.</p>
+            </div>
+          )}
+
           {/* ✅ 전화번호 — 중복 체크 추가 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              전화번호 <span className="text-red-500">*</span>
+              {isPlayer ? (
+                <>선수 본인 연락처 <span className="text-xs font-normal text-sub">(선택 — 휴대폰이 없으면 비워두세요)</span></>
+              ) : (
+                <>전화번호 <span className="text-red-500">*</span></>
+              )}
             </label>
             <div className="relative">
               <input type="tel" value={form.phone}
@@ -395,40 +488,44 @@ export default function RegisterPage() {
             )}
           </div>
 
-          {/* 소속 클럽 */}
+          {/* 소속 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              소속 클럽 <span className="text-red-500">*</span>
+              {isPlayer ? '소속 (학교 · 클럽 · 팀)' : '소속 클럽'} <span className="text-red-500">*</span>
             </label>
             <ClubComboBox
               value={form.club}
               onChange={val => handleChange('club', val)}
+              placeholder={isPlayer ? '소속 선택 또는 직접 입력' : '클럽명 선택 또는 직접 입력'}
             />
           </div>
 
-          {/* 랭킹부서 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              랭킹부서 <span className="text-red-500">*</span>
-            </label>
-            <select value={form.division} onChange={e => handleChange('division', e.target.value)}
-              className="w-full text-sm border border-line rounded-lg px-3 py-2.5 focus:border-accent focus:ring-2 focus:ring-accentSoft">
-              <option value="">선택하세요</option>
-              {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
+          {/* 동호인 전용: 랭킹부서 · 등급 */}
+          {!isPlayer && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  랭킹부서 <span className="text-red-500">*</span>
+                </label>
+                <select value={form.division} onChange={e => handleChange('division', e.target.value)}
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2.5 focus:border-accent focus:ring-2 focus:ring-accentSoft">
+                  <option value="">선택하세요</option>
+                  {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
 
-          {/* 등급 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              등급 <span className="text-red-500">*</span>
-            </label>
-            <select value={form.grade} onChange={e => handleChange('grade', e.target.value)}
-              className="w-full text-sm border border-line rounded-lg px-3 py-2.5 focus:border-accent focus:ring-2 focus:ring-accentSoft">
-              <option value="">선택하세요</option>
-              {grades.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  등급 <span className="text-red-500">*</span>
+                </label>
+                <select value={form.grade} onChange={e => handleChange('grade', e.target.value)}
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2.5 focus:border-accent focus:ring-2 focus:ring-accentSoft">
+                  <option value="">선택하세요</option>
+                  {grades.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+            </>
+          )}
 
           {/* 개인정보 동의 */}
           <div className="bg-soft rounded-lg p-4">
@@ -437,8 +534,13 @@ export default function RegisterPage() {
               <span className="text-sm text-gray-700">
                 개인정보 수집 및 이용에 동의합니다.
                 <span className="block text-xs text-sub mt-1">
-                  수집항목: 이름, 성별, 연락처, 소속클럽 / 이용목적: 동호인회 운영 및 대회 관리
+                  수집항목: 이름, 성별, 연락처, 소속{isPlayer ? ', 생년월일, 보호자 연락처' : ''} / 이용목적: 협회 운영 및 대회 관리
                 </span>
+                <a href="/privacy" target="_blank" rel="noopener noreferrer"
+                  className="block text-xs text-blue-500 underline mt-1"
+                  onClick={e => e.stopPropagation()}>
+                  개인정보처리방침 전문 보기
+                </a>
               </span>
             </label>
           </div>
@@ -447,7 +549,7 @@ export default function RegisterPage() {
           <button type="submit"
             disabled={submitting || !!phoneDupError || phoneChecking}
             className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {submitting ? '처리 중...' : `동호인 등록 신청 (등록비 ${formatFee(BANK_INFO.fee)})`}
+            {submitting ? '처리 중...' : `${memberType} 등록 신청 (등록비 ${formatFee(fee)})`}
           </button>
 
           <p className="text-xs text-sub text-center">등록 후 등록비 납부 확인 시 활성화됩니다.</p>

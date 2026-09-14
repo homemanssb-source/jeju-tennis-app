@@ -219,7 +219,7 @@ export default function HomePage() {
           {[
             { icon: '💬', label: '건의\n문의',   path: '/board' },
             { icon: '📋', label: '신청\n확인',   path: '/apply' },
-            { icon: '👤', label: '회원\n등록',   path: '/register' },
+            { icon: '👤', label: '동호인/\n선수등록', path: '/register' },
             { icon: '🔍', label: '선수\n검색',   path: '/search' },
           ].map(item => (
             <button
@@ -286,6 +286,9 @@ export default function HomePage() {
         {/* 푸터 */}
         <div style={{ textAlign: 'center', paddingTop: 20, borderTop: '1px solid #f0e8e0' }}>
           <p style={{ fontSize: 11, color: '#ddd', margin: 0 }}>© 2026 J.T.A 제주 · 제주시테니스협회</p>
+          <p style={{ margin: '6px 0 0' }}>
+            <a href="/privacy" style={{ fontSize: 10, color: '#c8a898', textDecoration: 'underline' }}>개인정보처리방침</a>
+          </p>
         </div>
       </div>
     </div>

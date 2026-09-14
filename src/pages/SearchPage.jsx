@@ -62,7 +62,7 @@ export default function SearchPage() {
     const matchedGrade = detectGrade(trimmed)
 
     let queryBuilder = supabase.from('members_public')
-      .select('member_id, name, display_name, club, division, grade, status')
+      .select('member_id, name, display_name, club, division, grade, status, member_type')
       .neq('status', '삭제')
       .limit(100)
 
@@ -222,13 +222,16 @@ export default function SearchPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="text-sm font-medium text-gray-900 truncate">{m.display_name || m.name}</span>
+                            {m.member_type === '선수' && (
+                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-semibold rounded shrink-0">선수</span>
+                            )}
                             {m.grade && (
                               <span className="px-1.5 py-0.5 bg-accent text-white text-[10px] font-semibold rounded shrink-0">
                                 {m.grade}
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-sub mt-0.5">{m.division || '-'}</p>
+                          <p className="text-xs text-sub mt-0.5">{m.member_type === '선수' ? '선수' : (m.division || '-')}</p>
                         </div>
                         <span className="text-xs text-sub shrink-0">〉</span>
                       </button>
@@ -257,11 +260,14 @@ export default function SearchPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="text-sm font-medium text-gray-900 truncate">{m.display_name || m.name}</span>
+                            {m.member_type === '선수' && (
+                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-semibold rounded shrink-0">선수</span>
+                            )}
                             {m.grade && (
                               <span className="px-1.5 py-0.5 bg-soft2 text-sub text-[10px] font-medium rounded shrink-0">{m.grade}</span>
                             )}
                           </div>
-                          <p className="text-xs text-sub mt-0.5">{m.division || '-'}</p>
+                          <p className="text-xs text-sub mt-0.5">{m.member_type === '선수' ? '선수' : (m.division || '-')}</p>
                         </div>
                         <span className="text-xs text-sub shrink-0">〉</span>
                       </button>
@@ -283,11 +289,14 @@ export default function SearchPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-semibold text-gray-900 truncate">{m.display_name || m.name}</span>
+                      {m.member_type === '선수' && (
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-semibold rounded shrink-0">선수</span>
+                      )}
                       {m.grade && (
                         <span className="px-1.5 py-0.5 bg-soft2 text-sub text-[10px] font-medium rounded shrink-0">{m.grade}</span>
                       )}
                     </div>
-                    <p className="text-xs text-sub mt-0.5 truncate">{(m.club || '-') + ' · ' + (m.division || '-')}</p>
+                    <p className="text-xs text-sub mt-0.5 truncate">{(m.club || '-') + ' · ' + (m.member_type === '선수' ? '선수' : (m.division || '-'))}</p>
                   </div>
                   <span className="text-xs text-sub shrink-0">〉</span>
                 </button>
