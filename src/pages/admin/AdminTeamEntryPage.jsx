@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
+import { getMatchTypeLabel, resolveMatchType, filterTeamDivisions } from '../../lib/teamMatch'
 
 const STATUS_MAP = {
   pending: { label: '대기', color: 'text-yellow-600 bg-yellow-50' },
@@ -14,12 +15,6 @@ const PAYMENT_MAP = {
   '현장납부': { label: '현장납부', color: 'text-yellow-600 bg-yellow-50' },
 }
 
-function getMatchTypeLabel(type) {
-  if (type === '5_doubles') return '5복식 (3승 선승)'
-  if (type === '3_doubles') return '3복식 (2승 선승)'
-  return '-'
-}
-
 export default function AdminTeamEntryPage() {
   const showToast = useContext(ToastContext)
   const [entries, setEntries] = useState([])
@@ -28,6 +23,7 @@ export default function AdminTeamEntryPage() {
   const [loading, setLoading] = useState(false)
   const [selectedEntry, setSelectedEntry] = useState(null)
   const [members, setMembers] = useState([])
+  const [divisions, setDivisions] = useState([])
 
   // ── 체크박스 일괄 처리 ──
   const [checkedIds, setCheckedIds] = useState(new Set())
@@ -39,7 +35,7 @@ export default function AdminTeamEntryPage() {
 
   async function fetchEvents() {
     const { data } = await supabase.from('events')
-      .select('event_id, event_name, event_date, status, event_type, team_match_type')
+      .select('event_id, event_name, event_date, status, event_type, team_match_type, team_member_limit')
       .order('event_date', { ascending: false })
     setEvents(data || [])
   }
@@ -54,6 +50,20 @@ export default function AdminTeamEntryPage() {
     setLoading(false)
   }
 
+  async function fetchDivisions(eventId) {
+    if (!eventId) { setDivisions([]); return }
+    const { data } = await supabase.from('event_divisions')
+      .select('*')
+      .eq('event_id', eventId).order('created_at')
+    setDivisions(data || [])
+  }
+
+  // 신청 건의 경기방식 — 부서 설정이 있으면 부서 값, 없으면 대회 기본값
+  function entryMatchType(entry) {
+    const div = divisions.find(d => d.division_id === entry?.division_id)
+    return resolveMatchType(selectedEvent, div)
+  }
+
   async function fetchMembers(entryId) {
     const { data } = await supabase.from('team_event_members')
       .select('*').eq('entry_id', entryId).order('member_order')
@@ -66,6 +76,7 @@ export default function AdminTeamEntryPage() {
     setCheckedIds(new Set())
     setBulkMode(false)
     fetchEntries(eventId)
+    fetchDivisions(eventId)
   }
 
   async function handleSelectEntry(entry) {
@@ -166,6 +177,8 @@ export default function AdminTeamEntryPage() {
   }
 
   const selectedEvent = events.find(ev => ev.event_id === selectedEventId)
+  // 신청 화면에 노출되는 팀전 부서와 동일한 목록
+  const teamDivisions = filterTeamDivisions(selectedEvent, divisions)
   const allChecked = activeEntries.length > 0 && checkedIds.size === activeEntries.length
   const someChecked = checkedIds.size > 0
 
@@ -186,13 +199,28 @@ export default function AdminTeamEntryPage() {
         </select>
       </div>
 
-      {/* 경기방식 표시 */}
+      {/* 경기방식 표시 — 부서별로 다를 수 있으므로 부서 단위로 보여준다 */}
       {selectedEvent && (selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center gap-2">
-          <span className="text-xs text-blue-600">경기방식:</span>
-          <span className="text-sm font-bold text-blue-800">
-            {getMatchTypeLabel(selectedEvent.team_match_type)}
-          </span>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+          {teamDivisions.length > 0 ? (
+            <>
+              <span className="text-xs text-blue-600">부서별 경기방식</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {teamDivisions.map(d => (
+                  <span key={d.division_id} className="text-xs bg-white border border-blue-200 text-blue-800 px-2 py-0.5 rounded">
+                    {d.division_name} · <b>{getMatchTypeLabel(resolveMatchType(selectedEvent, d), { full: true })}</b>
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-blue-600">경기방식:</span>
+              <span className="text-sm font-bold text-blue-800">
+                {getMatchTypeLabel(selectedEvent.team_match_type, { full: true })}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -243,7 +271,7 @@ export default function AdminTeamEntryPage() {
             <p className="text-sm"><span className="text-sub">부서:</span> <b>{selectedEntry.division_name || '미지정'}</b></p>
             <p className="text-sm"><span className="text-sub">대표:</span> {selectedEntry.captain_name}</p>
             {selectedEvent && (
-              <p className="text-sm"><span className="text-sub">경기방식:</span> <b>{getMatchTypeLabel(selectedEvent.team_match_type)}</b></p>
+              <p className="text-sm"><span className="text-sub">경기방식:</span> <b>{getMatchTypeLabel(entryMatchType(selectedEntry), { full: true })}</b></p>
             )}
             <p className="text-sm"><span className="text-sub">신청일:</span> {formatDate(selectedEntry.created_at)}</p>
           </div>
@@ -447,6 +475,7 @@ export default function AdminTeamEntryPage() {
                                 {entry.division_name && (
                                   <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 shrink-0">
                                     {entry.division_name}
+                                    {entryMatchType(entry) ? ' · ' + getMatchTypeLabel(entryMatchType(entry)) : ''}
                                   </span>
                                 )}
                               </div>

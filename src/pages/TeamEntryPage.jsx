@@ -2,6 +2,7 @@ import { useState, useEffect, useContext, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
+import { getMatchTypeLabel, resolveMatchType, resolveMemberLimit, filterTeamDivisions } from '../lib/teamMatch'
 
 // 기존 신청 수에 따라 팀 suffix 반환: 0→'', 1→' B', 2→' C' ...
 function getTeamSuffix(count) {
@@ -75,7 +76,8 @@ export default function TeamEntryPage() {
     ).slice(0, 10)
   }, [allMembers, searchQuery, roster])
 
-  const memberLimit = selectedEvent?.team_member_limit || null
+  const memberLimit = resolveMemberLimit(selectedEvent, selectedDivision)
+  const matchType   = resolveMatchType(selectedEvent, selectedDivision)
   const finalClubName = clubBase.trim() + teamSuffix
 
   function getEntryAvailability(ev) {
@@ -103,9 +105,13 @@ export default function TeamEntryPage() {
   }
 
   async function fetchDivisions(eventId) {
+    const ev = events.find(e => e.event_id === eventId)
     const { data } = await supabase.from('event_divisions')
-      .select('division_id, division_name').eq('event_id', eventId).order('created_at')
-    setDivisions(data || [])
+      // select('*') — 마이그레이션 전이라도 부서 선택이 멈추지 않도록 (없는 컬럼은 undefined 로 들어와 대회 기본값 사용)
+      .select('*')
+      .eq('event_id', eventId).order('created_at')
+    // '개인+팀' 대회에서 개인전 부서가 섞이지 않도록 팀전 부서만 노출
+    setDivisions(filterTeamDivisions(ev, data || []))
   }
 
   // 같은 대회+부서에서 해당 클럽 기존 신청 수 조회
@@ -276,6 +282,7 @@ export default function TeamEntryPage() {
         eventDate:     selectedEvent.event_date,
         eventDateEnd:  selectedEvent.event_date_end,
         divisionName:  selectedDivision?.division_name ?? null,
+        matchType:     matchType,
         clubName:      finalClubName.trim(),
         clubBase:      clubBase.trim(),
         isMultiTeam:   existingCount > 0,
@@ -337,6 +344,12 @@ export default function TeamEntryPage() {
                 <div className="flex justify-between">
                   <span className="text-xs text-sub">부서</span>
                   <span className="text-sm font-medium">{submittedInfo.divisionName}</span>
+                </div>
+              )}
+              {submittedInfo.matchType && (
+                <div className="flex justify-between">
+                  <span className="text-xs text-sub">경기방식</span>
+                  <span className="text-sm font-medium">{getMatchTypeLabel(submittedInfo.matchType, { full: true })}</span>
                 </div>
               )}
               <div className="border-t border-line/50 pt-2.5 flex justify-between">
@@ -481,10 +494,27 @@ export default function TeamEntryPage() {
                   onChange={e => handleDivisionChange(e.target.value)}
                   className="w-full text-sm border border-line rounded-lg px-3 py-2.5">
                   <option value="">부서를 선택하세요</option>
-                  {divisions.map(d => (
-                    <option key={d.division_id} value={d.division_id}>{d.division_name}</option>
-                  ))}
+                  {divisions.map(d => {
+                    const mt = getMatchTypeLabel(resolveMatchType(selectedEvent, d))
+                    return (
+                      <option key={d.division_id} value={d.division_id}>
+                        {d.division_name}{mt !== '-' ? ` · ${mt}` : ''}
+                      </option>
+                    )
+                  })}
                 </select>
+                {selectedDivision && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {matchType && (
+                      <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded">
+                        경기방식 {getMatchTypeLabel(matchType, { full: true })}
+                      </span>
+                    )}
+                    <span className="text-xs bg-soft text-sub border border-line px-2 py-0.5 rounded">
+                      인원 {memberLimit ? `최대 ${memberLimit}명` : '제한 없음'}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

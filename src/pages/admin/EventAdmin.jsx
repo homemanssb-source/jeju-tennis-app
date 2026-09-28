@@ -1,7 +1,8 @@
-import { useState, useEffect, useContext } from 'react'
+import { useState, useEffect, useContext, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 import { AGE_GROUPS } from '../../lib/ageGroups'
+import { TEAM_MATCH_TYPES, getMatchTypeLabel, resolveMatchType, resolveMemberLimit } from '../../lib/teamMatch'
 
 // 대회 대상: 동호인(랭킹부서) / 선수(연령부서) / 전체
 const TARGET_TYPES = [
@@ -24,7 +25,7 @@ export default function EventAdmin() {
   const [form, setForm] = useState({
     event_name: '', event_date: '', event_date_end: '', entry_fee_team: '',
     entry_open_at: '', entry_close_at: '', description: '', tournament_id: '',
-    event_type: 'individual', team_match_type: '3_doubles', team_division_id: '',
+    event_type: 'individual', team_match_type: '3_doubles', team_member_limit: '',
     account_number: '', account_holder: '', account_bank: '',
     qualification_image_url: '', target_type: '동호인',
   })
@@ -34,7 +35,10 @@ export default function EventAdmin() {
   // 부서 관리
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [eventDivisions, setEventDivisions] = useState([])
-  const [divForm, setDivForm] = useState({ division_name: '', has_groups: false })
+  const [divForm, setDivForm] = useState({
+    division_name: '', has_groups: false,
+    team_match_type: '', member_limit: '', is_team_division: true,
+  })
 
   // 대회 수정 모달
   const [editingEvent, setEditingEvent] = useState(null)
@@ -43,6 +47,12 @@ export default function EventAdmin() {
 
   // 팀전 설정 수정
   const [editingTeamSettings, setEditingTeamSettings] = useState(null)
+
+  // 팀전 부서로 체크된 부서 (하나도 없으면 신청 화면에서 전체 부서가 노출됨)
+  const teamDivisions = useMemo(
+    () => eventDivisions.filter(d => d.is_team_division),
+    [eventDivisions]
+  )
 
   useEffect(() => { fetchAll() }, [])
 
@@ -95,7 +105,8 @@ export default function EventAdmin() {
       description: form.description || null,
       event_type: form.event_type,
       team_match_type: (form.event_type === 'team' || form.event_type === 'both') ? form.team_match_type : null,
-      team_division_id: (form.event_type === 'team' || form.event_type === 'both') ? (form.team_division_id || null) : null,
+      team_member_limit: (form.event_type === 'team' || form.event_type === 'both') && form.team_member_limit
+        ? Number(form.team_member_limit) : null,
       account_number: form.account_number || null,
       account_holder: form.account_holder || null,
       account_bank: form.account_bank || null,
@@ -108,7 +119,7 @@ export default function EventAdmin() {
     setShowForm(false)
     setForm({
       event_name: '', event_date: '', event_date_end: '', entry_fee_team: '', entry_open_at: '', entry_close_at: '',
-      description: '', tournament_id: '', event_type: 'individual', team_match_type: '3_doubles', team_division_id: '',
+      description: '', tournament_id: '', event_type: 'individual', team_match_type: '3_doubles', team_member_limit: '',
       account_number: '', account_holder: '', account_bank: '', qualification_image_url: '', target_type: '동호인',
     })
     fetchAll()
@@ -210,12 +221,17 @@ export default function EventAdmin() {
       event_type: editingTeamSettings.event_type,
       team_match_type: (editingTeamSettings.event_type === 'team' || editingTeamSettings.event_type === 'both')
         ? editingTeamSettings.team_match_type : null,
-      team_division_id: (editingTeamSettings.event_type === 'team' || editingTeamSettings.event_type === 'both')
-        ? (editingTeamSettings.team_division_id || null) : null,
+      team_member_limit: (editingTeamSettings.event_type === 'team' || editingTeamSettings.event_type === 'both')
+        && editingTeamSettings.team_member_limit
+        ? Number(editingTeamSettings.team_member_limit) : null,
     }
     const { error } = await supabase.from('events').update(updates).eq('event_id', editingTeamSettings.event_id)
     if (error) { showToast?.(error.message, 'error'); return }
     showToast?.('팀전 설정이 저장되었습니다.')
+    // 아래 요약이 저장 직후 값을 보여주도록 선택된 대회도 함께 갱신
+    if (selectedEvent?.event_id === editingTeamSettings.event_id) {
+      setSelectedEvent({ ...selectedEvent, ...updates })
+    }
     setEditingTeamSettings(null)
     fetchAll()
   }
@@ -224,15 +240,26 @@ export default function EventAdmin() {
     if (!divForm.division_name || !selectedEvent) {
       showToast?.('부서명을 입력해주세요.', 'error'); return
     }
+    const isTeamEvent = selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both'
     const { error } = await supabase.from('event_divisions').insert([{
       event_id: selectedEvent.event_id,
       division_name: divForm.division_name,
       has_groups: divForm.has_groups,
+      team_match_type: isTeamEvent ? (divForm.team_match_type || null) : null,
+      member_limit: isTeamEvent && divForm.member_limit ? Number(divForm.member_limit) : null,
+      is_team_division: isTeamEvent ? divForm.is_team_division : false,
     }])
     if (error) { showToast?.(error.message, 'error'); return }
     showToast?.('부서가 추가되었습니다.')
-    setDivForm({ division_name: '', has_groups: false })
+    setDivForm({ division_name: '', has_groups: false, team_match_type: '', member_limit: '', is_team_division: true })
     fetchDivisions(selectedEvent.event_id)
+  }
+
+  // 부서 행에서 바로 저장 (경기방식·인원한도·팀전 부서 여부)
+  async function updateDivision(divId, patch) {
+    const { error } = await supabase.from('event_divisions').update(patch).eq('division_id', divId)
+    if (error) { showToast?.(error.message, 'error'); return }
+    if (selectedEvent) fetchDivisions(selectedEvent.event_id)
   }
 
   async function deleteDivision(divId) {
@@ -252,12 +279,6 @@ export default function EventAdmin() {
     if (ev.event_type === 'team') return { label: '팀전', color: 'bg-blue-50 text-blue-700' }
     if (ev.event_type === 'both') return { label: '개인+팀', color: 'bg-purple-50 text-purple-700' }
     return { label: '개인', color: 'bg-gray-100 text-gray-600' }
-  }
-
-  function getMatchTypeLabel(type) {
-    if (type === '5_doubles') return '5복식'
-    if (type === '3_doubles') return '3복식'
-    return '-'
   }
 
   function formatDateTime(str) {
@@ -344,15 +365,28 @@ export default function EventAdmin() {
             </div>
 
             {(form.event_type === 'team' || form.event_type === 'both') && (
-              <div>
-                <label className="block text-xs text-sub mb-1">경기 방식 *</label>
-                <select value={form.team_match_type}
-                  onChange={e => setForm({ ...form, team_match_type: e.target.value })}
-                  className="w-full text-sm border border-line rounded-lg px-3 py-2">
-                  <option value="3_doubles">3복식 (2판 선승)</option>
-                  <option value="5_doubles">5복식 (3판 선승)</option>
-                </select>
-              </div>
+              <>
+                <div>
+                  <label className="block text-xs text-sub mb-1">기본 경기 방식 *</label>
+                  <select value={form.team_match_type}
+                    onChange={e => setForm({ ...form, team_match_type: e.target.value })}
+                    className="w-full text-sm border border-line rounded-lg px-3 py-2">
+                    {TEAM_MATCH_TYPES.map(t => (
+                      <option key={t.value} value={t.value}>{t.full}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-sub mb-1">기본 팀 인원 한도 <span className="text-gray-400">(선택)</span></label>
+                  <input type="number" min="1" value={form.team_member_limit}
+                    onChange={e => setForm({ ...form, team_member_limit: e.target.value })}
+                    placeholder="무제한"
+                    className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+                </div>
+                <p className="col-span-2 text-xs text-blue-600 -mt-1">
+                  💡 부서별로 경기 방식·인원 한도가 다르면, 대회 생성 후 <b>부서 관리</b>에서 부서마다 따로 지정할 수 있습니다. (예: 남성부 5복식 / 여성부 3복식)
+                </p>
+              </>
             )}
 
             <div>
@@ -526,47 +560,62 @@ export default function EventAdmin() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-blue-700 mb-1">경기 방식</label>
+                <label className="block text-xs text-blue-700 mb-1">기본 경기 방식</label>
                 <select value={editingTeamSettings.team_match_type || '3_doubles'}
                   onChange={e => setEditingTeamSettings({ ...editingTeamSettings, team_match_type: e.target.value })}
                   className="w-full text-sm border border-blue-200 rounded-lg px-3 py-2">
-                  <option value="3_doubles">3복식 (2판 선승)</option>
-                  <option value="5_doubles">5복식 (3판 선승)</option>
-                </select>
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs text-blue-700 mb-1">팀전 참가부서</label>
-                <select value={editingTeamSettings.team_division_id || ''}
-                  onChange={e => setEditingTeamSettings({ ...editingTeamSettings, team_division_id: e.target.value || null })}
-                  className="w-full text-sm border border-blue-200 rounded-lg px-3 py-2">
-                  <option value="">미결정</option>
-                  {eventDivisions.map(d => (
-                    <option key={d.division_id} value={d.division_id}>{d.division_name}</option>
+                  {TEAM_MATCH_TYPES.map(t => (
+                    <option key={t.value} value={t.value}>{t.full}</option>
                   ))}
                 </select>
-                {eventDivisions.length === 0 && (
-                  <p className="text-xs text-blue-600 mt-1">아래에서 부서를 먼저 추가하세요.</p>
-                )}
               </div>
+              <div>
+                <label className="block text-xs text-blue-700 mb-1">기본 팀 인원 한도</label>
+                <input type="number" min="1" value={editingTeamSettings.team_member_limit || ''}
+                  onChange={e => setEditingTeamSettings({ ...editingTeamSettings, team_member_limit: e.target.value })}
+                  placeholder="무제한"
+                  className="w-full text-sm border border-blue-200 rounded-lg px-3 py-2" />
+              </div>
+              <p className="col-span-2 text-xs text-blue-600">
+                여기 값은 <b>대회 기본값</b>입니다. 부서마다 다르면 아래 부서 목록에서 부서별로 지정하세요.
+              </p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-3 text-sm">
-              <div>
-                <span className="text-xs text-blue-600">유형</span>
-                <p className="font-medium">{getEventTypeBadge(selectedEvent).label}</p>
+            <div className="space-y-2">
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div>
+                  <span className="text-xs text-blue-600">유형</span>
+                  <p className="font-medium">{getEventTypeBadge(selectedEvent).label}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-blue-600">기본 경기방식</span>
+                  <p className="font-medium">{getMatchTypeLabel(selectedEvent.team_match_type)}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-blue-600">기본 인원 한도</span>
+                  <p className="font-medium">{selectedEvent.team_member_limit ? selectedEvent.team_member_limit + '명' : '무제한'}</p>
+                </div>
               </div>
-              <div>
-                <span className="text-xs text-blue-600">경기방식</span>
-                <p className="font-medium">{getMatchTypeLabel(selectedEvent.team_match_type)}</p>
-              </div>
-              <div>
-                <span className="text-xs text-blue-600">참가부서</span>
-                <p className="font-medium">
-                  {selectedEvent.team_division_id
-                    ? (eventDivisions.find(d => d.division_id === selectedEvent.team_division_id)?.division_name || '미연결')
-                    : '미결정'}
+              {teamDivisions.length > 0 ? (
+                <div>
+                  <span className="text-xs text-blue-600">팀전 부서별 경기방식</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {teamDivisions.map(d => (
+                      <span key={d.division_id}
+                        className={`text-xs px-2 py-0.5 rounded ${d.team_match_type ? 'bg-blue-600 text-white' : 'bg-white text-blue-700 border border-blue-200'}`}>
+                        {d.division_name} · {getMatchTypeLabel(resolveMatchType(selectedEvent, d))}
+                        {resolveMemberLimit(selectedEvent, d) ? ' · ' + resolveMemberLimit(selectedEvent, d) + '명' : ''}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-blue-500 mt-1">진한 뱃지 = 부서에서 직접 지정 / 연한 뱃지 = 대회 기본값 사용</p>
+                </div>
+              ) : (
+                <p className="text-xs text-amber-700">
+                  ⚠️ 팀전 부서가 지정되지 않았습니다. 아래 부서 목록에서 <b>팀전</b>을 체크하세요.
+                  (체크가 하나도 없으면 전체 부서가 팀전 신청 목록에 노출됩니다.)
                 </p>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -597,7 +646,7 @@ export default function EventAdmin() {
           )}
 
           {/* 부서 추가 */}
-          <div className="flex gap-2 mb-3">
+          <div className="flex gap-2 mb-3 flex-wrap">
             <div className="flex-1">
               {(selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both' || selectedEvent.target_type === '선수') ? (
                 <input type="text" value={divForm.division_name}
@@ -615,6 +664,27 @@ export default function EventAdmin() {
                 </select>
               )}
             </div>
+            {(selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') && (
+              <>
+                <select value={divForm.team_match_type}
+                  onChange={e => setDivForm({ ...divForm, team_match_type: e.target.value })}
+                  className="text-sm border border-line rounded-lg px-2 py-2 shrink-0">
+                  <option value="">기본 경기방식</option>
+                  {TEAM_MATCH_TYPES.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+                <input type="number" min="1" value={divForm.member_limit}
+                  onChange={e => setDivForm({ ...divForm, member_limit: e.target.value })}
+                  placeholder="한도"
+                  className="w-16 text-sm border border-line rounded-lg px-2 py-2 shrink-0" />
+                <label className="flex items-center gap-1 text-xs text-blue-700 shrink-0">
+                  <input type="checkbox" checked={divForm.is_team_division}
+                    onChange={e => setDivForm({ ...divForm, is_team_division: e.target.checked })} />
+                  팀전
+                </label>
+              </>
+            )}
             <label className="flex items-center gap-1 text-xs text-sub shrink-0">
               <input type="checkbox" checked={divForm.has_groups}
                 onChange={e => setDivForm({ ...divForm, has_groups: e.target.checked })} />
@@ -633,7 +703,7 @@ export default function EventAdmin() {
             {eventDivisions.length === 0 ? (
               <p className="text-sm text-sub py-4 text-center">등록된 부서가 없습니다.</p>
             ) : eventDivisions.map(d => (
-              <div key={d.division_id} className="flex items-center justify-between py-2 px-3 bg-soft rounded-lg">
+              <div key={d.division_id} className="flex items-start justify-between gap-2 py-2 px-3 bg-soft rounded-lg">
                 <div>
                   <span className="text-sm font-medium">{d.division_name}</span>
                   {d.has_groups && (
@@ -643,11 +713,35 @@ export default function EventAdmin() {
                       'bg-gray-100 text-gray-500'
                     }`}>{d.groups_status}</span>
                   )}
-                  {selectedEvent.team_division_id === d.division_id && (
-                    <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">👥팀전 부서</span>
+                  {(selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') && (
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <label className="flex items-center gap-1 text-xs text-blue-700">
+                        <input type="checkbox" checked={!!d.is_team_division}
+                          onChange={e => updateDivision(d.division_id, { is_team_division: e.target.checked })} />
+                        팀전 부서
+                      </label>
+                      <select value={d.team_match_type || ''}
+                        onChange={e => updateDivision(d.division_id, { team_match_type: e.target.value || null })}
+                        className="text-xs border border-line rounded px-1.5 py-0.5 bg-white">
+                        <option value="">
+                          기본값 ({getMatchTypeLabel(selectedEvent.team_match_type)})
+                        </option>
+                        {TEAM_MATCH_TYPES.map(t => (
+                          <option key={t.value} value={t.value}>{t.full}</option>
+                        ))}
+                      </select>
+                      <span className="text-xs text-sub">한도</span>
+                      <input type="number" min="1" defaultValue={d.member_limit || ''}
+                        onBlur={e => {
+                          const v = e.target.value ? Number(e.target.value) : null
+                          if (v !== (d.member_limit ?? null)) updateDivision(d.division_id, { member_limit: v })
+                        }}
+                        placeholder={selectedEvent.team_member_limit ? String(selectedEvent.team_member_limit) : '무제한'}
+                        className="w-16 text-xs border border-line rounded px-1.5 py-0.5 bg-white" />
+                    </div>
                   )}
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 shrink-0">
                   {d.has_groups && d.groups_status !== 'COMPLETED' && (
                     <>
                       {d.groups_status === 'NONE' && (
