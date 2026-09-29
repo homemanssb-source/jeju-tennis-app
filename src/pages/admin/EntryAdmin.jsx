@@ -2,6 +2,7 @@
 import { useState, useEffect, useContext, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
+import BulkIndividualEntry from './BulkIndividualEntry'
 
 export default function EntryAdmin() {
   const showToast = useContext(ToastContext)
@@ -41,7 +42,7 @@ export default function EntryAdmin() {
 
   // ── 관리자 직접 등록 모달 ──
   const [addModal, setAddModal]           = useState(false)
-  const [addTab, setAddTab]               = useState('individual') // 'individual' | 'team'
+  const [addTab, setAddTab]               = useState('individual') // 'individual' | 'bulk' | 'team'
   const [addSubmitting, setAddSubmitting] = useState(false)
 
   // 개인전 직접 등록 state
@@ -1189,6 +1190,15 @@ export default function EntryAdmin() {
                 🎾 개인전
               </button>
               <button
+                onClick={() => setAddTab('bulk')}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  addTab === 'bulk'
+                    ? 'bg-accent text-white'
+                    : 'bg-soft text-sub hover:bg-soft2'
+                }`}>
+                📋 일괄
+              </button>
+              <button
                 onClick={() => setAddTab('team')}
                 className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
                   addTab === 'team'
@@ -1337,6 +1347,15 @@ export default function EntryAdmin() {
                 </>
               )}
 
+              {/* ──── 개인전 일괄 등록 (클럽·학교 단위) ──── */}
+              {addTab === 'bulk' && (
+                <BulkIndividualEntry
+                  event={events.find(ev => ev.event_id === selectedEventId)}
+                  divisions={addDivisions}
+                  entries={entries}
+                  onDone={() => { closeAddModal(); fetchEntries() }} />
+              )}
+
               {/* ──── 단체전 등록 ──── */}
               {addTab === 'team' && (
                 <>
@@ -1455,13 +1474,13 @@ export default function EntryAdmin() {
                 className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft">
                 닫기
               </button>
-              <button
+              {addTab !== 'bulk' && <button
                 onClick={addTab === 'individual' ? handleAddIndividual : handleAddTeam}
                 disabled={addSubmitting}
                 className="flex-1 py-2.5 bg-accent text-white rounded-xl text-sm font-semibold
                   hover:bg-blue-700 disabled:opacity-50">
                 {addSubmitting ? '등록 중...' : '✅ 등록 완료'}
-              </button>
+              </button>}
             </div>
           </div>
         </div>
