@@ -309,7 +309,7 @@ export default function RegisterPage() {
       division: isPlayer ? null : form.division,
       grade: isPlayer ? null : form.grade.replace(/점$/, ''),
       birthdate: isPlayer ? form.birthdate : null,
-      status: '휴면',
+      status: isPlayer ? '활성' : '휴면',   // 선수는 등록비 면제 → 등록 즉시 활성
       grade_source: 'auto',
       registered_at: new Date().toISOString(),
     }])
@@ -353,14 +353,14 @@ export default function RegisterPage() {
           <p className="text-5xl mb-4">🎉</p>
           <h2 className="text-lg font-bold text-gray-900 mb-1">{memberType} 등록 신청 완료!</h2>
           <p className="text-sm text-sub mb-5">
-            {feeExempt ? '관리자 확인 후 활성화됩니다.' : '등록비 납부 후 활성화됩니다.'}
+            {feeExempt ? '바로 활성화되어 대회 신청이 가능합니다.' : '등록비 납부 후 활성화됩니다.'}
           </p>
 
           {feeExempt ? <FeeExemptBox /> : <BankInfoBox fee={fee} />}
 
           <div className="bg-soft rounded-lg p-3 mt-3 text-left">
             <p className="text-xs text-sub">
-              {feeExempt ? '등록 정보 확인 후 관리자가 활성화합니다.' : '입금 확인 후 관리자가 활성화합니다.'} 문의는 협회로 연락해주세요.
+              {feeExempt ? '등록 정보 수정이 필요하면' : '입금 확인 후 관리자가 활성화합니다.'} 문의는 협회로 연락해주세요.
               {isPlayer && ' PIN 초기값은 선수 본인(없으면 보호자) 연락처 뒷 6자리입니다.'}
             </p>
           </div>
@@ -403,7 +403,7 @@ export default function RegisterPage() {
         <div className="mt-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
           <p className="text-xs text-amber-700">
             {feeExempt
-              ? <>⚠️ 등록 후 <b>관리자 확인</b>을 거쳐 활성화됩니다.</>
+              ? <>✅ 등록 즉시 <b>활성화</b>되어 바로 대회 신청이 가능합니다.</>
               : <>⚠️ 등록 후 <b>등록비 납부</b>가 확인되면 관리자가 활성화합니다.</>}
           </p>
         </div>
@@ -570,7 +570,7 @@ export default function RegisterPage() {
           </button>
 
           <p className="text-xs text-sub text-center">
-            {feeExempt ? '등록 후 관리자 확인 시 활성화됩니다.' : '등록 후 등록비 납부 확인 시 활성화됩니다.'}
+            {feeExempt ? '등록 즉시 활성화됩니다.' : '등록 후 등록비 납부 확인 시 활성화됩니다.'}
           </p>
         </form>
       </div>

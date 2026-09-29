@@ -1,7 +1,7 @@
 // src/pages/admin/PlayerAdmin.jsx — 선수(member_type='선수') 전용 관리
 // - 보호자 연락처(guardian_phone) 관리, 선수 본인 연락처는 선택
 // - 생년월일 기준 연령부서 자동 편성 (기준연도 선택 가능)
-// - 선수는 등록비 면제 — 등록 정보 확인 후 활성화
+// - 선수는 등록비 면제 — 등록 즉시 활성
 import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
@@ -238,7 +238,7 @@ export default function PlayerAdmin() {
           <span className="text-sm font-medium text-accent">{selected.size}명 선택</span>
           <button onClick={() => batchUpdateStatus('활성')}
             className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-700">
-            ✅ 일괄 활성화 (등록 확인)
+            ✅ 일괄 활성화
           </button>
           <button onClick={() => batchUpdateStatus('휴면')}
             className="bg-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-yellow-600">
