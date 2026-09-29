@@ -85,7 +85,7 @@ export default function EntryAdmin() {
     // 일반 신청 건 (취소 제외)
     const { data: normalData } = await supabase
       .from('event_entries')
-      .select('*, teams ( team_id, team_name, member1_id, member2_id ), event_divisions ( division_name )')
+      .select('*, teams ( team_id, team_name, member1_id, member2_id ), event_divisions ( division_name, play_format )')
       .eq('event_id', selectedEventId)
       .neq('entry_status', '취소')
       .order('applied_at', { ascending: false })
@@ -93,7 +93,7 @@ export default function EntryAdmin() {
     // 환불대기/환불완료 건 (취소됐지만 관리자가 처리해야 할 건)
     const { data: refundData } = await supabase
       .from('event_entries')
-      .select('*, teams ( team_id, team_name, member1_id, member2_id ), event_divisions ( division_name )')
+      .select('*, teams ( team_id, team_name, member1_id, member2_id ), event_divisions ( division_name, play_format )')
       .eq('event_id', selectedEventId)
       .eq('entry_status', '취소')
       .in('payment_status', ['환불대기', '환불완료'])
@@ -482,7 +482,7 @@ export default function EntryAdmin() {
     if (selectedEventId) {
       const { data } = await supabase
         .from('event_divisions')
-        .select('division_id, division_name')
+        .select('division_id, division_name, play_format')
         .eq('event_id', selectedEventId)
         .order('division_name')
       setAddDivisions(data || [])
@@ -556,37 +556,27 @@ export default function EntryAdmin() {
   }
 
   // ── 개인전 직접 등록 저장 ──
+  const addIsSingles = addDivisions.find(d => d.division_id === addDivisionId)?.play_format === 'singles'
+
   async function handleAddIndividual() {
     if (!addDivisionId) { showToast?.('부서를 선택해주세요.', 'error'); return }
     if (!addM1Selected) { showToast?.('선수1(신청자)을 선택해주세요.', 'error'); return }
-    if (!addM2Selected) { showToast?.('선수2(파트너)를 선택해주세요.', 'error'); return }
-    if (addM1Selected.member_id === addM2Selected.member_id) {
+    if (!addIsSingles && !addM2Selected) { showToast?.('선수2(파트너)를 선택해주세요.', 'error'); return }
+    if (!addIsSingles && addM1Selected.member_id === addM2Selected.member_id) {
       showToast?.('선수1과 선수2가 같습니다.', 'error'); return
     }
 
     setAddSubmitting(true)
     try {
-      // 1. teams 테이블에 팀 생성
-      const teamName = `${addM1Selected.name}/${addM2Selected.name}`
-      const { data: teamData, error: teamErr } = await supabase
-        .from('teams')
-        .insert({ team_name: teamName, member1_id: addM1Selected.member_id, member2_id: addM2Selected.member_id })
-        .select('team_id')
-        .single()
-      if (teamErr) throw teamErr
-
-      // 2. event_entries 에 신청 등록
-      const { error: entryErr } = await supabase
-        .from('event_entries')
-        .insert({
-          event_id:       selectedEventId,
-          team_id:        teamData.team_id,
-          division_id:    addDivisionId,
-          entry_status:   '신청',
-          payment_status: '미납',
-          applied_at:     new Date().toISOString(),
-        })
-      if (entryErr) throw entryErr
+      // 팀 생성 + 신청 등록 (중복·활성·단식/복식 검증은 서버에서)
+      const { data, error } = await supabase.rpc('rpc_apply_team_to_event', {
+        p_event_id:    selectedEventId,
+        p_division_id: addDivisionId,
+        p_member1_id:  addM1Selected.member_id,
+        p_member2_id:  addIsSingles ? null : addM2Selected.member_id,
+      })
+      if (error) throw error
+      if (!data?.ok) throw new Error(data?.message || '등록할 수 없습니다.')
 
       showToast?.('✅ 개인전 직접 등록 완료!')
       closeAddModal()
@@ -843,7 +833,7 @@ export default function EntryAdmin() {
                               신청자
                             </button>
                           )}
-                          {e._source === 'individual' && (
+                          {e._source === 'individual' && e._raw?.event_divisions?.play_format !== 'singles' && (
                             <button
                               onClick={() => openEditModal(e, 'member2')}
                               className="text-xs text-blue-600 border border-blue-200 bg-blue-50
@@ -1222,12 +1212,12 @@ export default function EntryAdmin() {
                     </label>
                     <select
                       value={addDivisionId}
-                      onChange={e => setAddDivisionId(e.target.value)}
+                      onChange={e => { setAddDivisionId(e.target.value); setAddM2Selected(null); setAddM2Search(''); setAddM2Results([]) }}
                       className="w-full text-sm border border-line rounded-lg px-3 py-2.5">
                       <option value="">부서를 선택하세요</option>
                       {addDivisions.map(d => (
                         <option key={d.division_id} value={d.division_id}>
-                          {d.division_name}
+                          {d.division_name}{d.play_format === 'singles' ? ' (단식)' : ''}
                         </option>
                       ))}
                     </select>
@@ -1282,7 +1272,8 @@ export default function EntryAdmin() {
                     )}
                   </div>
 
-                  {/* 선수2 */}
+                  {/* 선수2 (복식만) */}
+                  {!addIsSingles && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       선수2 (파트너) <span className="text-red-500">*</span>
@@ -1325,9 +1316,10 @@ export default function EntryAdmin() {
                       </div>
                     )}
                   </div>
+                  )}
 
                   {/* 등록 요약 */}
-                  {addM1Selected && addM2Selected && addDivisionId && (
+                  {addM1Selected && (addIsSingles || addM2Selected) && addDivisionId && (
                     <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
                       <p className="text-xs font-semibold text-green-800 mb-1.5">📋 등록 내용 확인</p>
                       <p className="text-xs text-green-700">
@@ -1336,7 +1328,9 @@ export default function EntryAdmin() {
                         </span>
                       </p>
                       <p className="text-xs text-green-700 mt-0.5">
-                        팀: <span className="font-medium">{addM1Selected.name} / {addM2Selected.name}</span>
+                        {addIsSingles
+                          ? <>선수(단식): <span className="font-medium">{addM1Selected.name}</span></>
+                          : <>팀: <span className="font-medium">{addM1Selected.name} / {addM2Selected.name}</span></>}
                       </p>
                     </div>
                   )}

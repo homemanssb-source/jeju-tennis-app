@@ -96,8 +96,8 @@ export default function EventEntryPage() {
   }
 
   async function handleSubmit() {
-    if (!selectedEvent || !selectedDivision || !member1Id || !member2Id) {
-      showToast?.('대회, 부서, 선수 2명을 모두 선택해주세요.', 'error'); return
+    if (!selectedEvent || !selectedDivision || !member1Id || (!isSingles && !member2Id)) {
+      showToast?.(isSingles ? '대회, 부서, 선수를 선택해주세요.' : '대회, 부서, 선수 2명을 모두 선택해주세요.', 'error'); return
     }
     if (!member1Pin || member1Pin.length !== 6) {
       showToast?.('PIN 6자리를 입력해주세요.', 'error'); return
@@ -105,11 +105,11 @@ export default function EventEntryPage() {
 
     // 활성 상태 체크
     const m1 = getMemberInfo(member1Id)
-    const m2 = getMemberInfo(member2Id)
+    const m2 = isSingles ? null : getMemberInfo(member2Id)
     if (!m1?.isActive) {
       showToast?.('⚠️ 선수1이 활성 회원이 아닙니다.', 'error'); return
     }
-    if (!m2?.isActive) {
+    if (!isSingles && !m2?.isActive) {
       showToast?.('⚠️ 선수2가 활성 회원이 아닙니다.', 'error'); return
     }
 
@@ -120,20 +120,11 @@ export default function EventEntryPage() {
 
     setSubmitting(true)
 
-    // PIN 검증
-    const { data: pinData, error: pinError } = await supabase.rpc('rpc_verify_member_pin', {
-      p_name: members.find(m => m.member_id === member1Id)?.name || '',
-      p_pin: member1Pin,
-    })
-    if (pinError) { showToast?.('PIN 인증 실패: ' + pinError.message, 'error'); setSubmitting(false); return }
-    if (pinData && !pinData.ok) { showToast?.('⚠️ ' + pinData.message, 'error'); setSubmitting(false); return }
-    if (pinData && pinData.ok && pinData.member_id !== member1Id) {
-      showToast?.('⚠️ PIN과 선택한 선수가 일치하지 않습니다.', 'error'); setSubmitting(false); return
-    }
-
-    const { data, error } = await supabase.rpc('rpc_apply_team_to_event', {
+    // PIN 검증은 서버(rpc_apply_team_with_pin)에서 신청과 함께 처리
+    const { data, error } = await supabase.rpc('rpc_apply_team_with_pin', {
       p_event_id: selectedEvent.event_id, p_division_id: selectedDivision,
-      p_member1_id: member1Id, p_member2_id: member2Id,
+      p_member1_id: member1Id, p_member1_pin: member1Pin,
+      p_member2_id: isSingles ? null : member2Id,
     })
     if (error) { showToast?.('신청 실패: ' + error.message, 'error') }
     else if (data && !data.ok) { showToast?.('⚠️ ' + (data.message || '신청할 수 없습니다.'), 'error') }
@@ -147,13 +138,21 @@ export default function EventEntryPage() {
   const member1Info = getMemberInfo(member1Id)
   const member2Info = getMemberInfo(member2Id)
   const entryAvail = getEntryAvailability(selectedEvent)
+  const divisionInfo = divisions.find(d => d.division_id === selectedDivision)
+  const isSingles = divisionInfo?.play_format === 'singles'
+
+  function handleDivisionChange(divisionId) {
+    setSelectedDivision(divisionId)
+    // 단식 부서로 바꾸면 선수2 선택을 비운다
+    setMember2Id(''); setMember2Search(''); setShowDropdown2(false)
+  }
 
   return (
     <div className="pb-20">
       <PageHeader title="🎾 참가신청" subtitle="복식 및 단식 참가 신청" />
       <div className="max-w-lg mx-auto px-5 py-4 space-y-4">
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-          <p className="text-xs text-amber-700">⚠️ 선수 2명 모두 <b>등록되고 활성(활성 회원)</b>이어야 참가 신청이 가능합니다.</p>
+          <p className="text-xs text-amber-700">⚠️ 참가 선수 모두 <b>등록되고 활성(활성 회원)</b>이어야 참가 신청이 가능합니다. (복식 2명 · 단식 1명)</p>
           <p className="text-xs text-amber-700 mt-1">🔐 신청자(선수1)는 <b>PIN 6자리</b>를 입력해야 합니다.</p>
         </div>
 
@@ -195,11 +194,16 @@ export default function EventEntryPage() {
             {/* 부서 선택 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">부서 선택</label>
-              <select value={selectedDivision} onChange={e => setSelectedDivision(e.target.value)}
+              <select value={selectedDivision} onChange={e => handleDivisionChange(e.target.value)}
                 className="w-full text-sm border border-line rounded-lg px-3 py-2.5">
                 <option value="">부서를 선택하세요</option>
-                {divisions.map(d => <option key={d.division_id} value={d.division_id}>{d.division_name}</option>)}
+                {divisions.map(d => (
+                  <option key={d.division_id} value={d.division_id}>
+                    {d.division_name}{d.play_format === 'singles' ? ' (단식)' : ''}
+                  </option>
+                ))}
               </select>
+              {isSingles && <p className="text-xs text-blue-600 mt-1">🎾 단식 부서 — 선수 1명만 신청합니다.</p>}
             </div>
 
             {selectedDivision && (
@@ -246,7 +250,8 @@ export default function EventEntryPage() {
                   </div>
                 )}
 
-                {/* 선수 2 */}
+                {/* 선수 2 (복식만) */}
+                {!isSingles && (
                 <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 mb-1">선수 2</label>
                   <input type="text" value={member2Search}
@@ -259,9 +264,9 @@ export default function EventEntryPage() {
                       {member2Info.name} · {member2Info.club || '-'} · {memberMeta(member2Info)} ✅활성
                     </div>
                   )}
-                  {showDropdown2 && filterMembers(member2Search).length > 0 && (
+                  {showDropdown2 && filterMembers(member2Search).some(m => m.member_id !== member1Id) && (
                     <div className="absolute left-0 right-0 top-full bg-white border border-line rounded-lg shadow-lg mt-1 z-20 max-h-48 overflow-y-auto">
-                      {filterMembers(member2Search).map(m => (
+                      {filterMembers(member2Search).filter(m => m.member_id !== member1Id).map(m => (
                         <button key={m.member_id}
                           onClick={() => { setMember2Id(m.member_id); setMember2Search(m.display_name || m.name); setShowDropdown2(false) }}
                           className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30">
@@ -273,9 +278,10 @@ export default function EventEntryPage() {
                     </div>
                   )}
                 </div>
+                )}
 
                 <button onClick={handleSubmit}
-                  disabled={submitting || !member1Id || !member2Id || member1Pin.length !== 6}
+                  disabled={submitting || !member1Id || (!isSingles && !member2Id) || member1Pin.length !== 6}
                   className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm
                     hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   {submitting ? '신청 중..' : '🎾 참가 신청하기'}

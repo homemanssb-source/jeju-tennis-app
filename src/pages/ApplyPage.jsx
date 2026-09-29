@@ -348,7 +348,8 @@ export default function ApplyPage() {
 
     const { data: entriesData } = entriesResult
     setMyName(entriesData?.member_name || memberRow.name || '')
-    setMyEntries(entriesData?.entries || [])
+    // 단체전은 아래 단체전 목록(myTeamEntries)에서 따로 보여준다
+    setMyEntries((entriesData?.entries || []).filter(e => e.entry_type !== 'team'))
   }
 
   // ── 취소 가능 여부 판단 ──
@@ -395,28 +396,20 @@ export default function ApplyPage() {
 
     setCancelling(true)
 
-    const updatePayload = {
-      entry_status: '취소',
-      cancelled_at: new Date().toISOString(),
-    }
-
-    if (isPaid) {
-      updatePayload.payment_status      = '환불대기'
-      updatePayload.refund_bank         = refundBank.trim()
-      updatePayload.refund_account      = refundAccount.trim()
-      updatePayload.refund_holder       = refundHolder.trim()
-      updatePayload.refund_requested_at = new Date().toISOString()
-    }
-
-    const { error } = await supabase
-      .from('event_entries')
-      .update(updatePayload)
-      .eq('entry_id', cancelTarget.entry_id)
+    // 본인 확인(전화번호+PIN)·마감·환불계좌 검증은 서버에서 처리
+    const { data, error } = await supabase.rpc('rpc_cancel_my_entry', {
+      p_phone:          phone.replace(/[^0-9]/g, ''),
+      p_pin:            pin,
+      p_entry_id:       cancelTarget.entry_id,
+      p_refund_bank:    isPaid ? refundBank.trim()    : null,
+      p_refund_account: isPaid ? refundAccount.trim() : null,
+      p_refund_holder:  isPaid ? refundHolder.trim()  : null,
+    })
 
     setCancelling(false)
 
-    if (error) {
-      showToast('취소 처리 실패: ' + error.message, 'error')
+    if (error || !data?.ok) {
+      showToast('취소 처리 실패: ' + (data?.message || error?.message || '오류'), 'error')
       return
     }
 
@@ -438,6 +431,7 @@ export default function ApplyPage() {
   // ── 파트너 변경 ──
   function openPartnerModal(entry) {
     if (entry.entry_status === 'cancelled') { showToast('취소된 신청입니다.', 'error'); return }
+    if (entry.play_format === 'singles') { showToast('단식 부서는 파트너가 없습니다.', 'error'); return }
     if (entry.entry_close_at && new Date(entry.entry_close_at) < new Date()) {
       showToast('접수 마감 후에는 변경할 수 없습니다.', 'error'); return
     }
@@ -458,13 +452,15 @@ export default function ApplyPage() {
     const q = partnerSearch.trim()
     if (!q) return
     setPartnerSearching(true)
-    const { data } = await supabase
+    // 대회 대상(동호인/선수/전체)에 맞는 회원만 검색
+    const targetType = partnerTarget?.target_type || '동호인'
+    let query = supabase
       .from('members')
       .select('member_id, name, club, status')
       .ilike('name', `%${q}%`)
       .eq('status', '활성')
-      .eq('member_type', '동호인')
-      .limit(20)
+    if (targetType !== '전체') query = query.eq('member_type', targetType)
+    const { data } = await query.limit(20)
     setPartnerSearching(false)
 
     // 같은 부서에 이미 신청한 member_id 수집 (프론트 체크)
@@ -491,25 +487,18 @@ export default function ApplyPage() {
     if (!partnerTarget || !partnerSelected) return
     setPartnerSaving(true)
 
-    // team_id: RPC 반환값에 있으면 직접 사용, 없으면 entry_id로 조회
-    let teamId = partnerTarget.team_id
-    if (!teamId) {
-      const { data: entryData } = await supabase
-        .from('event_entries')
-        .select('team_id')
-        .eq('entry_id', partnerTarget.entry_id)
-        .single()
-      teamId = entryData?.team_id
-    }
-    if (!teamId) { showToast('팀 정보를 찾을 수 없습니다.', 'error'); setPartnerSaving(false); return }
-
-    const { error } = await supabase
-      .from('teams')
-      .update({ member2_id: partnerSelected.member_id })
-      .eq('team_id', teamId)
+    // 본인 확인(전화번호+PIN)·마감·중복 검증은 서버에서 처리
+    const { data, error } = await supabase.rpc('rpc_change_my_partner', {
+      p_phone:          phone.replace(/[^0-9]/g, ''),
+      p_pin:            pin,
+      p_entry_id:       partnerTarget.entry_id,
+      p_new_partner_id: partnerSelected.member_id,
+    })
 
     setPartnerSaving(false)
-    if (error) { showToast('변경 실패: ' + error.message, 'error'); return }
+    if (error || !data?.ok) {
+      showToast('변경 실패: ' + (data?.message || error?.message || '오류'), 'error'); return
+    }
 
     showToast('✅ 파트너가 변경되었습니다.')
 
@@ -835,7 +824,7 @@ export default function ApplyPage() {
                           </div>
                         </div>
                         <div className="flex gap-3 text-xs text-sub mb-1">
-                          {e.division_name && <span>📋 {e.division_name}</span>}
+                          {e.division_name && <span>📋 {e.division_name}{e.play_format === 'singles' ? ' (단식)' : ''}</span>}
                           {e.partner_name  && <span>🤝 파트너: {e.partner_name}</span>}
                         </div>
                         <p className="text-[10px] text-gray-400 mb-2">신청일: {formatDate(e.applied_at)}</p>
@@ -855,7 +844,7 @@ export default function ApplyPage() {
                                 : closeDate ? `마감: ${closeDate}` : ''}
                             </span>
                             <div className="flex gap-1.5 shrink-0">
-                              {cancelStatus === 'ok' && (
+                              {cancelStatus === 'ok' && e.play_format !== 'singles' && (
                                 <button onClick={() => openPartnerModal(e)}
                                   className="text-xs text-blue-500 border border-blue-200 bg-blue-50
                                     hover:bg-blue-100 rounded-lg px-3 py-1.5 transition-colors">
