@@ -45,20 +45,13 @@ export default function AdminManagerPage() {
   }
 
   // ─── 관리자 추가 ───────────────────────────────
+  // 로그인 계정은 Supabase 대시보드(Authentication → Users → Add user)에서 먼저 만든다.
+  // 공개 회원가입을 막았기 때문에 앱에서 signUp 으로 계정을 만들 수 없다.
+  // 여기서는 그 계정에 관리자 권한(admin_users)만 부여한다. (슈퍼관리자만 가능 — DB 정책)
   async function handleAdd() {
     if (!form.email.trim() || !form.name.trim()) {
       showToast?.('이메일과 이름을 입력해주세요.', 'error'); return
     }
-    if (!newPassword || newPassword.length < 6) {
-      showToast?.('비밀번호는 6자 이상이어야 합니다.', 'error'); return
-    }
-
-    // Supabase Auth에 계정 생성 (signUp 방식 - 이메일 인증 없이 바로 사용 가능하게 설정 필요)
-    const { error: signupError } = await supabase.auth.signUp({
-      email: form.email.trim(),
-      password: newPassword,
-    })
-    if (signupError) { showToast?.('계정 생성 실패: ' + signupError.message, 'error'); return }
 
     const { error } = await supabase.from('admin_users').insert([{
       email: form.email.trim(),
@@ -323,12 +316,13 @@ export default function AdminManagerPage() {
             </div>
 
             {modal === 'add' && (
-              <div>
-                <label className="block text-xs text-sub mb-1">초기 비밀번호 * (6자 이상)</label>
-                <input type="password" value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  placeholder="초기 비밀번호"
-                  className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  ⚠️ 로그인 계정을 먼저 만들어주세요.<br />
+                  <b>Supabase 대시보드 → Authentication → Users → Add user</b>에서
+                  같은 이메일과 초기 비밀번호로 계정을 만들고 <b>Auto Confirm User</b>를 체크하세요.
+                  그다음 여기서 추가하면 관리자 권한이 부여됩니다. (슈퍼관리자만 가능)
+                </p>
               </div>
             )}
 
