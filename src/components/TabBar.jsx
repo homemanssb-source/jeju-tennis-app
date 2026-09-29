@@ -15,7 +15,7 @@ const moreTabs = [
   { path: '/entry/team',      label: '단체전 참가신청', icon: '🏟️' },
   { path: '/apply',           label: '신청확인',       icon: '📋' },
   { path: '/external-report', label: '외부대회 신고',   icon: '🏅' },
-  { path: '/register',        label: '동호인/선수 등록', icon: '👤' },
+  { path: '/register',        label: '동호인/학생선수 등록', icon: '👤' },
   { path: '/board',           label: '건의/문의',       icon: '💬' },
   { path: '/pin',             label: 'PIN 변경',        icon: '🔑' },
 ]

@@ -5,10 +5,11 @@ import { ToastContext } from '../App'
 
 const DIVISIONS = ['지도자부','마스터부','베테랑부','신인부','여자마스터부','여자베테랑부','여자신인부']
 
-// 등록 구분 — 동호인(랭킹부서/등급) · 선수(생년월일)
+// 등록 구분 — 동호인(랭킹부서/등급) · 학생선수(생년월일)
+// key 는 DB member_type 값('선수') 그대로, 화면 표시는 title 사용
 const MEMBER_TYPES = [
   { key: '동호인', icon: '🎾', title: '동호인', desc: '클럽 동호인 · 랭킹부서/등급 운영' },
-  { key: '선수',   icon: '🏅', title: '선수',   desc: '선수 등록 · 생년월일 기준 관리 · 등록비 면제' },
+  { key: '선수',   icon: '🏅', title: '학생선수', desc: '초·중·고 학생선수 전용 · 등록비 면제' },
 ]
 
 // ✅ 계좌 정보 — 여기만 수정하면 전체 반영됩니다
@@ -59,7 +60,7 @@ function FeeExemptBox({ compact = false }) {
   return (
     <div className={`bg-green-50 border border-green-200 rounded-lg ${compact ? 'p-3' : 'p-4'}`}>
       <p className={`font-semibold text-green-800 ${compact ? 'text-xs' : 'text-sm'}`}>
-        🎁 선수는 등록비가 면제됩니다
+        🎁 학생선수는 등록비가 면제됩니다
       </p>
       <p className="mt-1 text-xs text-green-700">별도 입금 없이 등록 신청만 하시면 됩니다.</p>
     </div>
@@ -176,6 +177,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState(EMPTY_FORM)
 
   const isPlayer = memberType === '선수'
+  const typeLabel = MEMBER_TYPES.find(t => t.key === memberType).title   // 화면 표시용 (선수 → 학생선수)
   const fee = BANK_INFO.fee[memberType]
   const feeExempt = !fee   // 등록비 면제 여부 (선수)
 
@@ -245,7 +247,7 @@ export default function RegisterPage() {
     if (isPlayer) {
       // 선수: 보호자 연락처 필수, 본인 연락처는 선택 (형제 선수가 보호자 번호를 공유할 수 있음)
       if (normalizePhone(form.guardian_phone).length < 10) return '보호자 연락처를 입력해주세요.'
-      if (form.phone && normalizePhone(form.phone).length < 10) return '선수 연락처를 확인해주세요.'
+      if (form.phone && normalizePhone(form.phone).length < 10) return '학생선수 연락처를 확인해주세요.'
       if (!form.birthdate) return '생년월일을 입력해주세요.'
       const d = new Date(form.birthdate)
       if (isNaN(d.getTime()) || d > new Date() || d.getFullYear() < 1900) return '생년월일을 확인해주세요.'
@@ -324,7 +326,7 @@ export default function RegisterPage() {
       }
     } else {
       setSubmitted(true)
-      showToast?.(`${memberType} 등록 신청이 완료되었습니다!`)
+      showToast?.(`${typeLabel} 등록 신청이 완료되었습니다!`)
     }
     setSubmitting(false)
   }
@@ -348,10 +350,10 @@ export default function RegisterPage() {
   if (submitted) {
     return (
       <div className="pb-20">
-        <PageHeader title="👤 동호인/선수 등록" />
+        <PageHeader title="👤 동호인/학생선수 등록" />
         <div className="max-w-lg mx-auto px-5 py-10 text-center">
           <p className="text-5xl mb-4">🎉</p>
-          <h2 className="text-lg font-bold text-gray-900 mb-1">{memberType} 등록 신청 완료!</h2>
+          <h2 className="text-lg font-bold text-gray-900 mb-1">{typeLabel} 등록 신청 완료!</h2>
           <p className="text-sm text-sub mb-5">
             {feeExempt ? '바로 활성화되어 대회 신청이 가능합니다.' : '등록비 납부 후 활성화됩니다.'}
           </p>
@@ -361,12 +363,12 @@ export default function RegisterPage() {
           <div className="bg-soft rounded-lg p-3 mt-3 text-left">
             <p className="text-xs text-sub">
               {feeExempt ? '등록 정보 수정이 필요하면' : '입금 확인 후 관리자가 활성화합니다.'} 문의는 협회로 연락해주세요.
-              {isPlayer && ' PIN 초기값은 선수 본인(없으면 보호자) 연락처 뒷 6자리입니다.'}
+              {isPlayer && ' PIN 초기값은 학생선수 본인(없으면 보호자) 연락처 뒷 6자리입니다.'}
             </p>
           </div>
 
           <button onClick={resetAll} className="mt-6 text-sm text-accent hover:underline">
-            다른 {memberType} 등록하기
+            다른 {typeLabel} 등록하기
           </button>
         </div>
       </div>
@@ -376,7 +378,7 @@ export default function RegisterPage() {
   // ── 등록 폼 ────────────────────────────────────────────
   return (
     <div className="pb-20">
-      <PageHeader title="👤 동호인/선수 등록" subtitle="제주시테니스협회 등록 신청" />
+      <PageHeader title="👤 동호인/학생선수 등록" subtitle="제주시테니스협회 등록 신청" />
       <div className="max-w-lg mx-auto px-5 py-4">
 
         {/* 등록 구분 선택 */}
@@ -398,7 +400,16 @@ export default function RegisterPage() {
           })}
         </div>
 
-        {/* 등록비 안내 — 폼 상단 (선수는 면제) */}
+        {/* 학생선수 선택 시 — 동호인 오등록 방지 안내 */}
+        {isPlayer && (
+          <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-xs text-red-700">
+              ⚠️ <b>초·중·고 학생선수 전용</b>입니다. 성인 동호인은 <b>'동호인'</b>으로 등록해주세요.
+            </p>
+          </div>
+        )}
+
+        {/* 등록비 안내 — 폼 상단 (학생선수는 면제) */}
         {feeExempt ? <FeeExemptBox compact /> : <BankInfoBox fee={fee} compact />}
         <div className="mt-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
           <p className="text-xs text-amber-700">
@@ -459,7 +470,7 @@ export default function RegisterPage() {
                 onChange={e => handleChange('guardian_phone', e.target.value)}
                 placeholder="010-0000-0000"
                 className="w-full text-sm border border-line rounded-lg px-3 py-2.5 focus:border-accent focus:ring-2 focus:ring-accentSoft" />
-              <p className="text-xs text-sub mt-1">성인 선수는 본인 번호를 입력해도 됩니다.</p>
+              <p className="text-xs text-sub mt-1">부모님 등 보호자 번호를 입력해주세요.</p>
             </div>
           )}
 
@@ -467,7 +478,7 @@ export default function RegisterPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {isPlayer ? (
-                <>선수 본인 연락처 <span className="text-xs font-normal text-sub">(선택 — 휴대폰이 없으면 비워두세요)</span></>
+                <>학생선수 본인 연락처 <span className="text-xs font-normal text-sub">(선택 — 휴대폰이 없으면 비워두세요)</span></>
               ) : (
                 <>전화번호 <span className="text-red-500">*</span></>
               )}
@@ -566,7 +577,7 @@ export default function RegisterPage() {
           <button type="submit"
             disabled={submitting || !!phoneDupError || phoneChecking}
             className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {submitting ? '처리 중...' : `${memberType} 등록 신청 (${feeExempt ? '등록비 면제' : `등록비 ${formatFee(fee)}`})`}
+            {submitting ? '처리 중...' : `${typeLabel} 등록 신청 (${feeExempt ? '등록비 면제' : `등록비 ${formatFee(fee)}`})`}
           </button>
 
           <p className="text-xs text-sub text-center">
