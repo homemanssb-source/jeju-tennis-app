@@ -8,7 +8,7 @@ const DIVISIONS = ['지도자부','마스터부','베테랑부','신인부','여
 // 등록 구분 — 동호인(랭킹부서/등급) · 선수(생년월일)
 const MEMBER_TYPES = [
   { key: '동호인', icon: '🎾', title: '동호인', desc: '클럽 동호인 · 랭킹부서/등급 운영' },
-  { key: '선수',   icon: '🏅', title: '선수',   desc: '선수 등록 · 생년월일 기준 관리' },
+  { key: '선수',   icon: '🏅', title: '선수',   desc: '선수 등록 · 생년월일 기준 관리 · 등록비 면제' },
 ]
 
 // ✅ 계좌 정보 — 여기만 수정하면 전체 반영됩니다
@@ -16,7 +16,7 @@ const BANK_INFO = {
   bank: '제주은행',
   account: '57-01-027381',
   holder: '제주시테니스협회',
-  fee: { 동호인: 10000, 선수: 10000 },   // 등록비 (원) — 구분별로 다르면 여기서 수정
+  fee: { 동호인: 10000, 선수: 0 },   // 등록비 (원) — 0 이면 면제 (선수는 등록비 면제)
 }
 
 // 금액 포맷 (예: 30000 → 30,000원)
@@ -50,6 +50,18 @@ function BankInfoBox({ fee, compact = false }) {
       <p className={`mt-2 text-blue-600 ${compact ? 'text-xs' : 'text-xs'}`}>
         ※ 입금자명은 <b>본인 이름</b>으로 해주세요.
       </p>
+    </div>
+  )
+}
+
+// 등록비 면제 안내 박스 (선수)
+function FeeExemptBox({ compact = false }) {
+  return (
+    <div className={`bg-green-50 border border-green-200 rounded-lg ${compact ? 'p-3' : 'p-4'}`}>
+      <p className={`font-semibold text-green-800 ${compact ? 'text-xs' : 'text-sm'}`}>
+        🎁 선수는 등록비가 면제됩니다
+      </p>
+      <p className="mt-1 text-xs text-green-700">별도 입금 없이 등록 신청만 하시면 됩니다.</p>
     </div>
   )
 }
@@ -165,6 +177,7 @@ export default function RegisterPage() {
 
   const isPlayer = memberType === '선수'
   const fee = BANK_INFO.fee[memberType]
+  const feeExempt = !fee   // 등록비 면제 여부 (선수)
 
   useEffect(() => { fetchGrades() }, [])
 
@@ -339,13 +352,15 @@ export default function RegisterPage() {
         <div className="max-w-lg mx-auto px-5 py-10 text-center">
           <p className="text-5xl mb-4">🎉</p>
           <h2 className="text-lg font-bold text-gray-900 mb-1">{memberType} 등록 신청 완료!</h2>
-          <p className="text-sm text-sub mb-5">등록비 납부 후 활성화됩니다.</p>
+          <p className="text-sm text-sub mb-5">
+            {feeExempt ? '관리자 확인 후 활성화됩니다.' : '등록비 납부 후 활성화됩니다.'}
+          </p>
 
-          <BankInfoBox fee={fee} />
+          {feeExempt ? <FeeExemptBox /> : <BankInfoBox fee={fee} />}
 
           <div className="bg-soft rounded-lg p-3 mt-3 text-left">
             <p className="text-xs text-sub">
-              입금 확인 후 관리자가 활성화합니다. 문의는 협회로 연락해주세요.
+              {feeExempt ? '등록 정보 확인 후 관리자가 활성화합니다.' : '입금 확인 후 관리자가 활성화합니다.'} 문의는 협회로 연락해주세요.
               {isPlayer && ' PIN 초기값은 선수 본인(없으면 보호자) 연락처 뒷 6자리입니다.'}
             </p>
           </div>
@@ -383,11 +398,13 @@ export default function RegisterPage() {
           })}
         </div>
 
-        {/* 등록비 안내 — 폼 상단 */}
-        <BankInfoBox fee={fee} compact />
+        {/* 등록비 안내 — 폼 상단 (선수는 면제) */}
+        {feeExempt ? <FeeExemptBox compact /> : <BankInfoBox fee={fee} compact />}
         <div className="mt-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
           <p className="text-xs text-amber-700">
-            ⚠️ 등록 후 <b>등록비 납부</b>가 확인되면 관리자가 활성화합니다.
+            {feeExempt
+              ? <>⚠️ 등록 후 <b>관리자 확인</b>을 거쳐 활성화됩니다.</>
+              : <>⚠️ 등록 후 <b>등록비 납부</b>가 확인되면 관리자가 활성화합니다.</>}
           </p>
         </div>
 
@@ -549,10 +566,12 @@ export default function RegisterPage() {
           <button type="submit"
             disabled={submitting || !!phoneDupError || phoneChecking}
             className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {submitting ? '처리 중...' : `${memberType} 등록 신청 (등록비 ${formatFee(fee)})`}
+            {submitting ? '처리 중...' : `${memberType} 등록 신청 (${feeExempt ? '등록비 면제' : `등록비 ${formatFee(fee)}`})`}
           </button>
 
-          <p className="text-xs text-sub text-center">등록 후 등록비 납부 확인 시 활성화됩니다.</p>
+          <p className="text-xs text-sub text-center">
+            {feeExempt ? '등록 후 관리자 확인 시 활성화됩니다.' : '등록 후 등록비 납부 확인 시 활성화됩니다.'}
+          </p>
         </form>
       </div>
     </div>
