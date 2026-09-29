@@ -37,7 +37,7 @@ export default function EventAdmin() {
   const [eventDivisions, setEventDivisions] = useState([])
   const [divForm, setDivForm] = useState({
     division_name: '', has_groups: false,
-    team_match_type: '', member_limit: '', is_team_division: true,
+    team_match_type: '', member_limit: '', is_team_division: true, play_format: 'doubles',
   })
 
   // 대회 수정 모달
@@ -248,10 +248,11 @@ export default function EventAdmin() {
       team_match_type: isTeamEvent ? (divForm.team_match_type || null) : null,
       member_limit: isTeamEvent && divForm.member_limit ? Number(divForm.member_limit) : null,
       is_team_division: isTeamEvent ? divForm.is_team_division : false,
+      play_format: selectedEvent.event_type === 'team' ? 'doubles' : (divForm.play_format || 'doubles'),
     }])
     if (error) { showToast?.(error.message, 'error'); return }
     showToast?.('부서가 추가되었습니다.')
-    setDivForm({ division_name: '', has_groups: false, team_match_type: '', member_limit: '', is_team_division: true })
+    setDivForm({ division_name: '', has_groups: false, team_match_type: '', member_limit: '', is_team_division: true, play_format: 'doubles' })
     fetchDivisions(selectedEvent.event_id)
   }
 
@@ -685,6 +686,14 @@ export default function EventAdmin() {
                 </label>
               </>
             )}
+            {selectedEvent.event_type !== 'team' && (
+              <select value={divForm.play_format}
+                onChange={e => setDivForm({ ...divForm, play_format: e.target.value })}
+                className="text-sm border border-line rounded-lg px-2 py-2 shrink-0">
+                <option value="doubles">복식</option>
+                <option value="singles">단식</option>
+              </select>
+            )}
             <label className="flex items-center gap-1 text-xs text-sub shrink-0">
               <input type="checkbox" checked={divForm.has_groups}
                 onChange={e => setDivForm({ ...divForm, has_groups: e.target.checked })} />
@@ -706,6 +715,16 @@ export default function EventAdmin() {
               <div key={d.division_id} className="flex items-start justify-between gap-2 py-2 px-3 bg-soft rounded-lg">
                 <div>
                   <span className="text-sm font-medium">{d.division_name}</span>
+                  {selectedEvent.event_type !== 'team' && !d.is_team_division && (
+                    <select value={d.play_format || 'doubles'}
+                      onChange={e => updateDivision(d.division_id, { play_format: e.target.value })}
+                      className={`ml-2 text-xs border rounded px-1.5 py-0.5 ${
+                        d.play_format === 'singles' ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-line bg-white'
+                      }`}>
+                      <option value="doubles">복식</option>
+                      <option value="singles">단식</option>
+                    </select>
+                  )}
                   {d.has_groups && (
                     <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
                       d.groups_status === 'COMPLETED' ? 'bg-green-50 text-green-700' :
