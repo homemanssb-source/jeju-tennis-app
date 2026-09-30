@@ -23,7 +23,12 @@ export default function HomePage() {
       .select('*')
       .eq('is_active', true)
       .order('sort_order')
-    setBanners(data || [])
+    // 게시 기간(start_at ~ end_at) 밖의 배너는 숨김 — 비어 있으면 제한 없음
+    const now = Date.now()
+    setBanners((data || []).filter(b =>
+      (!b.start_at || new Date(b.start_at).getTime() <= now) &&
+      (!b.end_at || new Date(b.end_at).getTime() > now)
+    ))
   }
 
   async function fetchUpcomingEvents() {
@@ -257,9 +262,15 @@ export default function HomePage() {
               {banners.map(b => (
                 <a
                   key={b.id}
-                  href={b.link_url || '#'}
-                  target="_blank" rel="noopener noreferrer"
+                  href={b.link_url || undefined}
+                  target={b.link_url && !b.link_url.startsWith('/') ? '_blank' : undefined}
+                  rel="noopener noreferrer"
+                  onClick={e => {
+                    // 앱 안의 화면(/shop 등)은 새 창 대신 앱 안에서 이동
+                    if (b.link_url?.startsWith('/')) { e.preventDefault(); navigate(b.link_url) }
+                  }}
                   style={{
+                    cursor: b.link_url ? 'pointer' : 'default',
                     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
                     textDecoration: 'none', padding: '8px 4px', borderRadius: 12, background: '#fff',
                     transition: 'opacity 0.15s', minWidth: 0,
