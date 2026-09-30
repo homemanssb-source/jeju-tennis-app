@@ -283,37 +283,25 @@ export default function RegisterPage() {
       }
     }
 
-    const memberId = 'M' + Date.now().toString().slice(-8)
-    const nameNorm = form.name.replace(/[^가-힣a-zA-Z0-9]/g, '').toLowerCase()
+    // 회원번호·상태(동호인 '휴면' / 학생선수 '활성')·PIN(전화 또는 보호자 전화 뒷 6자리)은 서버가 정함
+    const { data, error } = await supabase.rpc('rpc_register_member', {
+      p_name:           form.name,
+      p_gender:         form.gender,
+      p_phone:          phoneNorm || null,
+      p_guardian_phone: isPlayer ? (guardianNorm || null) : null,
+      p_club:           form.club,
+      p_member_type:    memberType,
+      p_division:       isPlayer ? null : form.division,
+      p_grade:          isPlayer ? null : form.grade,
+      p_birthdate:      isPlayer ? form.birthdate : null,
+    })
 
-    const { error } = await supabase.from('members').insert([{
-      member_id: memberId,
-      name: form.name,
-      display_name: form.name,
-      name_norm: nameNorm,
-      gender: form.gender,
-      phone: phoneNorm || null,   // ✅ 항상 하이픈 없이 저장 (통일), 선수는 없을 수 있음
-      guardian_phone: isPlayer ? (guardianNorm || null) : null,
-      // 선수 본인 번호가 없으면 PIN 이 자동 생성되지 않으므로 보호자 번호 뒷 6자리로 지정
-      ...(isPlayer && { pin_code: (phoneNorm || guardianNorm).slice(-6) }),
-      club: form.club,
-      member_type: memberType,
-      // 선수는 랭킹부서/등급 없음, 동호인은 생년월일 없음
-      division: isPlayer ? null : form.division,
-      grade: isPlayer ? null : form.grade.replace(/점$/, ''),
-      birthdate: isPlayer ? form.birthdate : null,
-      status: isPlayer ? '활성' : '휴면',   // 선수는 등록비 면제 → 등록 즉시 활성
-      grade_source: 'auto',
-      registered_at: new Date().toISOString(),
-    }])
-
-    if (error) {
-      // ✅ DB UNIQUE 제약 위반 시 친절한 메시지
-      if (error.code === '23505') {
+    if (error || !data?.ok) {
+      if (data?.code === 'duplicate_phone' || error?.code === '23505') {
         setPhoneDupError('이미 등록된 전화번호입니다.')
         showToast?.('이미 등록된 전화번호입니다.', 'error')
       } else {
-        showToast?.('등록 실패: ' + error.message, 'error')
+        showToast?.('등록 실패: ' + (data?.message || error?.message || '오류'), 'error')
       }
     } else {
       setSubmitted(true)
