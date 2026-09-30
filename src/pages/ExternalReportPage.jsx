@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
 
+// 신고 내역 공개 조회 열 (회원 전화번호 제외)
+const REPORT_COLS = 'id, member_id, member_name, reported_at, tournament_name, tournament_date, tournament_type, tournament_division, result, before_grade, expected_grade, admin_applied, admin_applied_at, admin_note'
+
 const TOURNAMENT_TYPES = ['전국대회', '도내대회']
 const RESULTS = ['우승', '준우승', '4강']
 
@@ -163,7 +166,7 @@ export default function ExternalReportPage() {
     setHistoryLoading(true)
     const { data } = await supabase
       .from('external_report_log')
-      .select('*')
+      .select(REPORT_COLS)
       .eq('member_id', member.member_id)
       .order('reported_at', { ascending: false })
     setHistory(data || [])

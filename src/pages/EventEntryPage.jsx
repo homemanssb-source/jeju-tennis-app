@@ -33,7 +33,7 @@ export default function EventEntryPage() {
   async function fetchMembers() {
     // 동호인·선수 모두 불러오고, 선택한 대회의 대상(target_type)에 따라 필터링
     const { data } = await supabase.from('members_public')
-      .select('member_id, name, display_name, club, division, grade, status, member_type, birthdate')
+      .select('member_id, name, display_name, club, division, grade, status, member_type, birth_year')
       .eq('status', '활성')  // ← 활성만 조회
       .order('name')
     setMembers(data || [])
@@ -49,7 +49,7 @@ export default function EventEntryPage() {
   // 드롭다운/선택 정보에 표시할 부가 정보: 동호인은 등급, 선수는 연령부서
   function memberMeta(m) {
     if (!m) return ''
-    if (m.member_type === '선수') return ageGroupOf(m.birthdate, eventYear) || '선수'
+    if (m.member_type === '선수') return ageGroupOf(m.birth_year, eventYear) || '선수'
     return m.grade || '-'
   }
 
