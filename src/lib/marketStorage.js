@@ -5,7 +5,7 @@ const BUCKET = 'market-images'
 const MAX_SIZE_MB = 5
 
 // 이미지 리사이즈 + JPEG 변환 (용량 절감)
-function resizeImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) {
+export function resizeImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) {
   return new Promise((resolve) => {
     const img = new Image()
     img.onload = () => {
