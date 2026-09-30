@@ -4,11 +4,14 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import NotificationBell from '../components/NotificationBell'
 import NotificationOptIn from '../components/NotificationOptIn'
+import HomePopup from '../components/HomePopup'
 
 export default function HomePage() {
   const navigate = useNavigate()
   const [banners, setBanners] = useState([])
   const [upcomingEvents, setUpcomingEvents] = useState([])
+  // 팝업이 끝난 뒤에 알림 권유 모달을 띄워 두 모달이 겹치지 않게 함
+  const [popupDone, setPopupDone] = useState(false)
 
   useEffect(() => {
     fetchBanners()
@@ -97,8 +100,9 @@ export default function HomePage() {
       {/* 본문 */}
       <div style={{ maxWidth: 512, margin: '0 auto', padding: '16px 16px 80px' }}>
 
-        {/* 알림 미설정 사용자에게 노출 */}
-        <NotificationOptIn />
+        {/* 메인 팝업 → 닫힌 뒤 알림 미설정 사용자에게 알림 권유 */}
+        <HomePopup onDone={() => setPopupDone(true)} />
+        {popupDone && <NotificationOptIn />}
 
         {/* 다가오는 대회 */}
         {upcomingEvents.length > 0 && (

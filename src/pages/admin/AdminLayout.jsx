@@ -18,6 +18,7 @@ import UploadAdmin from './UploadAdmin'
 import AdminBoardPage from './AdminBoardPage'
 import AdminTeamEntryPage from './AdminTeamEntryPage'
 import SponsorAdmin from './SponsorAdmin'
+import PopupAdmin from './PopupAdmin'
 import AdminManagerPage from './AdminManagerPage'
 import AdminLogsPage from './AdminLogsPage'
 import AccessLogAdmin from './AccessLogAdmin'
@@ -75,6 +76,7 @@ const TAB_GROUPS = [
     label: '📢 공지',
     subs: [
       { path: '/admin/notices', label: '공지 관리' },
+      { path: '/admin/popups', label: '🪧 메인 팝업' },
       { path: '/admin/board', label: '게시판' },
       { path: '/admin/sponsors', label: '스폰서 배너' },
       { path: '/admin/push', label: '🔔 푸시 알림' },
@@ -264,6 +266,7 @@ export default function AdminLayout() {
             <Route path="notices"          element={<NoticeAdmin />} />
             <Route path="board"            element={<AdminBoardPage />} />
             <Route path="sponsors"         element={<SponsorAdmin />} />
+            <Route path="popups"           element={<PopupAdmin />} />
             <Route path="managers"         element={<AdminManagerPage />} />
             <Route path="logs"             element={<AdminLogsPage />} />
             <Route path="access-log"       element={<AccessLogAdmin />} />
