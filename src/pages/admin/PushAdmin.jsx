@@ -139,9 +139,16 @@ export default function PushAdmin() {
     if (/{[a-z_]+}/.test(title) || /{[a-z_]+}/.test(body)) { showToast?.('대회 또는 공지를 선택해 변수를 채워주세요.', 'error'); setConfirmModal(false); return }
     setConfirmModal(false); setSending(true)
     try {
+      // 발송 함수는 관리자 로그인 토큰을 확인한다 (공개 키로는 발송 불가)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('관리자 로그인이 필요합니다.')
       const res = await fetch(`${SUPABASE_URL}/functions/v1/push-send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
         body: JSON.stringify({ title, body, url }),
       })
       const json = await res.json()

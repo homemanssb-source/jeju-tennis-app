@@ -23,6 +23,19 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
 
+  // 관리자만 발송 가능: 로그인 토큰의 이메일이 admin_users 에 있어야 함
+  const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
+  const { data: userData } = token ? await supabase.auth.getUser(token) : { data: { user: null } }
+  const email = userData?.user?.email
+  const { data: adminRow } = email
+    ? await supabase.from('admin_users').select('id').eq('email', email).maybeSingle()
+    : { data: null }
+  if (!adminRow) {
+    return new Response(JSON.stringify({ error: '관리자만 발송할 수 있습니다.' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
   try {
     const { title, body, url = '/' } = await req.json()
     if (!title || !body) {

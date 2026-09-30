@@ -44,7 +44,7 @@ function PinModal({ open, onClose, onVerified }) {
       showToast(data?.message || '인증 실패. 이름 또는 PIN을 확인해주세요.', 'error')
       return
     }
-    onVerified(data)
+    onVerified({ ...data, name: data.name || name.trim(), pin })
   }
 
   if (!open) return null
@@ -207,22 +207,15 @@ function PostForm({ member, editPost, onClose, onSaved }) {
     if (form.price === '' || isNaN(Number(form.price))) { showToast('가격을 입력해주세요.', 'error'); return }
     if (!form.content.trim())                       { showToast('설명을 입력해주세요.', 'error'); return }
     setSaving(true)
-    const payload = {
-      member_id: member.member_id, author_name: member.name, club: member.club || '',
-      title: form.title.trim(), content: form.content.trim(),
-      price: Number(form.price), category: form.category,
-      condition: form.condition, images: form.images,
-    }
-    let error
-    if (editPost) {
-      ;({ error } = await supabase.from('market_posts')
-        .update({ ...payload, updated_at: new Date().toISOString() })
-        .eq('post_id', editPost.post_id))
-    } else {
-      ;({ error } = await supabase.from('market_posts').insert(payload))
-    }
+    // 본인 확인(이름+PIN)·소유자 확인은 서버에서
+    const { data, error } = await supabase.rpc('rpc_market_save_post', {
+      p_name: member.name, p_pin: member.pin, p_post_id: editPost?.post_id ?? null,
+      p_title: form.title.trim(), p_content: form.content.trim(),
+      p_price: Number(form.price), p_category: form.category,
+      p_condition: form.condition, p_images: form.images,
+    })
     setSaving(false)
-    if (error) { showToast('저장 실패: ' + error.message, 'error'); return }
+    if (error || !data?.ok) { showToast('저장 실패: ' + (data?.message || error?.message || '오류'), 'error'); return }
     showToast(editPost ? '수정 완료!' : '게시물 등록 완료!')
     onSaved(); onClose()
   }
@@ -322,17 +315,16 @@ function PostDetail({ post: initialPost, member, onClose, onUpdated }) {
   const images  = post.images || []
 
   useEffect(() => { fetchComments(); fetchLikes() }, [post.post_id])
+  // PIN 인증 후 본인이 볼 수 있는 비밀 댓글까지 다시 불러옴
+  useEffect(() => { if (commentMember) fetchComments() }, [commentMember])
 
   async function fetchComments() {
-    const { data } = await supabase.from('market_comments')
-      .select('*').eq('post_id', post.post_id).order('created_at')
-    // 비밀 댓글 필터: 본인(판매자 or 작성자)만 열람
-    const visible = (data || []).filter(c => {
-      if (!c.is_private) return true
-      if (!member) return false
-      return c.member_id === member.member_id || member.member_id === post.member_id
+    // 비밀 댓글은 서버가 작성자·판매자에게만 보냄
+    const viewer = commentMember || member
+    const { data } = await supabase.rpc('rpc_market_comments', {
+      p_post_id: post.post_id, p_name: viewer?.name ?? null, p_pin: viewer?.pin ?? null,
     })
-    setComments(visible)
+    setComments(Array.isArray(data) ? data : [])
   }
 
   async function fetchLikes() {
@@ -347,41 +339,43 @@ function PostDetail({ post: initialPost, member, onClose, onUpdated }) {
   }
 
   async function handleLike(m) {
-    if (liked) {
-      await supabase.from('market_likes').delete()
-        .eq('post_id', post.post_id).eq('member_id', m.member_id)
-      setLiked(false); setLikeCount(prev => Math.max(0, prev - 1))
-    } else {
-      await supabase.from('market_likes').insert({ post_id: post.post_id, member_id: m.member_id })
-      setLiked(true); setLikeCount(prev => prev + 1)
-    }
+    const { data, error } = await supabase.rpc('rpc_market_toggle_like', {
+      p_name: m.name, p_pin: m.pin, p_post_id: post.post_id,
+    })
+    if (error || !data?.ok) { showToast(data?.message || '처리 실패', 'error'); return }
+    setLiked(data.liked)
+    setLikeCount(prev => data.liked ? prev + 1 : Math.max(0, prev - 1))
   }
 
   async function submitComment() {
     if (!commentText.trim() || !commentMember) return
     setSubmitting(true)
-    const { error } = await supabase.from('market_comments').insert({
-      post_id: post.post_id, member_id: commentMember.member_id,
-      author_name: commentMember.name, content: commentText.trim(),
-      is_private: isPrivate,
+    const { data, error } = await supabase.rpc('rpc_market_add_comment', {
+      p_name: commentMember.name, p_pin: commentMember.pin, p_post_id: post.post_id,
+      p_content: commentText.trim(), p_is_private: isPrivate,
     })
     setSubmitting(false)
-    if (error) { showToast('댓글 등록 실패', 'error'); return }
+    if (error || !data?.ok) { showToast(data?.message || '댓글 등록 실패', 'error'); return }
     setCommentText('')
     fetchComments()
   }
 
   async function handleDeleteComment(cid) {
-    await supabase.from('market_comments').delete().eq('comment_id', cid)
+    const who = commentMember || member
+    if (!who?.pin) { setPinTarget('comment'); return }
+    const { data, error } = await supabase.rpc('rpc_market_delete_comment', {
+      p_name: who.name, p_pin: who.pin, p_comment_id: cid,
+    })
+    if (error || !data?.ok) { showToast(data?.message || '삭제 실패', 'error'); return }
     fetchComments()
   }
 
   async function handleStatusChange(m, newStatus) {
     if (m.member_id !== post.member_id) { showToast('본인 게시물만 변경 가능합니다.', 'error'); return }
-    const { error } = await supabase.from('market_posts')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq('post_id', post.post_id)
-    if (error) { showToast('상태 변경 실패', 'error'); return }
+    const { data, error } = await supabase.rpc('rpc_market_set_status', {
+      p_name: m.name, p_pin: m.pin, p_post_id: post.post_id, p_status: newStatus,
+    })
+    if (error || !data?.ok) { showToast(data?.message || '상태 변경 실패', 'error'); return }
     setPost(p => ({ ...p, status: newStatus }))
     setShowStatusMenu(false); setPinTarget(null)
     showToast('상태가 변경되었습니다.')
@@ -390,9 +384,10 @@ function PostDetail({ post: initialPost, member, onClose, onUpdated }) {
 
   async function handleDelete(m) {
     if (m.member_id !== post.member_id) { showToast('본인 게시물만 삭제 가능합니다.', 'error'); return }
-    for (const url of images) await deleteMarketImage(url)
-    const { error } = await supabase.from('market_posts').delete().eq('post_id', post.post_id)
-    if (error) { showToast('삭제 실패', 'error'); return }
+    const { data, error } = await supabase.rpc('rpc_market_delete_post', {
+      p_name: m.name, p_pin: m.pin, p_post_id: post.post_id,
+    })
+    if (error || !data?.ok) { showToast(data?.message || '삭제 실패', 'error'); return }
     showToast('게시물이 삭제되었습니다.')
     onUpdated(); onClose()
   }
