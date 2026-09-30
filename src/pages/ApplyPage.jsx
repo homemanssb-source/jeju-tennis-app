@@ -23,6 +23,7 @@ export default function ApplyPage() {
   const [pin, setPin]               = useState('')
   const [myEntries, setMyEntries]   = useState([])
   const [myName, setMyName]         = useState('')
+  const [myMemberId, setMyMemberId] = useState('')
   const [myLoading, setMyLoading]   = useState(false)
   const [myError, setMyError]       = useState('')
   const [mySearched, setMySearched] = useState(false)
@@ -139,18 +140,9 @@ export default function ApplyPage() {
 
   // ── 내 단체전 신청 조회 ──
   // 대표자(captain_name)이거나 선수 명단(member_id)에 포함된 팀 모두 조회
-  async function fetchMyTeamEntries(cleanPhone, cleanPin) {
-    // 1) 전화번호로 이름 조회
-    const { data: memberRow } = await supabase
-      .from('members')
-      .select('member_id, name')
-      .eq('phone', cleanPhone)
-      .single()
-
-    if (!memberRow) { setMyTeamEntries([]); return }
-
-    const myName     = memberRow.name
-    const myMemberId = memberRow.member_id
+  // myMemberId/myName 은 rpc_get_my_entries(전화번호+PIN 확인)가 돌려준 본인 정보
+  async function fetchMyTeamEntries(myMemberId, myName) {
+    if (!myMemberId) { setMyTeamEntries([]); return }
 
     // 2) captain_name으로 팀 조회 + member_id로 팀 조회 병렬
     const [captainResult, memberResult] = await Promise.all([
@@ -281,21 +273,20 @@ export default function ApplyPage() {
     if (!rosterEditPinVerified) { showToast('대표자 PIN 인증이 필요합니다.', 'error'); return }
     if (rosterEditMembers.length === 0) { showToast('선수를 1명 이상 등록해주세요.', 'error'); return }
     setRosterEditSaving(true)
-    const entryId = rosterEditTarget.id
-    const { error: delErr } = await supabase.from('team_event_members').delete().eq('entry_id', entryId)
-    if (delErr) { showToast('저장 실패: ' + delErr.message, 'error'); setRosterEditSaving(false); return }
-    const { error: insErr } = await supabase.from('team_event_members').insert(
-      rosterEditMembers.map((m, i) => ({
-        entry_id: entryId, member_id: m.member_id || null,
-        member_name: m.member_name, gender: m.gender || '',
-        grade: m.grade || '', member_order: i + 1,
-      }))
-    )
+    // 대표자 PIN 확인·마감·중복·활성 회원 검증은 서버에서
+    const { data, error } = await supabase.rpc('rpc_update_team_roster_v2', {
+      p_entry_id:     rosterEditTarget.id,
+      p_captain_name: rosterEditTarget.captain_name || '',
+      p_captain_pin:  rosterEditPin,
+      p_members:      rosterEditMembers.map(m => ({ member_id: m.member_id, name: m.member_name })),
+    })
     setRosterEditSaving(false)
-    if (insErr) { showToast('저장 실패: ' + insErr.message, 'error'); return }
+    if (error || !data?.ok) {
+      showToast('저장 실패: ' + (data?.message || error?.message || '오류'), 'error'); return
+    }
     showToast('✅ 선수 명단이 수정되었습니다.')
     closeRosterEdit()
-    await fetchMyTeamEntries(phone.replace(/[^0-9]/g, ''), pin)
+    await fetchMyTeamEntries(myMemberId, myName)
   }
 
   async function handleMySearch() {
@@ -307,49 +298,30 @@ export default function ApplyPage() {
 
     const cleanPhone = phone.replace(/[^0-9]/g, '')
 
-    // 1단계: 전화번호로 회원 조회 → 이름 확보 → PIN 검증
-    const { data: memberRow } = await supabase
-      .from('members')
-      .select('member_id, name')
-      .eq('phone', cleanPhone)
-      .single()
-
-    if (!memberRow) {
-      setMyLoading(false)
-      setMySearched(true)
-      setMyError('등록된 전화번호가 아닙니다.')
-      setMyEntries([])
-      setMyTeamEntries([])
-      return
-    }
-
-    const { data: pinData } = await supabase.rpc('rpc_verify_member_pin', {
-      p_name: memberRow.name,
-      p_pin: pin,
+    // 전화번호+PIN 본인 확인과 개인전 내역 조회를 서버에서 한 번에
+    // (회원 원본의 전화번호는 공개 조회가 막혀 있다)
+    const { data: entriesData, error: entriesError } = await supabase.rpc('rpc_get_my_entries', {
+      p_phone: cleanPhone, p_pin: pin,
     })
 
-    if (!pinData?.ok) {
+    if (entriesError || !entriesData?.ok) {
       setMyLoading(false)
       setMySearched(true)
-      setMyError(pinData?.message || 'PIN이 올바르지 않습니다.')
+      setMyError(entriesData?.message || entriesError?.message || 'PIN이 올바르지 않습니다.')
       setMyEntries([])
       setMyTeamEntries([])
+      setMyMemberId('')
       return
     }
 
-    // 2단계: PIN 인증 성공 → 개인전 + 단체전 병렬 조회
-    const [entriesResult, teamResult] = await Promise.all([
-      supabase.rpc('rpc_get_my_entries', { p_phone: cleanPhone, p_pin: pin }),
-      fetchMyTeamEntries(cleanPhone, pin),
-    ])
+    setMyMemberId(entriesData.member_id || '')
+    setMyName(entriesData.member_name || '')
+    // 단체전은 아래 단체전 목록(myTeamEntries)에서 따로 보여준다
+    setMyEntries((entriesData.entries || []).filter(e => e.entry_type !== 'team'))
+    await fetchMyTeamEntries(entriesData.member_id, entriesData.member_name)
 
     setMyLoading(false)
     setMySearched(true)
-
-    const { data: entriesData } = entriesResult
-    setMyName(entriesData?.member_name || memberRow.name || '')
-    // 단체전은 아래 단체전 목록(myTeamEntries)에서 따로 보여준다
-    setMyEntries((entriesData?.entries || []).filter(e => e.entry_type !== 'team'))
   }
 
   // ── 취소 가능 여부 판단 ──

@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 import BottomSheet from './BottomSheet'
 import { SkeletonLine } from './Skeleton'
 
+// 신고 내역 공개 조회 열 (회원 전화번호 제외)
+const REPORT_COLS = 'id, member_id, member_name, reported_at, tournament_name, tournament_date, tournament_type, tournament_division, result, before_grade, expected_grade, admin_applied, admin_applied_at, admin_note'
+
 export default function PlayerDetail({ memberId, open, onClose }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -24,7 +27,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
     const [{ data: result, error }, { data: extData }] = await Promise.all([
       supabase.rpc('get_member_history', { p_member_id: memberId, p_season_year: year }),
       supabase.from('external_report_log')
-        .select('*')
+        .select(REPORT_COLS)
         .eq('member_id', memberId)
         .order('tournament_date', { ascending: false }),
     ])

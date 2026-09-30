@@ -207,8 +207,18 @@ export default function RegisterPage() {
     return phoneNorm.replace(/^(\d{3})(\d{4})(\d{4})$/, '$1-$2-$3')
   }
 
+  // 전화번호 중복 확인 — 하이픈 유무와 관계없이 숫자만 비교 (서버 함수)
+  // 등록돼 있으면 { label: '홍*동 · 활성 회원' }, 없으면 null
+  async function checkPhoneRegistered(phoneNorm) {
+    const { data } = await supabase.rpc('rpc_check_phone_registered', { p_phone: phoneNorm })
+    if (!data?.registered) return null
+    const statusLabel =
+      data.status === '활성' ? '활성 회원' :
+      data.status === '휴면' ? '가입 대기 중' : data.status
+    return { label: `${data.masked_name} · ${statusLabel}` }
+  }
+
   // ✅ 전화번호 포커스 아웃 시 중복 체크
-  // DB에 하이픈 있음/없음 두 형식이 혼재하므로 둘 다 조회
   async function handlePhoneBlur() {
     const phoneNorm = normalizePhone(form.phone)
     if (phoneNorm.length < 10) return
@@ -217,22 +227,13 @@ export default function RegisterPage() {
     setPhoneDupError('')
     setPhoneOk(false)
 
-    const phoneWithDash = formatPhoneWithDash(phoneNorm)
-    const { data } = await supabase
-      .from('members')
-      .select('member_id, name, status')
-      .or(`phone.eq.${phoneNorm},phone.eq.${phoneWithDash}`)
-      .neq('status', '삭제')
-      .limit(1)
+    // 회원 전화번호는 공개 조회가 막혀 있어 서버 함수로 확인 (이름은 가려서 옴)
+    const dup = await checkPhoneRegistered(phoneNorm)
 
     setPhoneChecking(false)
 
-    if (data && data.length > 0) {
-      const m = data[0]
-      const statusLabel =
-        m.status === '활성' ? '활성 회원' :
-        m.status === '휴면' ? '가입 대기 중' : m.status
-      setPhoneDupError(`이미 등록된 전화번호입니다. (${m.name} · ${statusLabel})`)
+    if (dup) {
+      setPhoneDupError(`이미 등록된 전화번호입니다. (${dup.label})`)
       setPhoneOk(false)
     } else {
       setPhoneDupError('')
@@ -272,20 +273,10 @@ export default function RegisterPage() {
     const phoneNorm = normalizePhone(form.phone)
     const guardianNorm = normalizePhone(form.guardian_phone)
     if (phoneNorm) {
-      const phoneWithDash = formatPhoneWithDash(phoneNorm)
-      const { data: existing } = await supabase
-        .from('members')
-        .select('member_id, name, status')
-        .or(`phone.eq.${phoneNorm},phone.eq.${phoneWithDash}`)
-        .neq('status', '삭제')
-        .limit(1)
+      const dup = await checkPhoneRegistered(phoneNorm)
 
-      if (existing && existing.length > 0) {
-        const m = existing[0]
-        const statusLabel =
-          m.status === '활성' ? '활성 회원' :
-          m.status === '휴면' ? '가입 대기 중' : m.status
-        setPhoneDupError(`이미 등록된 전화번호입니다. (${m.name} · ${statusLabel})`)
+      if (dup) {
+        setPhoneDupError(`이미 등록된 전화번호입니다. (${dup.label})`)
         showToast?.('이미 등록된 전화번호입니다.', 'error')
         setSubmitting(false)
         return
