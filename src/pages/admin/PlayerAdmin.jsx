@@ -19,6 +19,14 @@ function fmtPhone(p) {
   return normPhone(p).replace(/^(\d{3})(\d{3,4})(\d{4})$/, '$1-$2-$3')
 }
 
+// 등록일 표시 (YYYY.MM.DD)
+function formatRegDate(v) {
+  if (!v) return '-'
+  const d = new Date(v)
+  if (isNaN(d)) return '-'
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+}
+
 export default function PlayerAdmin() {
   const showToast = useContext(ToastContext)
   const thisYear = new Date().getFullYear()
@@ -28,6 +36,7 @@ export default function PlayerAdmin() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterClub, setFilterClub] = useState('')
   const [filterGroup, setFilterGroup] = useState('')
+  const [sortBy, setSortBy] = useState('name') // name | reg_desc | reg_asc
   const [baseYear, setBaseYear] = useState(thisYear)
   const [clubs, setClubs] = useState([])
   const [selected, setSelected] = useState(new Set())
@@ -54,7 +63,8 @@ export default function PlayerAdmin() {
   const groupOf = p => ageGroupOf(p.birthdate, baseYear)
 
   const filtered = players.filter(p => {
-    if (filterStatus && p.status !== filterStatus) return false
+    // 삭제 선수는 상태 필터에서 '삭제'를 고를 때만 표시
+    if (filterStatus ? p.status !== filterStatus : p.status === '삭제') return false
     if (filterClub && p.club !== filterClub) return false
     if (filterGroup && (groupOf(p) || '미정') !== filterGroup) return false
     if (search) {
@@ -68,6 +78,16 @@ export default function PlayerAdmin() {
     }
     return true
   })
+
+  if (sortBy !== 'name') {
+    const dir = sortBy === 'reg_desc' ? -1 : 1
+    filtered.sort((a, b) => {
+      // 등록일 없는 선수는 항상 맨 뒤
+      if (!a.registered_at) return b.registered_at ? 1 : 0
+      if (!b.registered_at) return -1
+      return a.registered_at < b.registered_at ? -dir : a.registered_at > b.registered_at ? dir : 0
+    })
+  }
 
   // 연령부서별 인원 (삭제 제외)
   const groupCounts = {}
@@ -228,7 +248,13 @@ export default function PlayerAdmin() {
           <option value="">전체 상태</option>
           <option value="활성">활성</option>
           <option value="휴면">휴면(대기)</option>
-          <option value="삭제">삭제</option>
+          <option value="삭제">삭제 선수 보기</option>
+        </select>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+          className="text-sm border border-line rounded-lg px-3 py-2">
+          <option value="name">이름순</option>
+          <option value="reg_desc">최근 등록순</option>
+          <option value="reg_asc">오래된 등록순</option>
         </select>
       </div>
 
@@ -265,14 +291,15 @@ export default function PlayerAdmin() {
               <th className="px-3 py-2 text-left font-medium text-sub">소속</th>
               <th className="px-3 py-2 text-left font-medium text-sub">연락처 (본인 / 보호자)</th>
               <th className="px-3 py-2 text-left font-medium text-sub">상태</th>
+              <th className="px-3 py-2 text-left font-medium text-sub whitespace-nowrap">등록일</th>
               <th className="px-3 py-2 text-center font-medium text-sub">액션</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} className="text-center py-8 text-sub">로딩 중...</td></tr>
+              <tr><td colSpan={10} className="text-center py-8 text-sub">로딩 중...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={9} className="text-center py-8 text-sub">
+              <tr><td colSpan={10} className="text-center py-8 text-sub">
                 {players.length === 0 ? '등록된 선수가 없습니다.' : '결과 없음'}
               </td></tr>
             ) : filtered.map(p => {
@@ -299,7 +326,7 @@ export default function PlayerAdmin() {
                   <td className="px-3 py-2 text-sub font-mono text-xs whitespace-nowrap">
                     {fmtPhone(p.phone)} / {fmtPhone(p.guardian_phone)}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 whitespace-nowrap">
                     <span className={`text-xs px-1.5 py-0.5 rounded ${
                       p.status === '활성' ? 'bg-green-50 text-green-700' :
                       p.status === '휴면' ? 'bg-yellow-50 text-yellow-700' :
@@ -307,7 +334,8 @@ export default function PlayerAdmin() {
                       'bg-gray-100 text-gray-500'
                     }`}>{p.status}</span>
                   </td>
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-3 py-2 text-xs text-sub whitespace-nowrap">{formatRegDate(p.registered_at)}</td>
+                  <td className="px-3 py-2 text-center whitespace-nowrap">
                     <div className="flex gap-1 justify-center">
                       <button onClick={() => openEdit(p)} className="text-xs text-accent hover:underline">수정</button>
                       {p.status !== '삭제' && (
@@ -372,6 +400,7 @@ export default function PlayerAdmin() {
                   className="w-full text-sm border border-line rounded-lg px-3 py-2">
                   <option value="활성">활성</option>
                   <option value="휴면">휴면(대기)</option>
+                  {form.status === '삭제' && <option value="삭제">삭제</option>}
                 </select>
               </div>
             </div>
