@@ -3,6 +3,7 @@ import { useState, useEffect, useContext, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 import BulkIndividualEntry from './BulkIndividualEntry'
+import { yearAge } from '../../lib/ageGroups'
 
 export default function EntryAdmin() {
   const showToast = useContext(ToastContext)
@@ -113,10 +114,10 @@ export default function EntryAdmin() {
     if (memberIds.length > 0) {
       const { data: membersData } = await supabase
         .from('members')
-        .select('member_id, name, club')
+        .select('member_id, name, club, gender, birthdate')
         .in('member_id', memberIds)
       for (const m of (membersData || [])) {
-        memberClubMap[m.member_id] = { name: m.name, club: m.club }
+        memberClubMap[m.member_id] = { name: m.name, club: m.club, gender: m.gender, birthdate: m.birthdate }
       }
     }
     // ★ 각 entry에 club 정보 첨부
@@ -162,12 +163,21 @@ export default function EntryAdmin() {
   }
 
   // ── 통합 목록 ──
+  const selectedEventDate = events.find(ev => String(ev.event_id) === String(selectedEventId))?.event_date
+  const eventYear = selectedEventDate ? parseInt(String(selectedEventDate).slice(0, 4), 10) : new Date().getFullYear()
   const allEntries = [
     ...entries.map(e => {
       // ★ "홍길동(제주하나)/홍길금(제주아라)" 형식 조합
       const p1 = e._m1 ? (e._m1.club ? `${e._m1.name}(${e._m1.club})` : e._m1.name) : ''
       const p2 = e._m2 ? (e._m2.club ? `${e._m2.name}(${e._m2.club})` : e._m2.name) : ''
       const displayName = p1 && p2 ? `${p1}/${p2}` : (p1 || e.teams?.team_name || '-')
+      const g = m => !m ? '' : (m.gender === 'M' || m.gender === '남') ? '남' : (m.gender === 'F' || m.gender === '여') ? '여' : ''
+      const g1 = g(e._m1), g2 = g(e._m2)
+      const genderLabel = e._m2 ? ((g1 || g2) ? `${g1 || '?'}/${g2 || '?'}` : '-') : (g1 || '-')
+      // 나이: 대회 연도 기준 연 나이 (부서 편성 기준과 동일)
+      const a = m => { const v = m ? yearAge(m.birthdate, eventYear) : null; return v === null ? '' : `${v}세` }
+      const a1 = a(e._m1), a2 = a(e._m2)
+      const ageLabel = e._m2 ? ((a1 || a2) ? `${a1 || '?'}/${a2 || '?'}` : '-') : (a1 || '-')
       return {
         id:             e.entry_id,
         type:           '개인',
@@ -176,6 +186,8 @@ export default function EntryAdmin() {
         status:         e.entry_status,
         payment_status: e.payment_status,
         date:           e.applied_at,
+        gender:         genderLabel,
+        age:            ageLabel,
         _source:        'individual',
         _raw:           e,
       }
@@ -762,6 +774,7 @@ export default function EntryAdmin() {
                 <th className="px-3 py-2 text-left text-sub font-medium whitespace-nowrap">부서</th>
                 <th className="px-3 py-2 text-left text-sub font-medium whitespace-nowrap">팀/클럽</th>
                 <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">성별</th>
+                <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">나이</th>
                 <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">상태</th>
                 <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">결제</th>
                 <th className="px-3 py-2 text-left text-sub font-medium whitespace-nowrap">신청일</th>
@@ -771,7 +784,7 @@ export default function EntryAdmin() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 text-sub">신청 내역 없음</td>
+                  <td colSpan={9} className="text-center py-8 text-sub">신청 내역 없음</td>
                 </tr>
               ) : filtered.map(e => (
                 <tr
@@ -787,10 +800,10 @@ export default function EntryAdmin() {
                   <td className="px-3 py-2 whitespace-nowrap">{e.division}</td>
                   <td className="px-3 py-2 font-medium">{e.name}</td>
                   <td className="px-3 py-2 text-center whitespace-nowrap">
-                    {e._source === 'team'
-                      ? <span className="text-xs text-gray-600">{e.gender || '-'}</span>
-                      : <span className="text-xs text-gray-400">-</span>
-                    }
+                    <span className="text-xs text-gray-600">{e.gender || '-'}</span>
+                  </td>
+                  <td className="px-3 py-2 text-center whitespace-nowrap">
+                    <span className="text-xs text-gray-600">{e.age || '-'}</span>
                   </td>
                   <td className="px-3 py-2 text-center whitespace-nowrap">
                     <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
