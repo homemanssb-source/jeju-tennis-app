@@ -342,7 +342,7 @@ export default function MemberAdmin() {
                 <td className="px-3 py-2">
                   <span className="px-1.5 py-0.5 bg-accentSoft text-accent text-xs rounded">{m.grade || '-'}</span>
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 whitespace-nowrap">
                   <span className={`text-xs px-1.5 py-0.5 rounded ${
                     m.status === '\uD65C\uC131' ? 'bg-green-50 text-green-700' :
                     m.status === '\uD734\uBA74' ? 'bg-yellow-50 text-yellow-700' :
@@ -351,7 +351,7 @@ export default function MemberAdmin() {
                   }`}>{m.status}</span>
                 </td>
                 <td className="px-3 py-2 text-xs text-sub whitespace-nowrap">{formatRegDate(m.registered_at)}</td>
-                <td className="px-3 py-2 text-center">
+                <td className="px-3 py-2 text-center whitespace-nowrap">
                   <div className="flex gap-1 justify-center">
                     <button onClick={() => openEdit(m)} className="text-xs text-accent hover:underline">{'\uC218\uC815'}</button>
                     <button onClick={() => openGrade(m)} className="text-xs text-purple-600 hover:underline">{'\uB4F1\uAE09'}</button>
