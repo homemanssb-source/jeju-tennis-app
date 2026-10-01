@@ -279,7 +279,7 @@ export default function PlayerAdmin() {
       <div className="bg-white rounded-lg border border-line overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-soft2">
-            <tr>
+            <tr className="whitespace-nowrap">
               <th className="px-2 py-2 text-center w-8">
                 <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0}
                   onChange={toggleSelectAll} className="rounded" />
@@ -311,8 +311,8 @@ export default function PlayerAdmin() {
                     <input type="checkbox" checked={selected.has(p.member_id)}
                       onChange={() => toggleSelect(p.member_id)} className="rounded" />
                   </td>
-                  <td className="px-3 py-2 font-medium">{p.display_name || p.name}</td>
-                  <td className="px-3 py-2 text-sub">{p.gender || '-'}</td>
+                  <td className="px-3 py-2 font-medium whitespace-nowrap">{p.display_name || p.name}</td>
+                  <td className="px-3 py-2 text-sub whitespace-nowrap">{p.gender || '-'}</td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {p.birthdate || '-'}
                     {age !== null && <span className="ml-1 text-xs text-sub">(만 {age}세)</span>}
@@ -322,7 +322,7 @@ export default function PlayerAdmin() {
                       ? <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-xs rounded whitespace-nowrap">{group}</span>
                       : <span className="text-xs text-gray-400">미정</span>}
                   </td>
-                  <td className="px-3 py-2 text-sub">{p.club || '-'}</td>
+                  <td className="px-3 py-2 text-sub whitespace-nowrap">{p.club || '-'}</td>
                   <td className="px-3 py-2 text-sub font-mono text-xs whitespace-nowrap">
                     {fmtPhone(p.phone)} / {fmtPhone(p.guardian_phone)}
                   </td>
