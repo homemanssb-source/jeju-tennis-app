@@ -22,7 +22,7 @@ export default function UploadAdmin() {
       const wb = XLSX.read(evt.target.result, { type: 'array', cellDates: false, raw: true })
       const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: true })
 
-      const PHONE_KEYS = ['전화번호', '휴대폰', '연락처']
+      const PHONE_KEYS = ['전화번호', '휴대폰', '연락처', '보호자연락처', '선수연락처(선택)', '선수연락처']
       const normalized = data.map(row => {
         const r = { ...row }
         PHONE_KEYS.forEach(key => {
@@ -40,7 +40,7 @@ export default function UploadAdmin() {
           r['등급'] = r['등급'].toString().replace('점', '').trim()
         }
         return r
-      })
+      }).filter(r => Object.values(r).some(v => v !== '' && v !== null && v !== undefined)) // 빈 행 제외
 
       setPreview(normalized)
     }
@@ -79,6 +79,61 @@ export default function UploadAdmin() {
       }])
       if (error) errorList.push(`${name}: ${error.message}`)
       else successList.push(`${name} (${phone}) → ${division}`)
+    }
+    setResult({ successList, skippedList, errorList })
+    setUploading(false)
+    showToast?.(`완료: ${successList.length}명 추가`)
+  }
+
+  // 생년월일: 엑셀 날짜(일련번호) / 2014-03-05 / 2014.3.5 / 2014/3/5 / 20140305 → YYYY-MM-DD
+  function parseBirthdate(v) {
+    if (v === '' || v === null || v === undefined) return ''
+    if (typeof v === 'number' && v > 10000 && v < 100000) {
+      const d = new Date(Date.UTC(1899, 11, 30) + v * 86400000)
+      return d.toISOString().slice(0, 10)
+    }
+    const str = v.toString().trim()
+    let m = str.match(/^(\d{4})[-./\s]+(\d{1,2})[-./\s]+(\d{1,2})\.?$/)
+    if (!m) m = str.match(/^(\d{4})(\d{2})(\d{2})$/)
+    if (!m) return ''
+    const iso = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
+    const d = new Date(iso)
+    return isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso ? '' : iso
+  }
+
+  async function uploadPlayers() {
+    if (!preview.length) { showToast?.('파일을 선택해주세요.', 'error'); return }
+    setUploading(true)
+    let successList = [], skippedList = [], errorList = []
+
+    for (const row of preview) {
+      const name = (row['이름'] || '').toString().trim()
+      if (!name) { skippedList.push('빈 행 건너뜀'); continue }
+      const genderRaw = (row['성별(남/여)'] || row['성별'] || '').toString().trim()
+      const gender = ['남', 'M', 'm', '남자'].includes(genderRaw) ? '남'
+        : ['여', 'F', 'f', '여자'].includes(genderRaw) ? '여' : ''
+      const birthRaw = row['생년월일(YYYY-MM-DD)'] ?? row['생년월일'] ?? ''
+      const birthdate = parseBirthdate(birthRaw)
+      const club = (row['소속클럽'] || row['소속'] || '').toString().trim()
+      const guardian = (row['보호자연락처'] || '').toString().trim()
+      const phone = (row['선수연락처(선택)'] || row['선수연락처'] || '').toString().trim()
+
+      if (!gender) { skippedList.push(`${name}: 성별 확인 필요 (남/여)`); continue }
+      if (!birthdate) { skippedList.push(`${name}: 생년월일 형식 확인 (${birthRaw || '빈칸'})`); continue }
+      if (!club) { skippedList.push(`${name}: 소속클럽 누락`); continue }
+      if (guardian.length < 10) { skippedList.push(`${name}: 보호자연락처 확인 (${guardian || '빈칸'})`); continue }
+
+      // 선수등록 화면과 같은 RPC — 검증·PIN·중복 전화번호 체크·상태(활성) 동일 적용
+      const { data, error } = await supabase.rpc('rpc_register_member', {
+        p_name: name, p_gender: gender, p_phone: phone || null, p_guardian_phone: guardian,
+        p_club: club, p_member_type: '선수', p_division: null, p_grade: null, p_birthdate: birthdate,
+      })
+      if (error) errorList.push(`${name}: ${error.message}`)
+      else if (!data?.ok) {
+        if (data?.code === 'duplicate_phone') skippedList.push(`${name} (${phone}): 이미 등록된 전화번호`)
+        else errorList.push(`${name}: ${data?.message || '등록 실패'}`)
+      }
+      else successList.push(`${name} (${birthdate}, ${club})`)
     }
     setResult({ successList, skippedList, errorList })
     setUploading(false)
@@ -309,6 +364,10 @@ export default function UploadAdmin() {
           className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'member' ? 'bg-accent text-white' : 'bg-white border border-line text-sub'}`}>
           👥 회원 일괄 등록
         </button>
+        <button onClick={() => { setTab('player'); reset() }}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'player' ? 'bg-accent text-white' : 'bg-white border border-line text-sub'}`}>
+          🎾 선수 일괄 등록
+        </button>
         <button onClick={() => { setTab('result'); reset() }}
           className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'result' ? 'bg-accent text-white' : 'bg-white border border-line text-sub'}`}>
           🏆 대회결과 등록
@@ -320,6 +379,14 @@ export default function UploadAdmin() {
           <>
             <p className="font-semibold">회원 일괄 등록</p>
             <p>필수: 이름, 전화번호(또는 휴대폰), 소속클럽, 랭킹부서</p>
+          </>
+        ) : tab === 'player' ? (
+          <>
+            <p className="font-semibold">학생선수 일괄 등록</p>
+            <p>필수: 이름, 성별(남/여), 생년월일, 소속클럽, 보호자연락처 · 선택: 선수연락처</p>
+            <p>등록 즉시 '활성' 상태, PIN은 선수연락처(없으면 보호자연락처) 뒷 6자리입니다.</p>
+            <a href="/templates/player_bulk_template.xlsx" download="선수일괄등록_양식.xlsx"
+              className="inline-block mt-1 text-accent font-semibold hover:underline">📥 양식 다운로드</a>
           </>
         ) : (
           <>
@@ -382,7 +449,7 @@ export default function UploadAdmin() {
 
       {preview.length > 0 && !result && (
         <button
-          onClick={tab === 'member' ? uploadMembers : uploadResults}
+          onClick={tab === 'member' ? uploadMembers : tab === 'player' ? uploadPlayers : uploadResults}
           disabled={uploading}
           className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm hover:bg-blue-700 disabled:opacity-50">
           {uploading ? '업로드 중...' : `📤 ${preview.length}건 업로드 실행`}
