@@ -87,6 +87,14 @@ function ClubComboBox({ value, onChange, clubs }) {
   )
 }
 
+// 등록일 표시 (YYYY.MM.DD). 초기 일괄 업로드 회원은 업로드 날짜가 들어가 있음
+function formatRegDate(v) {
+  if (!v) return '-'
+  const d = new Date(v)
+  if (isNaN(d)) return '-'
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+}
+
 export default function MemberAdmin() {
   const showToast = useContext(ToastContext)
   const [members, setMembers] = useState([])
@@ -95,6 +103,7 @@ export default function MemberAdmin() {
   const [filterDiv, setFilterDiv] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterClub, setFilterClub] = useState('')
+  const [sortBy, setSortBy] = useState('name') // name | reg_desc | reg_asc
   const [divisions, setDivisions] = useState([])
   const [clubs, setClubs] = useState([])
   const [selected, setSelected] = useState(new Set())
@@ -127,7 +136,8 @@ export default function MemberAdmin() {
   }
 
   const filtered = members.filter(m => {
-    if (filterStatus && m.status !== filterStatus) return false
+    // 삭제 회원은 상태 필터에서 '삭제'를 고를 때만 표시
+    if (filterStatus ? m.status !== filterStatus : m.status === '삭제') return false
     if (filterDiv && m.division !== filterDiv) return false
     if (filterClub && m.club !== filterClub) return false
     if (search) {
@@ -139,6 +149,16 @@ export default function MemberAdmin() {
     }
     return true
   })
+
+  if (sortBy !== 'name') {
+    const dir = sortBy === 'reg_desc' ? -1 : 1
+    filtered.sort((a, b) => {
+      // 등록일 없는 회원은 항상 맨 뒤
+      if (!a.registered_at) return b.registered_at ? 1 : 0
+      if (!b.registered_at) return -1
+      return a.registered_at < b.registered_at ? -dir : a.registered_at > b.registered_at ? dir : 0
+    })
+  }
 
   function toggleSelect(id) {
     const s = new Set(selected)
@@ -219,7 +239,7 @@ export default function MemberAdmin() {
   const totalCount   = members.filter(m => m.status !== '\uC0AD\uC81C').length
   const activeCount  = members.filter(m => m.status === '\uD65C\uC131').length
   const dormantCount = members.filter(m => m.status === '\uD734\uBA74').length
-  const isFiltered   = filtered.length !== members.length
+  const isFiltered   = !!(search || filterDiv || filterClub || filterStatus)
 
   return (
     <div>
@@ -257,7 +277,13 @@ export default function MemberAdmin() {
           <option value="">{'\uC804\uCCB4 \uC0C1\uD0DC'}</option>
           <option value={'\uD65C\uC131'}>{'\uD65C\uC131'}</option>
           <option value={'\uD734\uBA74'}>{'\uD734\uBA74'}</option>
-          <option value={'\uC0AD\uC81C'}>{'\uC0AD\uC81C'}</option>
+          <option value={'\uC0AD\uC81C'}>{'\uC0AD\uC81C \uD68C\uC6D0 \uBCF4\uAE30'}</option>
+        </select>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+          className="text-sm border border-line rounded-lg px-3 py-2">
+          <option value="name">{'\uC774\uB984\uC21C'}</option>
+          <option value="reg_desc">{'\uCD5C\uADFC \uB4F1\uB85D\uC21C'}</option>
+          <option value="reg_asc">{'\uC624\uB798\uB41C \uB4F1\uB85D\uC21C'}</option>
         </select>
       </div>
 
@@ -292,14 +318,15 @@ export default function MemberAdmin() {
               <th className="px-3 py-2 text-left font-medium text-sub">{'\uBD80\uC11C'}</th>
               <th className="px-3 py-2 text-left font-medium text-sub">{'\uB4F1\uAE09'}</th>
               <th className="px-3 py-2 text-left font-medium text-sub">{'\uC0C1\uD0DC'}</th>
+              <th className="px-3 py-2 text-left font-medium text-sub whitespace-nowrap">{'\uB4F1\uB85D\uC77C'}</th>
               <th className="px-3 py-2 text-center font-medium text-sub">{'\uC561\uC158'}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="text-center py-8 text-sub">{'\uB85C\uB529 \uC911...'}</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-sub">{'\uB85C\uB529 \uC911...'}</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-8 text-sub">{'\uACB0\uACFC \uC5C6\uC74C'}</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-sub">{'\uACB0\uACFC \uC5C6\uC74C'}</td></tr>
             ) : filtered.map(m => (
               <tr key={m.member_id} className={`border-t border-line hover:bg-soft ${selected.has(m.member_id) ? 'bg-blue-50/50' : ''}`}>
                 <td className="px-2 py-2 text-center">
@@ -323,6 +350,7 @@ export default function MemberAdmin() {
                     'bg-gray-100 text-gray-500'
                   }`}>{m.status}</span>
                 </td>
+                <td className="px-3 py-2 text-xs text-sub whitespace-nowrap">{formatRegDate(m.registered_at)}</td>
                 <td className="px-3 py-2 text-center">
                   <div className="flex gap-1 justify-center">
                     <button onClick={() => openEdit(m)} className="text-xs text-accent hover:underline">{'\uC218\uC815'}</button>
@@ -396,6 +424,7 @@ export default function MemberAdmin() {
                   className="w-full text-sm border border-line rounded-lg px-3 py-2">
                   <option value={'\uD65C\uC131'}>{'\uD65C\uC131'}</option>
                   <option value={'\uD734\uBA74'}>{'\uD734\uBA74'}</option>
+                  {form.status === '\uC0AD\uC81C' && <option value={'\uC0AD\uC81C'}>{'\uC0AD\uC81C'}</option>}
                 </select>
               </div>
             </div>
