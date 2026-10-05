@@ -2,7 +2,7 @@ import { useState, useEffect, useContext, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
-import { getMatchTypeLabel, resolveMatchType, resolveMemberLimit, filterTeamDivisions } from '../lib/teamMatch'
+import { getMatchTypeLabel, resolveMatchType, resolveMemberLimit, filterTeamDivisions, clubBaseKey } from '../lib/teamMatch'
 
 // 기존 신청 수에 따라 팀 suffix 반환: 0→'', 1→' B', 2→' C' ...
 function getTeamSuffix(count) {
@@ -16,6 +16,8 @@ export default function TeamEntryPage() {
   const [events, setEvents]                     = useState([])
   const [selectedEvent, setSelectedEvent]       = useState(null)
   const [divisions, setDivisions]               = useState([])
+  const [allDivisions, setAllDivisions]         = useState([])
+  const [clubDivisionLock, setClubDivisionLock] = useState(null)  // 이 클럽이 이미 신청한 '중복 제한' 부서
   const [selectedDivision, setSelectedDivision] = useState(null)
   const [captainName, setCaptainName]           = useState('')
   const [captainPin, setCaptainPin]             = useState('')
@@ -78,6 +80,14 @@ export default function TeamEntryPage() {
 
   const memberLimit = resolveMemberLimit(selectedEvent, selectedDivision)
   const matchType   = resolveMatchType(selectedEvent, selectedDivision)
+
+  // 클럽대항전은 한 부서만 신청 가능 — 이미 다른 제한 부서에 신청했으면 이 부서는 막는다.
+  // (allow_multi_entry 부서는 성별이 다른 트랙이라 제한에서 빠진다.)
+  const divisionBlocked = !!(
+    clubDivisionLock && selectedDivision &&
+    !selectedDivision.allow_multi_entry &&
+    selectedDivision.division_id !== clubDivisionLock.division_id
+  )
   const finalClubName = clubBase.trim() + teamSuffix
 
   function getEntryAvailability(ev) {
@@ -97,7 +107,7 @@ export default function TeamEntryPage() {
   function handleEventChange(eventId) {
     const ev = events.find(e => e.event_id === eventId)
     setSelectedEvent(ev || null)
-    setSelectedDivision(null); setDivisions([])
+    setSelectedDivision(null); setDivisions([]); setAllDivisions([]); setClubDivisionLock(null)
     setCaptainVerified(null); setCaptainName(''); setCaptainPin('')
     setRoster([]); setClubBase(''); setTeamSuffix(''); setExistingCount(0)
     setSelectedClubs(new Set()); setClubChecked({})
@@ -110,26 +120,39 @@ export default function TeamEntryPage() {
       // select('*') — 마이그레이션 전이라도 부서 선택이 멈추지 않도록 (없는 컬럼은 undefined 로 들어와 대회 기본값 사용)
       .select('*')
       .eq('event_id', eventId).order('created_at')
+    const raw = data || []
+    setAllDivisions(raw)
     // '개인+팀' 대회에서 개인전 부서가 섞이지 않도록 팀전 부서만 노출
-    setDivisions(filterTeamDivisions(ev, data || []))
+    setDivisions(filterTeamDivisions(ev, raw))
   }
 
   // 같은 대회+부서에서 해당 클럽 기존 신청 수 조회
   async function checkExistingClubEntries(base, divisionId) {
-    if (!selectedEvent || !base.trim()) { setExistingCount(0); setTeamSuffix(''); return }
+    if (!selectedEvent || !base.trim()) {
+      setExistingCount(0); setTeamSuffix(''); setClubDivisionLock(null); return
+    }
     setCheckingClub(true)
-    let query = supabase.from('team_event_entries')
-      .select('id, club_name')
+    // 부서로 좁히지 않고 대회 전체를 받아온다 — 다른 부서 중복 신청까지 같이 봐야 한다.
+    const { data } = await supabase.from('team_event_entries')
+      .select('id, club_name, division_id')
       .eq('event_id', selectedEvent.event_id)
       .neq('status', 'cancelled')
-    if (divisionId) query = query.eq('division_id', divisionId)
 
-    const { data } = await query
-    // base와 같거나 base + ' X' 패턴인 것만 카운트
-    const regex = new RegExp(`^${base.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( [B-Z])?$`)
-    const count = (data || []).filter(e => regex.test((e.club_name || '').trim())).length
+    const key  = clubBaseKey(base)
+    const mine = (data || []).filter(e => clubBaseKey(e.club_name) === key)
+
+    // 같은 부서 기존 팀 수 → 자동 suffix(B, C…)
+    const count = divisionId
+      ? mine.filter(e => e.division_id === divisionId).length
+      : mine.length
     setExistingCount(count)
     setTeamSuffix(getTeamSuffix(count))
+
+    // 이미 '중복 제한' 부서에 신청했다면 그 부서로 고정된다.
+    const locked = mine
+      .map(e => allDivisions.find(d => d.division_id === e.division_id))
+      .find(d => d && !d.allow_multi_entry)
+    setClubDivisionLock(locked || null)
     setCheckingClub(false)
   }
 
@@ -250,6 +273,10 @@ export default function TeamEntryPage() {
   async function handleSubmit() {
     if (!selectedEvent) { showToast?.('대회를 선택해주세요.', 'error'); return }
     if (divisions.length > 0 && !selectedDivision) { showToast?.('부서를 선택해주세요.', 'error'); return }
+    if (divisionBlocked) {
+      showToast?.(`이미 ${clubDivisionLock.division_name}에 신청한 클럽입니다. 클럽대항전은 한 부서만 신청할 수 있습니다.`, 'error')
+      return
+    }
     if (!captainVerified) { showToast?.('주장 본인인증을 해주세요.', 'error'); return }
     if (!finalClubName.trim()) { showToast?.('클럽명을 입력해주세요.', 'error'); return }
     if (roster.length === 0) { showToast?.('선수를 1명 이상 추가해주세요.', 'error'); return }
@@ -301,7 +328,7 @@ export default function TeamEntryPage() {
 
   function handleReset() {
     setSubmitted(false); setSubmittedInfo(null)
-    setSelectedEvent(null); setSelectedDivision(null); setDivisions([])
+    setSelectedEvent(null); setSelectedDivision(null); setDivisions([]); setAllDivisions([]); setClubDivisionLock(null)
     setCaptainVerified(null); setCaptainName(''); setCaptainPin('')
     setRoster([]); setClubBase(''); setTeamSuffix(''); setExistingCount(0)
     setSelectedClubs(new Set()); setClubChecked({})
@@ -496,14 +523,20 @@ export default function TeamEntryPage() {
                   <option value="">부서를 선택하세요</option>
                   {divisions.map(d => {
                     const mt = getMatchTypeLabel(resolveMatchType(selectedEvent, d))
+                    // 한 부서만 신청 가능 — 이미 신청한 제한 부서가 있으면 나머지 제한 부서는 잠근다
+                    const locked = !!(
+                      clubDivisionLock &&
+                      !d.allow_multi_entry &&
+                      d.division_id !== clubDivisionLock.division_id
+                    )
                     return (
-                      <option key={d.division_id} value={d.division_id}>
-                        {d.division_name}{mt !== '-' ? ` · ${mt}` : ''}
+                      <option key={d.division_id} value={d.division_id} disabled={locked}>
+                        {d.division_name}{mt !== '-' ? ` · ${mt}` : ''}{locked ? ' — 신청 불가' : ''}
                       </option>
                     )
                   })}
                 </select>
-                {selectedDivision && (
+                {selectedDivision && !divisionBlocked && (
                   <div className="flex flex-wrap gap-1 mt-1.5">
                     {matchType && (
                       <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded">
@@ -515,11 +548,32 @@ export default function TeamEntryPage() {
                     </span>
                   </div>
                 )}
+
+                {/* 한 클럽은 한 부서만 — 이미 신청한 부서가 있을 때 */}
+                {divisionBlocked ? (
+                  <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-sm font-medium text-red-700">
+                      🔒 <b>{clubBase.trim()}</b>은 이미 <b>{clubDivisionLock.division_name}</b>에 신청했습니다.
+                    </p>
+                    <p className="text-xs text-red-600 mt-1">
+                      클럽대항전은 한 클럽이 한 부서만 신청할 수 있습니다. 경기 요일이 달라도 다른 부서에는 신청할 수 없습니다.
+                    </p>
+                    <button type="button"
+                      onClick={() => handleDivisionChange(clubDivisionLock.division_id)}
+                      className="mt-2 text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg">
+                      {clubDivisionLock.division_name}로 이동
+                    </button>
+                  </div>
+                ) : clubDivisionLock && selectedDivision?.division_id === clubDivisionLock.division_id ? (
+                  <p className="text-xs text-amber-700 mt-1.5">
+                    ℹ️ 이 클럽은 <b>{clubDivisionLock.division_name}</b>에 신청되어 있습니다. 다른 부서에는 신청할 수 없고, 같은 부서에 추가 팀만 신청할 수 있습니다.
+                  </p>
+                ) : null}
               </div>
             )}
 
             {/* 주장 인증 */}
-            {(divisions.length === 0 || selectedDivision) && (
+            {(divisions.length === 0 || selectedDivision) && !divisionBlocked && (
               <div className="bg-soft rounded-lg p-3 space-y-2">
                 <p className="text-xs font-medium text-gray-700">대표(주장) 본인인증</p>
                 <p className="text-xs text-sub">🔐 PIN 초기값은 전화번호 뒷 6자리입니다.</p>
@@ -745,7 +799,7 @@ export default function TeamEntryPage() {
             {/* 신청 버튼 */}
             {captainVerified && finalClubName.trim() && (
               <button onClick={handleSubmit}
-                disabled={submitting || roster.length === 0}
+                disabled={submitting || roster.length === 0 || divisionBlocked}
                 className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm
                   hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 {submitting ? '신청 중..' : `🎾 팀전 참가 신청 (${roster.length}명)`}

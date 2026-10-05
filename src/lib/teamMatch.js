@@ -34,3 +34,9 @@ export function hasMixedMatchType(event, divisions) {
   const set = new Set((divisions || []).map(d => resolveMatchType(event, d)).filter(Boolean))
   return set.size > 1
 }
+
+// SQL 의 public.team_club_base() 와 같은 기준으로 클럽명을 정규화한다.
+// 자동 팀 suffix(' B' ~ ' Z') 를 떼고 공백을 모두 제거 → '영주클럽 B' · '영주 클럽' 모두 '영주클럽'
+export function clubBaseKey(name) {
+  return (name || '').replace(/\s+[B-Z]$/, '').replace(/\s/g, '')
+}

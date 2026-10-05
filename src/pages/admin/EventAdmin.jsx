@@ -38,6 +38,7 @@ export default function EventAdmin() {
   const [divForm, setDivForm] = useState({
     division_name: '', has_groups: false,
     team_match_type: '', member_limit: '', is_team_division: true, play_format: 'doubles',
+    allow_multi_entry: false,
   })
 
   // 대회 수정 모달
@@ -248,11 +249,15 @@ export default function EventAdmin() {
       team_match_type: isTeamEvent ? (divForm.team_match_type || null) : null,
       member_limit: isTeamEvent && divForm.member_limit ? Number(divForm.member_limit) : null,
       is_team_division: isTeamEvent ? divForm.is_team_division : false,
+      allow_multi_entry: isTeamEvent ? divForm.allow_multi_entry : false,
       play_format: selectedEvent.event_type === 'team' ? 'doubles' : (divForm.play_format || 'doubles'),
     }])
     if (error) { showToast?.(error.message, 'error'); return }
     showToast?.('부서가 추가되었습니다.')
-    setDivForm({ division_name: '', has_groups: false, team_match_type: '', member_limit: '', is_team_division: true, play_format: 'doubles' })
+    setDivForm({
+      division_name: '', has_groups: false, team_match_type: '', member_limit: '',
+      is_team_division: true, play_format: 'doubles', allow_multi_entry: false,
+    })
     fetchDivisions(selectedEvent.event_id)
   }
 
@@ -606,6 +611,7 @@ export default function EventAdmin() {
                         className={`text-xs px-2 py-0.5 rounded ${d.team_match_type ? 'bg-blue-600 text-white' : 'bg-white text-blue-700 border border-blue-200'}`}>
                         {d.division_name} · {getMatchTypeLabel(resolveMatchType(selectedEvent, d))}
                         {resolveMemberLimit(selectedEvent, d) ? ' · ' + resolveMemberLimit(selectedEvent, d) + '명' : ''}
+                        {d.allow_multi_entry ? ' · 중복허용' : ''}
                       </span>
                     ))}
                   </div>
@@ -641,7 +647,12 @@ export default function EventAdmin() {
               </div>
             </div>
           ) : (selectedEvent.event_type === 'team' || selectedEvent.event_type === 'both') ? (
-            <p className="text-xs text-blue-600 mb-3">👥 클럽대항전 부서 — 직접 입력하세요. (예: 남성부, 여성부, 혼성부)</p>
+            <>
+              <p className="text-xs text-blue-600 mb-1">👥 클럽대항전 부서 — 직접 입력하세요. (예: 1부, 2부, 여성부)</p>
+              <p className="text-xs text-sub mb-3">
+                한 클럽은 <b>한 부서만</b> 신청할 수 있습니다. 여성부처럼 성별이 달라 중복 출전으로 보지 않는 부서는 <b>중복허용</b>을 체크하세요.
+              </p>
+            </>
           ) : (
             <p className="text-xs text-sub mb-3">📊 개인전 부서 — 포인트 규정 목록에서 선택하세요.</p>
           )}
@@ -683,6 +694,12 @@ export default function EventAdmin() {
                   <input type="checkbox" checked={divForm.is_team_division}
                     onChange={e => setDivForm({ ...divForm, is_team_division: e.target.checked })} />
                   팀전
+                </label>
+                <label className="flex items-center gap-1 text-xs text-amber-700 shrink-0"
+                  title="체크하면 다른 부서와 겹쳐 신청할 수 있습니다. 여성부처럼 성별이 다른 트랙에 사용하세요.">
+                  <input type="checkbox" checked={divForm.allow_multi_entry}
+                    onChange={e => setDivForm({ ...divForm, allow_multi_entry: e.target.checked })} />
+                  중복허용
                 </label>
               </>
             )}
@@ -749,6 +766,12 @@ export default function EventAdmin() {
                           <option key={t.value} value={t.value}>{t.full}</option>
                         ))}
                       </select>
+                      <label className="flex items-center gap-1 text-xs text-amber-700"
+                        title="체크하면 다른 부서와 겹쳐 신청할 수 있습니다. 여성부처럼 성별이 다른 트랙에 사용하세요.">
+                        <input type="checkbox" checked={!!d.allow_multi_entry}
+                          onChange={e => updateDivision(d.division_id, { allow_multi_entry: e.target.checked })} />
+                        중복허용
+                      </label>
                       <span className="text-xs text-sub">한도</span>
                       <input type="number" min="1" defaultValue={d.member_limit || ''}
                         onBlur={e => {
