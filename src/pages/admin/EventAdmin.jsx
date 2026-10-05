@@ -72,7 +72,9 @@ export default function EventAdmin() {
 
   async function fetchDivisions(eventId) {
     const [{ data: divs }, { data: prules }] = await Promise.all([
-      supabase.from('event_divisions').select('*').eq('event_id', eventId),
+      // order 가 없으면 UPDATE 로 행 위치가 바뀔 때마다 순서가 달라진다.
+      // 신청 화면(TeamEntryPage)·참가신청 관리와 같은 created_at 순으로 고정.
+      supabase.from('event_divisions').select('*').eq('event_id', eventId).order('created_at'),
       supabase.from('point_rules').select('division, sort_order').order('sort_order', { ascending: true, nullsFirst: false }),
     ])
     const sorted = (divs || []).sort((a, b) => {
