@@ -68,20 +68,22 @@ function FeeExemptBox({ compact = false }) {
 }
 
 // ── 클럽 콤보박스 ─────────────────────────────────────
-function ClubComboBox({ value, onChange, placeholder = '클럽명 선택 또는 직접 입력' }) {
+function ClubComboBox({ value, onChange, memberType, placeholder = '클럽명 선택 또는 직접 입력' }) {
   const [open, setOpen] = useState(false)
   const [inputVal, setInputVal] = useState(value || '')
   const [clubs, setClubs] = useState([])
   const wrapRef = useRef(null)
 
   useEffect(() => {
-    supabase.from('members_public').select('club').neq('status', '삭제')
-      .then(({ data }) => {
-        if (!data) return
-        const unique = [...new Set(data.map(r => r.club).filter(Boolean))].sort()
-        setClubs(unique)
-      })
-  }, [])
+    // 동호인 클럽과 학생선수 소속(학교·팀)이 섞이지 않도록 같은 회원 유형의 소속만 보여준다
+    let q = supabase.from('members_public').select('club').neq('status', '삭제')
+    if (memberType) q = q.eq('member_type', memberType)
+    q.then(({ data }) => {
+      if (!data) return
+      const unique = [...new Set(data.map(r => r.club).filter(Boolean))].sort()
+      setClubs(unique)
+    })
+  }, [memberType])
 
   useEffect(() => { setInputVal(value || '') }, [value])
 
@@ -503,6 +505,7 @@ export default function RegisterPage() {
             <ClubComboBox
               value={form.club}
               onChange={val => handleChange('club', val)}
+              memberType={memberType}
               placeholder={isPlayer ? '소속 선택 또는 직접 입력' : '클럽명 선택 또는 직접 입력'}
             />
           </div>
