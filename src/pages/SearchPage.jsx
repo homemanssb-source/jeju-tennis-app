@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import PlayerDetail from '../components/PlayerDetail'
 import { SkeletonList } from '../components/Skeleton'
+import { formatGrade } from '../lib/grade'
 
 export default function SearchPage() {
   // ❌ usePageView('search') 제거 → App.jsx에서 중앙 처리
@@ -228,7 +229,7 @@ export default function SearchPage() {
                             )}
                             {m.grade && (
                               <span className="px-1.5 py-0.5 bg-accent text-white text-[11px] font-semibold rounded shrink-0">
-                                {m.grade}
+                                {formatGrade(m.grade)}
                               </span>
                             )}
                           </div>
@@ -265,7 +266,7 @@ export default function SearchPage() {
                               <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[11px] font-semibold rounded shrink-0">선수</span>
                             )}
                             {m.grade && (
-                              <span className="px-1.5 py-0.5 bg-soft2 text-sub text-[11px] font-medium rounded shrink-0">{m.grade}</span>
+                              <span className="px-1.5 py-0.5 bg-soft2 text-sub text-[11px] font-medium rounded shrink-0">{formatGrade(m.grade)}</span>
                             )}
                           </div>
                           <p className="text-xs text-sub mt-0.5">{m.member_type === '선수' ? '선수' : (m.division || '-')}</p>
@@ -294,7 +295,7 @@ export default function SearchPage() {
                         <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[11px] font-semibold rounded shrink-0">선수</span>
                       )}
                       {m.grade && (
-                        <span className="px-1.5 py-0.5 bg-soft2 text-sub text-[11px] font-medium rounded shrink-0">{m.grade}</span>
+                        <span className="px-1.5 py-0.5 bg-soft2 text-sub text-[11px] font-medium rounded shrink-0">{formatGrade(m.grade)}</span>
                       )}
                     </div>
                     <p className="text-xs text-sub mt-0.5 truncate">{(m.club || '-') + ' · ' + (m.member_type === '선수' ? '선수' : (m.division || '-'))}</p>

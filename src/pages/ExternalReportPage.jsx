@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
+import { formatGrade, gradeNumber } from '../lib/grade'
 
 // 신고 내역 공개 조회 열 (회원 전화번호 제외)
 const REPORT_COLS = 'id, member_id, member_name, reported_at, tournament_name, tournament_date, tournament_type, tournament_division, result, before_grade, expected_grade, admin_applied, admin_applied_at, admin_note'
@@ -58,7 +59,7 @@ export default function ExternalReportPage() {
     if (!member || !result || !promotionRules.length) return
     const condition = RESULT_TO_CONDITION[result]
     // "4.5점" 같은 문자 포함된 경우 숫자만 추출
-    const currentGrade = parseFloat(String(member.grade).replace(/[^0-9.]/g, ''))
+    const currentGrade = gradeNumber(member.grade)
     const matched = promotionRules.find(r => {
       const genderMatch = r.gender === member.gender
       const scoreMatch = Number(r.current_score) === currentGrade
@@ -146,7 +147,7 @@ export default function ExternalReportPage() {
       tournament_type: tournamentType,
       tournament_division: tournamentDivision || null, // [버그5] 참가부서
       result,
-      before_grade: Number(member.grade) || null,
+      before_grade: gradeNumber(member.grade),
       expected_grade: expectedGrade ?? null,
     }])
 
@@ -227,7 +228,7 @@ export default function ExternalReportPage() {
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold text-green-800">✅ {member.display_name || member.name}</p>
-                    <p className="text-xs text-green-600 mt-0.5">{member.division} · 현재 등급: <span className="font-bold">{member.grade}</span></p>
+                    <p className="text-xs text-green-600 mt-0.5">{member.division} · 현재 등급: <span className="font-bold">{formatGrade(member.grade)}</span></p>
                   </div>
                   <button onClick={() => setMember(null)} className="text-xs text-green-600 hover:text-green-800">변경</button>
                 </div>
@@ -277,7 +278,7 @@ export default function ExternalReportPage() {
                   <div className={`rounded-lg p-3 border ${gradeChanged ? 'bg-amber-50 border-amber-200' : 'bg-soft border-line'}`}>
                     <p className="text-xs font-medium text-gray-700 mb-1">📊 등급 변경 예상</p>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-gray-800">{member.grade}</span>
+                      <span className="text-sm font-bold text-gray-800">{formatGrade(member.grade)}</span>
                       <span className="text-sub">→</span>
                       {gradeChanged ? (
                         <span className="text-sm font-bold text-accent">
@@ -331,9 +332,9 @@ export default function ExternalReportPage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-sub">
-                  <span>신고 등급: <b className="text-gray-700">{h.before_grade}</b></span>
+                  <span>신고 등급: <b className="text-gray-700">{formatGrade(h.before_grade)}</b></span>
                   {h.expected_grade && Number(h.expected_grade) !== Number(h.before_grade) && (
-                    <><span>→</span><span>예상: <b className="text-accent">{h.expected_grade}</b></span></>
+                    <><span>→</span><span>예상: <b className="text-accent">{formatGrade(h.expected_grade)}</b></span></>
                   )}
                 </div>
                 {h.admin_note && (

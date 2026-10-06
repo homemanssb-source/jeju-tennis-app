@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
+import { normalizeGrade, formatGrade } from '../../lib/grade'
 
 // ── 클럽 콤보박스 컴포넌트 ─────────────────────────────
 function ClubComboBox({ value, onChange, clubs }) {
@@ -406,7 +407,7 @@ export default function MemberAdmin() {
                 <select value={form.grade || ''} onChange={e => setForm({ ...form, grade: e.target.value })}
                   className="w-full text-sm border border-line rounded-lg px-3 py-2">
                   <option value="">{'\uC120\uD0DD'}</option>
-                  {grades.map(g => <option key={g} value={g}>{g}</option>)}
+                  {grades.map(g => <option key={g} value={normalizeGrade(g)}>{formatGrade(g)}</option>)}
                 </select>
               </div>
               <div>
@@ -450,7 +451,7 @@ export default function MemberAdmin() {
                 <select value={gradeForm.newGrade} onChange={e => setGradeForm({ ...gradeForm, newGrade: e.target.value })}
                   className="w-full text-sm border border-line rounded-lg px-3 py-2">
                   <option value="">{'\uC120\uD0DD'}</option>
-                  {grades.map(g => <option key={g} value={g}>{g}</option>)}
+                  {grades.map(g => <option key={g} value={normalizeGrade(g)}>{formatGrade(g)}</option>)}
                 </select>
               </div>
               <div>

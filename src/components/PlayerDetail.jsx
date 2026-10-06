@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import BottomSheet from './BottomSheet'
 import { SkeletonLine } from './Skeleton'
+import { formatGrade } from '../lib/grade'
 
 // 신고 내역 공개 조회 열 (회원 전화번호 제외)
 const REPORT_COLS = 'id, member_id, member_name, reported_at, tournament_name, tournament_date, tournament_type, tournament_division, result, before_grade, expected_grade, admin_applied, admin_applied_at, admin_note'
@@ -91,7 +92,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
               </span>
               {member.grade && (
                 <span className="px-2 py-0.5 bg-accentSoft text-accent text-xs font-semibold rounded-full">
-                  등급 {member.grade}
+                  등급 {formatGrade(member.grade)}
                 </span>
               )}
             </div>
@@ -171,7 +172,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
                           <p className="text-xs text-sub">{h.date} · {h.division}</p>
                           {h.grade && (
                             <span className="text-[11px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">
-                              출전등급 {h.grade}
+                              출전등급 {formatGrade(h.grade)}
                             </span>
                           )}
                         </div>
@@ -215,7 +216,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
                            Number(h.expected_grade) !== Number(h.before_grade) && (
                             <div className="inline-flex items-center gap-1 mt-1 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">
                               <span className="text-[11px] font-semibold text-green-700">
-                                {h.before_grade} → {h.expected_grade}
+                                {formatGrade(h.before_grade)} → {formatGrade(h.expected_grade)}
                               </span>
                             </div>
                           )}

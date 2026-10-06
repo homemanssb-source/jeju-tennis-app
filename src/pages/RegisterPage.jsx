@@ -2,6 +2,7 @@ import { useState, useEffect, useContext, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
+import { normalizeGrade, formatGrade } from '../lib/grade'
 
 const DIVISIONS = ['지도자부','마스터부','베테랑부','신인부','여자마스터부','여자베테랑부','여자신인부']
 
@@ -531,7 +532,7 @@ export default function RegisterPage() {
                 <select value={form.grade} onChange={e => handleChange('grade', e.target.value)}
                   className="w-full text-sm border border-line rounded-lg px-3 py-2.5 focus:border-accent focus:ring-2 focus:ring-accentSoft">
                   <option value="">선택하세요</option>
-                  {grades.map(g => <option key={g} value={g}>{g}</option>)}
+                  {grades.map(g => <option key={g} value={normalizeGrade(g)}>{formatGrade(g)}</option>)}
                 </select>
               </div>
             </>

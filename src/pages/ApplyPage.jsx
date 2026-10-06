@@ -4,6 +4,7 @@ import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
+import { formatGrade } from '../lib/grade'
 
 export default function ApplyPage() {
   const showToast = useContext(ToastContext)
@@ -1068,7 +1069,7 @@ export default function ApplyPage() {
                           <div>
                             <span className="text-sm font-medium">{m.name}</span>
                             {m.club && <span className="text-xs text-sub ml-1.5">({m.club})</span>}
-                            {m.grade && <span className="text-xs text-sub ml-1.5">{m.grade}</span>}
+                            {m.grade && <span className="text-xs text-sub ml-1.5">{formatGrade(m.grade)}</span>}
                           </div>
                           {m.disabled
                             ? <span className="text-[11px] text-gray-400">{m.disabledReason}</span>
