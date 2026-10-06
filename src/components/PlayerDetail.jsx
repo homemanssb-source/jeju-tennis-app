@@ -146,7 +146,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
                 ${histTab === 'external' ? 'text-accent' : 'text-sub'}`}>
               외부대회
               {pendingExtCount > 0 && (
-                <span className="ml-1 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold bg-amber-400 text-white rounded-full">
+                <span className="ml-1 inline-flex items-center justify-center w-4 h-4 text-[11px] font-bold bg-amber-400 text-white rounded-full">
                   {pendingExtCount}
                 </span>
               )}
@@ -170,7 +170,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
                         <div className="flex items-center gap-2 mt-0.5">
                           <p className="text-xs text-sub">{h.date} · {h.division}</p>
                           {h.grade && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">
+                            <span className="text-[11px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">
                               출전등급 {h.grade}
                             </span>
                           )}
@@ -199,13 +199,13 @@ export default function PlayerDetail({ memberId, open, onClose }) {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-1.5 mb-0.5">
-                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded
+                            <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded
                               ${h.tournament_type === '전국대회'
                                 ? 'bg-red-50 text-red-600'
                                 : 'bg-blue-50 text-blue-600'}`}>
                               {h.tournament_type}
                             </span>
-                            <span className="text-[10px] text-sub">{h.tournament_date}</span>
+                            <span className="text-[11px] text-sub">{h.tournament_date}</span>
                           </div>
                           <p className="text-sm font-medium text-gray-900">{h.tournament_name}</p>
                           {h.tournament_division && (
@@ -214,12 +214,12 @@ export default function PlayerDetail({ memberId, open, onClose }) {
                           {h.admin_applied && h.expected_grade &&
                            Number(h.expected_grade) !== Number(h.before_grade) && (
                             <div className="inline-flex items-center gap-1 mt-1 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">
-                              <span className="text-[10px] font-semibold text-green-700">
+                              <span className="text-[11px] font-semibold text-green-700">
                                 {h.before_grade} → {h.expected_grade}
                               </span>
                             </div>
                           )}
-                          <p className={`text-[10px] mt-1 ${h.admin_applied ? 'text-green-600' : 'text-amber-600'}`}>
+                          <p className={`text-[11px] mt-1 ${h.admin_applied ? 'text-green-600' : 'text-amber-600'}`}>
                             {h.admin_applied ? '✅ 등급 반영 완료' : '🟡 관리자 검토중'}
                           </p>
                         </div>

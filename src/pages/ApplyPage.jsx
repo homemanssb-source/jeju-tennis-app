@@ -597,23 +597,13 @@ export default function ApplyPage() {
 
               {/* 개인전 부서 필터 */}
               {Object.keys(divCounts).length > 0 && (
-                <div className="flex gap-2 mb-4 flex-wrap">
-                  <button onClick={() => setActiveDivision('전체')}
-                    className={`px-3 py-2 rounded-lg transition-colors ${
-                      activeDivision === '전체' ? 'bg-accent text-white' : 'bg-white border border-line hover:bg-soft'}`}>
-                    <p className="text-[10px] opacity-80">전체</p>
-                    <p className="text-lg font-bold">{entries.length}팀</p>
-                  </button>
+                <select value={activeDivision} onChange={e => setActiveDivision(e.target.value)}
+                  className="w-full mb-4 text-sm border border-line rounded-lg px-3 py-2.5 bg-white font-medium">
+                  <option value="전체">전체 부서 ({entries.length}팀)</option>
                   {Object.entries(divCounts).map(([div, count]) => (
-                    <button key={div}
-                      onClick={() => setActiveDivision(activeDivision === div ? '전체' : div)}
-                      className={`px-3 py-2 rounded-lg transition-colors ${
-                        activeDivision === div ? 'bg-accent text-white' : 'bg-white border border-line hover:bg-soft'}`}>
-                      <p className={`text-[10px] ${activeDivision === div ? 'opacity-80' : 'text-sub'}`}>{div}</p>
-                      <p className={`text-lg font-bold ${activeDivision === div ? '' : 'text-gray-800'}`}>{count}팀</p>
-                    </button>
+                    <option key={div} value={div}>{div} ({count}팀)</option>
                   ))}
-                </div>
+                </select>
               )}
 
               {loading ? (
@@ -629,25 +619,39 @@ export default function ApplyPage() {
                     <div className="space-y-2 mb-4">
                       {filteredEntries.map((entry, idx) => (
                         <div key={entry.entry_id}
-                          className="bg-white border border-line rounded-lg p-3 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-bold text-sub w-6">{idx + 1}</span>
-                            <div>
-                              <p className="text-sm font-medium">
-                                {entry._m1
-                                  ? `${entry._m1.name}${entry._m1.club ? `(${entry._m1.club})` : ''}` +
-                                    (entry._m2 ? `/${entry._m2.name}${entry._m2.club ? `(${entry._m2.club})` : ''}` : '')
-                                  : (entry.teams?.team_name || '-')}
+                          className="bg-white border border-line rounded-lg p-3 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-sm font-bold text-sub w-6 shrink-0">{idx + 1}</span>
+                            <div className="min-w-0">
+                              {/* 선수 단위로 줄바꿈되도록 각 선수를 inline-block 으로 묶음 */}
+                              <p className="text-sm font-medium break-keep">
+                                {entry._m1 ? (
+                                  <>
+                                    <span className="inline-block">
+                                      {entry._m1.name}
+                                      {entry._m1.club && <span className="text-xs text-sub font-normal">({entry._m1.club})</span>}
+                                    </span>
+                                    {entry._m2 && (
+                                      <>
+                                        <span className="text-sub mx-1">/</span>
+                                        <span className="inline-block">
+                                          {entry._m2.name}
+                                          {entry._m2.club && <span className="text-xs text-sub font-normal">({entry._m2.club})</span>}
+                                        </span>
+                                      </>
+                                    )}
+                                  </>
+                                ) : (entry.teams?.team_name || '-')}
                               </p>
                               <p className="text-xs text-sub">
                                 {entry.event_divisions?.division_name || '-'}
-                                <span className="ml-2">
+                                <span className="ml-2 whitespace-nowrap">
                                   {entry.applied_at ? new Date(entry.applied_at).toLocaleDateString('ko-KR') : ''}
                                 </span>
                               </p>
                             </div>
                           </div>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap ${getPayStyle(entry.payment_status)}`}>
+                          <span className={`shrink-0 text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap ${getPayStyle(entry.payment_status)}`}>
                             {entry.payment_status || '미납'}
                           </span>
                         </div>
@@ -664,23 +668,13 @@ export default function ApplyPage() {
 
                       {/* 단체전 부서 필터 */}
                       {Object.keys(teamDivCounts).length > 1 && (
-                        <div className="flex gap-2 mb-3 flex-wrap">
-                          <button onClick={() => setActiveTeamDivision('전체')}
-                            className={`px-3 py-2 rounded-lg transition-colors ${
-                              activeTeamDivision === '전체' ? 'bg-accent text-white' : 'bg-white border border-line hover:bg-soft'}`}>
-                            <p className="text-[10px] opacity-80">전체</p>
-                            <p className="text-lg font-bold">{teamEntries.length}팀</p>
-                          </button>
+                        <select value={activeTeamDivision} onChange={e => setActiveTeamDivision(e.target.value)}
+                          className="w-full mb-3 text-sm border border-line rounded-lg px-3 py-2.5 bg-white font-medium">
+                          <option value="전체">전체 부서 ({teamEntries.length}팀)</option>
                           {Object.entries(teamDivCounts).map(([div, count]) => (
-                            <button key={div}
-                              onClick={() => setActiveTeamDivision(activeTeamDivision === div ? '전체' : div)}
-                              className={`px-3 py-2 rounded-lg transition-colors ${
-                                activeTeamDivision === div ? 'bg-accent text-white' : 'bg-white border border-line hover:bg-soft'}`}>
-                              <p className={`text-[10px] ${activeTeamDivision === div ? 'opacity-80' : 'text-sub'}`}>{div}</p>
-                              <p className={`text-lg font-bold ${activeTeamDivision === div ? '' : 'text-gray-800'}`}>{count}팀</p>
-                            </button>
+                            <option key={div} value={div}>{div} ({count}팀)</option>
                           ))}
-                        </div>
+                        </select>
                       )}
 
                       <div className="space-y-2">
@@ -698,12 +692,12 @@ export default function ApplyPage() {
                                 </div>
                               </div>
                               <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap ${
+                                <span className={`text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap ${
                                   team.status === 'confirmed' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
                                 }`}>
                                   {team.status === 'confirmed' ? '확정' : '대기'}
                                 </span>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap ${getPayStyle(team.payment_status)}`}>
+                                <span className={`text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap ${getPayStyle(team.payment_status)}`}>
                                   {team.payment_status || '미납'}
                                 </span>
                               </div>
@@ -782,35 +776,35 @@ export default function ApplyPage() {
                     return (
                       <div key={e.entry_id || idx} className="bg-white border border-line rounded-xl p-4">
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-sm font-bold text-gray-900">{e.event_name}</p>
                             <p className="text-xs text-sub mt-0.5">📅 {e.event_date}</p>
                           </div>
                           <div className="flex flex-col gap-1 items-end shrink-0">
-                            <span className={`text-[10px] px-2 py-0.5 rounded whitespace-nowrap ${getStatusStyle(e.entry_status)}`}>
+                            <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getStatusStyle(e.entry_status)}`}>
                               {getStatusLabel(e.entry_status)}
                             </span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded whitespace-nowrap ${getPayStyle(e.payment_status)}`}>
+                            <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getPayStyle(e.payment_status)}`}>
                               {e.payment_status || '미납'}
                             </span>
                           </div>
                         </div>
-                        <div className="flex gap-3 text-xs text-sub mb-1">
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-sub mb-1">
                           {e.division_name && <span>📋 {e.division_name}{e.play_format === 'singles' ? ' (단식)' : ''}</span>}
                           {e.partner_name  && <span>🤝 파트너: {e.partner_name}</span>}
                         </div>
-                        <p className="text-[10px] text-gray-400 mb-2">신청일: {formatDate(e.applied_at)}</p>
+                        <p className="text-[11px] text-gray-400 mb-2">신청일: {formatDate(e.applied_at)}</p>
                         {e.payment_status === '환불대기' && (
                           <div className="bg-orange-50 rounded-lg px-3 py-2 mt-1">
-                            <p className="text-[10px] text-orange-700">환불 신청 접수 완료. 관리자 확인 후 입금됩니다.</p>
+                            <p className="text-[11px] text-orange-700">환불 신청 접수 완료. 관리자 확인 후 입금됩니다.</p>
                           </div>
                         )}
                         {e.payment_status === '환불완료' && (
-                          <p className="text-[10px] text-gray-400 mt-1">환불 처리가 완료되었습니다.</p>
+                          <p className="text-[11px] text-gray-400 mt-1">환불 처리가 완료되었습니다.</p>
                         )}
                         {showCancelBtn && (
                           <div className="border-t border-line mt-3 pt-3 flex items-center justify-between gap-2">
-                            <span className="text-[10px] text-sub">
+                            <span className="text-[11px] text-sub">
                               {cancelStatus === 'closed'
                                 ? '🔴 마감 후 취소불가 · 관리자 문의'
                                 : closeDate ? `마감: ${closeDate}` : ''}
@@ -830,7 +824,7 @@ export default function ApplyPage() {
                                   신청 취소
                                 </button>
                               ) : cancelStatus !== 'already' && cancelStatus !== 'refund_pending' && cancelStatus !== 'refund_done' ? (
-                                <span className="text-[10px] text-gray-400 border border-gray-200
+                                <span className="text-[11px] text-gray-400 border border-gray-200
                                   bg-gray-50 rounded-lg px-3 py-1.5">
                                   취소불가
                                 </span>
@@ -861,21 +855,21 @@ export default function ApplyPage() {
                                 <p className="text-xs text-sub mt-0.5">📅 {evDate}</p>
                               </div>
                               <div className="flex flex-col gap-1 items-end shrink-0">
-                                <span className={`text-[10px] px-2 py-0.5 rounded whitespace-nowrap ${
+                                <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${
                                   t.status === 'confirmed' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
                                 }`}>
                                   {t.status === 'confirmed' ? '확정' : '대기'}
                                 </span>
-                                <span className={`text-[10px] px-2 py-0.5 rounded whitespace-nowrap ${getPayStyle(t.payment_status)}`}>
+                                <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getPayStyle(t.payment_status)}`}>
                                   {t.payment_status || '미납'}
                                 </span>
                               </div>
                             </div>
-                            <div className="flex gap-3 text-xs text-sub mb-1">
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-sub mb-1">
                               {t.division_name && <span>📋 {t.division_name}</span>}
                               <span>🏅 {t.club_name}</span>
                             </div>
-                            <p className="text-[10px] text-gray-400 mb-2">신청일: {formatDate(t.created_at)}</p>
+                            <p className="text-[11px] text-gray-400 mb-2">신청일: {formatDate(t.created_at)}</p>
                             <div className="border-t border-line pt-2 mt-2 flex gap-2">
                               <button onClick={() => openRosterView(t)}
                                 className="text-xs text-blue-500 border border-blue-200 bg-blue-50
@@ -907,7 +901,7 @@ export default function ApplyPage() {
         <div className="fixed inset-0 z-50 flex items-end justify-center"
           style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <div className="absolute inset-0 bg-black/40" onClick={closeRosterView} />
-          <div className="relative w-full max-w-lg bg-white rounded-t-2xl px-5 pt-4 pb-8 z-10 max-h-[80vh] overflow-y-auto">
+          <div className="relative w-full max-w-lg bg-white rounded-t-2xl px-5 pt-4 pb-8 z-10 max-h-[85dvh] overflow-y-auto">
             <div className="flex justify-center mb-4">
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
             </div>
@@ -961,7 +955,7 @@ export default function ApplyPage() {
         <div className="fixed inset-0 z-50 flex items-end justify-center"
           style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <div className="absolute inset-0 bg-black/40" onClick={closeRosterEdit} />
-          <div className="relative w-full max-w-lg bg-white rounded-t-2xl px-5 pt-4 pb-8 z-10 max-h-[90vh] overflow-y-auto">
+          <div className="relative w-full max-w-lg bg-white rounded-t-2xl px-5 pt-4 pb-8 z-10 max-h-[90dvh] overflow-y-auto">
             <div className="flex justify-center mb-4">
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
             </div>
@@ -1077,7 +1071,7 @@ export default function ApplyPage() {
                             {m.grade && <span className="text-xs text-sub ml-1.5">{m.grade}</span>}
                           </div>
                           {m.disabled
-                            ? <span className="text-[10px] text-gray-400">{m.disabledReason}</span>
+                            ? <span className="text-[11px] text-gray-400">{m.disabledReason}</span>
                             : <span className="text-xs text-accent">+ 추가</span>}
                         </button>
                       ))}
@@ -1108,7 +1102,7 @@ export default function ApplyPage() {
         <div className="fixed inset-0 z-50 flex items-end justify-center"
           style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <div className="absolute inset-0 bg-black/40" onClick={closeCancelModal} />
-          <div className="relative w-full max-w-lg bg-white rounded-t-2xl px-5 pt-4 pb-8 z-10">
+          <div className="relative w-full max-w-lg bg-white rounded-t-2xl px-5 pt-4 pb-8 z-10 max-h-[90dvh] overflow-y-auto">
             <div className="flex justify-center mb-4">
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
             </div>
@@ -1174,7 +1168,7 @@ export default function ApplyPage() {
         <div className="fixed inset-0 z-50 flex items-end justify-center"
           style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <div className="absolute inset-0 bg-black/40" onClick={closePartnerModal} />
-          <div className="relative w-full max-w-lg bg-white rounded-t-2xl px-5 pt-4 pb-8 z-10">
+          <div className="relative w-full max-w-lg bg-white rounded-t-2xl px-5 pt-4 pb-8 z-10 max-h-[90dvh] overflow-y-auto">
             <div className="flex justify-center mb-4">
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
             </div>
@@ -1213,7 +1207,7 @@ export default function ApplyPage() {
                       {m.club && <span className="text-xs text-sub ml-1.5">({m.club})</span>}
                     </div>
                     {m.disabled
-                      ? <span className="text-[10px] text-gray-400">{m.disabledReason}</span>
+                      ? <span className="text-[11px] text-gray-400">{m.disabledReason}</span>
                       : partnerSelected?.member_id === m.member_id
                         ? <span className="text-xs text-blue-500 font-medium">✓ 선택됨</span>
                         : null}

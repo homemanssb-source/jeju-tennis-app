@@ -339,7 +339,7 @@ export default function ExternalReportPage() {
                 {h.admin_note && (
                   <p className="text-xs text-gray-500 bg-soft rounded px-2 py-1">💬 관리자 메모: {h.admin_note}</p>
                 )}
-                <p className="text-[10px] text-sub">신고일: {new Date(h.reported_at).toLocaleDateString('ko-KR')}</p>
+                <p className="text-[11px] text-sub">신고일: {new Date(h.reported_at).toLocaleDateString('ko-KR')}</p>
               </div>
             ))}
           </div>

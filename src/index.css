@@ -91,3 +91,26 @@ input:focus, select:focus, textarea:focus {
   ring: 2px;
   ring-color: var(--accent);
 }
+/* ── 휴대폰 최적화 ── */
+@media (max-width: 640px) {
+  /* iOS 사파리는 16px 미만 입력창에 포커스하면 화면을 자동 확대함 → 16px 로 고정 */
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* 긴 대회명 등이 들어간 select 가 화면 밖으로 밀려나지 않게 */
+select {
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+
+/* 회원 화면 버튼 기본 터치감 */
+button {
+  touch-action: manipulation;
+}
+
+/* type="search" 기본 X 버튼 숨김 (직접 만든 지우기 버튼 사용) */
+input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }

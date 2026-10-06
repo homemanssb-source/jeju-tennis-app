@@ -22,7 +22,7 @@ export default function BottomSheet({ open, onClose, title, children }) {
       />
 
       {/* 시트 */}
-      <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-r2 bottom-sheet-enter max-h-[85vh] flex flex-col"
+      <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-r2 bottom-sheet-enter max-h-[85dvh] flex flex-col"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {/* 핸들 */}
         <div className="flex justify-center pt-3 pb-1">
@@ -35,7 +35,7 @@ export default function BottomSheet({ open, onClose, title, children }) {
             <h3 className="text-base font-semibold text-gray-900">{title}</h3>
             <button
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-soft2 text-sub"
+              className="w-10 h-10 -mr-2 flex items-center justify-center rounded-full hover:bg-soft2 text-sub text-lg"
             >
               ✕
             </button>

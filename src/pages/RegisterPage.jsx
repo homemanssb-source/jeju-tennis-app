@@ -126,7 +126,7 @@ function ClubComboBox({ value, onChange, memberType, placeholder = '클럽명 �
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-sub text-xs"
+          className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-sub text-xs"
         >▾</button>
       </div>
       {open && (
@@ -547,7 +547,7 @@ export default function RegisterPage() {
                   수집항목: 이름, 성별, 연락처, 소속{isPlayer ? ', 생년월일, 보호자 연락처' : ''} / 이용목적: 협회 운영 및 대회 관리
                 </span>
                 <a href="/privacy" target="_blank" rel="noopener noreferrer"
-                  className="block text-xs text-blue-500 underline mt-1"
+                  className="inline-block text-xs text-blue-500 underline mt-1 py-1"
                   onClick={e => e.stopPropagation()}>
                   개인정보처리방침 전문 보기
                 </a>

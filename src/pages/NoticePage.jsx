@@ -10,6 +10,24 @@ export default function NoticePage() {
 
   useEffect(() => { fetchNotices() }, [])
 
+  // 휴대폰 뒤로가기로 상세 → 목록 복귀 (앱이 닫히거나 이전 화면으로 가지 않게)
+  useEffect(() => {
+    const onPop = () => setSelected(null)
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  function openNotice(n) {
+    window.history.pushState({ ...window.history.state, noticeDetail: true }, '')
+    setSelected(n)
+    window.scrollTo(0, 0)
+  }
+
+  function closeNotice() {
+    if (window.history.state?.noticeDetail) window.history.back()
+    else setSelected(null)
+  }
+
   async function fetchNotices() {
     setLoading(true)
     const { data } = await supabase.from('notices').select('*')
@@ -33,7 +51,7 @@ export default function NoticePage() {
     return (
       <div className="pb-20">
         <div className="sticky top-0 bg-white z-10 border-b border-line px-4 py-3 flex items-center gap-3">
-          <button onClick={() => setSelected(null)} className="text-accent text-sm">← 목록</button>
+          <button onClick={closeNotice} className="text-accent text-sm font-medium -ml-2 px-2 py-2 shrink-0">← 목록</button>
           <span className="text-sm font-semibold truncate flex-1">{selected.title}</span>
         </div>
 
@@ -184,7 +202,7 @@ export default function NoticePage() {
           <div className="space-y-2">
             {notices.map(n => (
               n.notice_type === 'tournament'
-                ? <TournamentCard key={n.id} n={n} onSelect={setSelected} formatDate={formatDate} />
+                ? <TournamentCard key={n.id} n={n} onSelect={openNotice} formatDate={formatDate} />
                 : <GeneralCard key={n.id} n={n} formatDate={formatDate} />
             ))}
           </div>

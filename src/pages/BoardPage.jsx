@@ -92,10 +92,10 @@ export default function BoardPage() {
           <p className="text-xs text-sub">※ PIN 초기값은 전화번호 뒷6자리입니다.</p>
           <div className="flex gap-2">
             <input type="text" value={authName} onChange={e => setAuthName(e.target.value)}
-              placeholder="이름" className="flex-1 text-sm border border-line rounded-lg px-3 py-2" />
+              placeholder="이름" className="flex-1 min-w-0 text-sm border border-line rounded-lg px-3 py-2" />
             <input type="password" inputMode="numeric" maxLength={6} value={authPin}
               onChange={e => setAuthPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="PIN 6자리" className="w-28 text-sm border border-line rounded-lg px-3 py-2 tracking-widest" />
+              placeholder="PIN 6자리" className="w-32 shrink-0 text-sm border border-line rounded-lg px-3 py-2 tracking-widest" />
           </div>
         </div>
 
@@ -173,7 +173,7 @@ export default function BoardPage() {
             {/* 글 상세 */}
             {selectedPost && (
               <div className="space-y-3">
-                <button onClick={() => setSelectedPost(null)} className="text-sm text-accent">← 목록으로</button>
+                <button onClick={() => setSelectedPost(null)} className="text-sm text-accent font-medium -ml-2 px-2 py-2">← 목록으로</button>
                 <div className="border border-line rounded-lg p-4 space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs px-2 py-0.5 bg-soft rounded text-sub">{getCategoryLabel(selectedPost.category)}</span>

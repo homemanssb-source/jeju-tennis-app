@@ -90,7 +90,7 @@ export default function HomePage() {
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#2d1a0e', letterSpacing: -0.8, lineHeight: 1 }}>
               J.T.A <span style={{ color: '#c0612b' }}>제주</span>
             </h1>
-            <p style={{ margin: '4px 0 0', fontSize: 10, color: '#c8a898', letterSpacing: 2.5, fontWeight: 600 }}>
+            <p style={{ margin: '4px 0 0', fontSize: 9, color: '#b89484', letterSpacing: 0.6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>
               JEJUSI TENNIS ASSOCIATION
             </p>
           </div>
@@ -145,30 +145,27 @@ export default function HomePage() {
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <p style={{
-                        margin: 0, fontSize: isFirst ? 13 : 12,
+                        margin: 0, fontSize: isFirst ? 15 : 14,
                         fontWeight: isFirst ? 700 : 600,
                         color: isFirst ? '#2d1a0e' : '#7a6a62',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>{ev.event_name}</p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 10, color: '#c8a898' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', columnGap: 10, rowGap: 2, marginTop: 4, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 12, color: '#a08070' }}>
                           📅 {ev.event_date}{ev.event_date_end ? ` ~ ${ev.event_date_end.slice(5).replace('-', '/')}` : ''}
                         </span>
-                        {(ev.entry_open_at || ev.entry_close_at) && (
-                          <span style={{ fontSize: 10, color: '#e0d8d0' }}>|</span>
-                        )}
-                        {(ev.entry_open_at || ev.entry_close_at) && (
-                          <span style={{ fontSize: 10, color: '#c8a898' }}>
+                                                {(ev.entry_open_at || ev.entry_close_at) && (
+                          <span style={{ fontSize: 12, color: '#a08070' }}>
                             📝 {formatDateMD(ev.entry_open_at)} ~ {formatDateMD(ev.entry_close_at)}
                           </span>
                         )}
                         {isFirst && (
                           <span style={{
-                            fontSize: 9, fontWeight: 600,
+                            fontSize: 11, fontWeight: 700,
                             color: getEntryStatusColor(ev),
                             background: getEntryStatus(ev) === '접수 중' ? '#f0fdf4'
                               : getEntryStatus(ev) === '접수 예정' ? '#fffbeb' : '#f8fafc',
-                            padding: '1px 5px', borderRadius: 4,
+                            padding: '1px 6px', borderRadius: 4,
                           }}>
                             {getEntryStatus(ev)}
                           </span>
@@ -201,8 +198,8 @@ export default function HomePage() {
               width: 44, height: 44, borderRadius: 16, background: '#fef3ec',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, marginBottom: 12
             }}>🏆</div>
-            <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: '#2d1a0e' }}>랭킹 / 참가</p>
-            <p style={{ margin: '3px 0 0', fontSize: 10, color: '#c0612b' }}>순위조회 · 참가신청</p>
+            <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: '#2d1a0e' }}>랭킹 / 참가</p>
+            <p style={{ margin: '3px 0 0', fontSize: 12, color: '#c0612b' }}>순위조회 · 참가신청</p>
           </button>
 
           <a
@@ -218,8 +215,8 @@ export default function HomePage() {
               width: 44, height: 44, borderRadius: 16, background: '#fffbeb',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, marginBottom: 12
             }}>🎯</div>
-            <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: '#2d1a0e' }}>대회 운영</p>
-            <p style={{ margin: '3px 0 0', fontSize: 10, color: '#d97706' }}>대진표·결과표·조편성</p>
+            <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: '#2d1a0e' }}>대회 운영</p>
+            <p style={{ margin: '3px 0 0', fontSize: 12, color: '#d97706' }}>대진표·결과표·조편성</p>
           </a>
         </div>
 
@@ -235,7 +232,7 @@ export default function HomePage() {
               key={item.path}
               onClick={() => navigate(item.path)}
               style={{
-                background: '#fff', borderRadius: 18, padding: '14px 6px', textAlign: 'center',
+                background: '#fff', borderRadius: 18, padding: '14px 4px', textAlign: 'center',
                 border: 'none', cursor: 'pointer',
                 boxShadow: '0 2px 0 rgba(192,97,43,0.05), 0 4px 14px rgba(192,97,43,0.05)',
                 transition: 'transform 0.15s'
@@ -245,7 +242,7 @@ export default function HomePage() {
               onTouchStart={e => e.currentTarget.style.transform = 'scale(0.97)'}
               onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}>
               <span style={{ fontSize: 22, display: 'block', marginBottom: 5 }}>{item.icon}</span>
-              <span style={{ fontSize: 9, color: '#c8a898', whiteSpace: 'pre-line', lineHeight: 1.4 }}>{item.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#7a5a48', whiteSpace: 'pre-line', lineHeight: 1.35, wordBreak: 'keep-all', display: 'block' }}>{item.label}</span>
             </button>
           ))}
         </div>
@@ -255,7 +252,7 @@ export default function HomePage() {
           <div style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <div style={{ height: 1, flex: 1, background: '#f0e8e0' }} />
-              <span style={{ fontSize: 9, color: '#d4c4bc', letterSpacing: 3, fontWeight: 700 }}>SPONSORS</span>
+              <span style={{ fontSize: 10, color: '#c4b0a4', letterSpacing: 3, fontWeight: 700 }}>SPONSORS</span>
               <div style={{ height: 1, flex: 1, background: '#f0e8e0' }} />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -288,8 +285,8 @@ export default function HomePage() {
                     }
                   </div>
                   <p style={{
-                    margin: 0, fontSize: 9, fontWeight: 600,
-                    color: '#b0a8a0', textAlign: 'center', lineHeight: 1.3, wordBreak: 'keep-all',
+                    margin: 0, fontSize: 11, fontWeight: 600,
+                    color: '#8a7a70', textAlign: 'center', lineHeight: 1.3, wordBreak: 'keep-all', overflowWrap: 'anywhere', maxWidth: '100%',
                     overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                   }}>{b.company_name}</p>
                 </a>
@@ -300,9 +297,9 @@ export default function HomePage() {
 
         {/* 푸터 */}
         <div style={{ textAlign: 'center', paddingTop: 20, borderTop: '1px solid #f0e8e0' }}>
-          <p style={{ fontSize: 11, color: '#ddd', margin: 0 }}>© 2026 J.T.A 제주 · 제주시테니스협회</p>
+          <p style={{ fontSize: 11, color: '#b8aaa0', margin: 0 }}>© 2026 J.T.A 제주 · 제주시테니스협회</p>
           <p style={{ margin: '6px 0 0' }}>
-            <a href="/privacy" style={{ fontSize: 10, color: '#c8a898', textDecoration: 'underline' }}>개인정보처리방침</a>
+            <a href="/privacy" style={{ fontSize: 12, color: '#a08070', textDecoration: 'underline', display: 'inline-block', padding: '8px 4px' }}>개인정보처리방침</a>
           </p>
         </div>
       </div>

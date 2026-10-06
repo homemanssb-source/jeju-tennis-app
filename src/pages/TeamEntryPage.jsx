@@ -414,7 +414,7 @@ export default function TeamEntryPage() {
                     <td className="px-3 py-2 font-medium">
                       {r.name}
                       {r.name === submittedInfo.captainName && (
-                        <span className="ml-1 text-[10px] text-blue-500">★</span>
+                        <span className="ml-1 text-[11px] text-blue-500">★</span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-xs text-sub">{r.gender === 'M' ? '남' : r.gender === 'F' ? '여' : '-'}</td>

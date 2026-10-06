@@ -29,12 +29,13 @@ export default function TabBar() {
     <>
       {showMore && (
         <div className="fixed inset-0 z-40" onClick={() => setShowMore(false)}>
-          <div className="absolute bottom-[60px] right-2 bg-white border border-line rounded-xl shadow-lg p-2 min-w-[170px]"
+          <div className="absolute right-2 bg-white border border-line rounded-xl shadow-lg p-2 min-w-[190px]"
+            style={{ bottom: "calc(64px + env(safe-area-inset-bottom, 0px))" }}
             onClick={e => e.stopPropagation()}>
             {moreTabs.map(tab => (
               <button key={tab.path}
                 onClick={() => { navigate(tab.path); setShowMore(false) }}
-                className={`w-full text-left px-3 py-2.5 text-sm rounded-lg hover:bg-soft flex items-center gap-2
+                className={`w-full text-left px-3 py-3 text-[15px] rounded-lg hover:bg-soft flex items-center gap-2
                   ${location.pathname === tab.path ? 'text-accent font-semibold' : 'text-gray-700'}`}>
                 <span>{tab.icon}</span>
                 <span>{tab.label}</span>
@@ -50,20 +51,20 @@ export default function TabBar() {
             const active = location.pathname === tab.path
             return (
               <button key={tab.path} onClick={() => navigate(tab.path)}
-                className={`flex flex-col items-center justify-center gap-0.5 min-w-[48px] py-1 transition-colors
+                className={`flex-1 h-full flex flex-col items-center justify-center gap-1 transition-colors
                   ${active ? 'text-accent' : 'text-sub'}`}>
-                <span className="text-[18px] leading-none">{tab.icon}</span>
-                <span className={`text-[10px] leading-none font-medium ${active ? 'text-accent' : 'text-sub'}`}>
+                <span className="text-[20px] leading-none">{tab.icon}</span>
+                <span className={`text-[11px] leading-none font-medium ${active ? 'text-accent' : 'text-sub'}`}>
                   {tab.label}
                 </span>
               </button>
             )
           })}
           <button onClick={() => setShowMore(!showMore)}
-            className={`flex flex-col items-center justify-center gap-0.5 min-w-[48px] py-1 transition-colors
+            className={`flex-1 h-full flex flex-col items-center justify-center gap-1 transition-colors
               ${showMore ? 'text-accent' : 'text-sub'}`}>
-            <span className="text-[18px] leading-none">⋯</span>
-            <span className={`text-[10px] leading-none font-medium ${showMore ? 'text-accent' : 'text-sub'}`}>
+            <span className="text-[20px] leading-none">⋯</span>
+            <span className={`text-[11px] leading-none font-medium ${showMore ? 'text-accent' : 'text-sub'}`}>
               더보기
             </span>
           </button>

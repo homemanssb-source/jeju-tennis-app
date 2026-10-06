@@ -51,7 +51,7 @@ function PinModal({ open, onClose, onVerified }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full bg-white rounded-t-2xl px-5 pt-5"
+      <div className="relative w-full bg-white rounded-t-2xl px-5 pt-5 max-h-[90dvh] overflow-y-auto"
         style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}>
         <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
         <h3 className="text-base font-bold text-gray-900 mb-1">회원 인증</h3>
@@ -102,7 +102,7 @@ function ReportModal({ open, postId, memberId, onClose }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full bg-white rounded-t-2xl px-5 pt-5"
+      <div className="relative w-full bg-white rounded-t-2xl px-5 pt-5 max-h-[90dvh] overflow-y-auto"
         style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}>
         <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
         <h3 className="text-base font-bold text-gray-900 mb-1">게시물 신고</h3>
@@ -177,7 +177,7 @@ function ImageUploader({ memberId, images, onChange, maxCount = 4 }) {
           className="w-20 h-20 border-2 border-dashed border-line rounded-xl
                      flex flex-col items-center justify-center text-sub text-xs gap-1 active:bg-soft flex-shrink-0">
           {uploading
-            ? <span className="text-[10px] text-accent">업로드 중...</span>
+            ? <span className="text-[11px] text-accent">업로드 중...</span>
             : <><span className="text-2xl leading-none text-sub">+</span><span>사진 추가</span></>}
         </button>
       )}
@@ -282,7 +282,7 @@ function PostForm({ member, editPost, onClose, onSaved }) {
             placeholder="상품 설명, 사용 기간, 거래 방식 등을 적어주세요."
             rows={5} className="w-full border border-line rounded-xl px-3 py-2.5 text-sm resize-none" />
         </div>
-        <p className="text-[10px] text-gray-400 leading-relaxed pb-4">
+        <p className="text-[11px] text-gray-400 leading-relaxed pb-4">
           ※ 본 게시판은 회원 간 직거래를 위한 공간입니다. 거래에 관한 분쟁은 당사자 간 해결을 원칙으로 하며,
           제주시테니스협회는 책임을 지지 않습니다.
         </p>
@@ -542,12 +542,12 @@ function PostDetail({ post: initialPost, member, onClose, onUpdated }) {
                     <div className="flex items-baseline gap-1.5 flex-wrap">
                       <span className="text-xs font-medium text-gray-800">{c.author_name}</span>
                       {c.member_id === post.member_id && (
-                        <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">판매자</span>
+                        <span className="text-[11px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">판매자</span>
                       )}
                       {c.is_private && (
-                        <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">🔒 비밀</span>
+                        <span className="text-[11px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">🔒 비밀</span>
                       )}
-                      <span className="text-[10px] text-sub">
+                      <span className="text-[11px] text-sub">
                         {new Date(c.created_at).toLocaleDateString('ko', { month: 'numeric', day: 'numeric' })}
                       </span>
                     </div>
@@ -555,7 +555,7 @@ function PostDetail({ post: initialPost, member, onClose, onUpdated }) {
                   </div>
                   {member && c.member_id === member.member_id && (
                     <button onClick={() => handleDeleteComment(c.comment_id)}
-                      className="text-[10px] text-red-400 flex-shrink-0 self-start mt-1">삭제</button>
+                      className="text-[11px] text-red-400 flex-shrink-0 self-start mt-1">삭제</button>
                   )}
                 </div>
               ))}
@@ -679,7 +679,7 @@ export default function MarketPage() {
       <div className="flex gap-2 px-4 py-2.5 overflow-x-auto hide-scrollbar border-b border-line">
         {CATEGORIES.map(c => (
           <button key={c} onClick={() => setCategory(c)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors
+            className={`flex-shrink-0 px-3.5 py-2 rounded-full text-[13px] font-medium border transition-colors
               ${category === c ? 'bg-accent text-white border-accent' : 'border-line text-sub bg-white'}`}>
             {c}
           </button>
@@ -690,7 +690,7 @@ export default function MarketPage() {
       <div className="flex gap-2 px-4 py-2 border-b border-line">
         {['전체', '판매중', '예약중', '거래완료'].map(s => (
           <button key={s} onClick={() => setStatusFilter(s)}
-            className={`text-xs px-2.5 py-1 rounded-full transition-colors
+            className={`text-[13px] px-3 py-1.5 rounded-full transition-colors
               ${statusFilter === s ? 'bg-gray-800 text-white' : 'text-sub'}`}>
             {s}
           </button>
@@ -733,10 +733,10 @@ export default function MarketPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-1">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_STYLE[post.status]}`}>
+                    <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_STYLE[post.status]}`}>
                       {post.status}
                     </span>
-                    <span className="text-[10px] text-sub">{post.category}</span>
+                    <span className="text-[11px] text-sub">{post.category}</span>
                   </div>
                   <p className={`text-sm font-medium truncate ${isDone ? 'text-sub line-through' : 'text-gray-900'}`}>
                     {post.title}
@@ -748,7 +748,7 @@ export default function MarketPage() {
                     <span className={`text-sm font-bold ${isDone ? 'text-sub line-through' : 'text-gray-900'}`}>
                       {Number(post.price).toLocaleString()}원
                     </span>
-                    <span className="text-[10px] text-sub">{formatTime(post.created_at)}</span>
+                    <span className="text-[11px] text-sub">{formatTime(post.created_at)}</span>
                   </div>
                 </div>
               </button>

@@ -92,13 +92,13 @@ export default function TournamentPage() {
       <div className="px-5 py-3 space-y-2 max-w-lg mx-auto">
         <div className="flex gap-2">
           <select value={seasonYear} onChange={e => setSeasonYear(Number(e.target.value))}
-            className="text-sm border border-line rounded-lg px-3 py-2 bg-white font-medium">
+            className="shrink-0 text-sm border border-line rounded-lg px-3 py-2 bg-white font-medium">
             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
               <option key={y} value={y}>{y}년</option>
             ))}
           </select>
           <select value={selectedTournament} onChange={e => setSelectedTournament(e.target.value)}
-            className="flex-1 text-sm border border-line rounded-lg px-3 py-2 bg-white font-medium">
+            className="flex-1 min-w-0 text-sm border border-line rounded-lg px-3 py-2 bg-white font-medium truncate">
             <option value="">대회 선택</option>
             {tournaments.map(t => (
               <option key={t.tournament_id} value={t.tournament_name}>
@@ -145,19 +145,19 @@ export default function TournamentPage() {
                     <div className="border-b border-line/30">
                       <button onClick={() => toggleClub(item.key)}
                         className="w-full flex items-center justify-between py-2.5 px-3 hover:bg-soft transition-colors text-left">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded
                             ${item.rank === '우승' ? 'bg-yellow-100 text-yellow-700' :
                               item.rank === '준우승' ? 'bg-gray-100 text-gray-700' :
                               'bg-soft2 text-sub'}`}>
                             {item.rank}
                           </span>
-                          <span className="text-sm font-medium text-gray-900">
+                          <span className="text-sm font-medium text-gray-900 truncate">
                             {item.club_name}
                           </span>
-                          <span className="text-[10px] text-sub">({item.members.length}명)</span>
+                          <span className="text-[11px] text-sub shrink-0">({item.members.length}명)</span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0 pl-2">
                           <span className="text-sm font-bold text-accent">+{item.points}</span>
                           <span className={`text-xs text-sub transition-transform ${expandedClubs.has(item.key) ? 'rotate-90' : ''}`}>›</span>
                         </div>

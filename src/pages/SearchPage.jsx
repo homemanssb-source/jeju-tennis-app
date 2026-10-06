@@ -144,16 +144,15 @@ export default function SearchPage() {
 
   return (
     <div className="pb-20">
-      <PageHeader title="🔎 검색" subtitle="이름 · 클럽명 · 등급 모두 검색 가능" />
-
-      <div className="px-5 py-3 max-w-lg mx-auto space-y-2">
+      <PageHeader title="🔎 검색" subtitle="이름 · 클럽명 · 등급 모두 검색 가능">
         <form onSubmit={handleSubmit}>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sub text-lg pointer-events-none">
               {isGradeSearch ? '🏅' : '🔍'}
             </span>
             <input
-              type="text"
+              type="search"
+              enterKeyHint="search"
               value={query}
               onChange={handleChange}
               placeholder="이름, 클럽명, 등급 (예: 7점) ..."
@@ -163,14 +162,16 @@ export default function SearchPage() {
               <button
                 type="button"
                 onClick={handleClear}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-sub hover:text-gray-600 text-base leading-none"
+                className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-sub hover:text-gray-600 text-base leading-none"
               >
                 ✕
               </button>
             )}
           </div>
         </form>
+      </PageHeader>
 
+      <div className="px-5 pt-3 max-w-lg mx-auto space-y-2">
         {searched && !loading && results.length > 0 && (
           <div className="flex items-center justify-between">
             <p className="text-xs text-sub">
@@ -181,13 +182,13 @@ export default function SearchPage() {
               <div className="flex gap-1">
                 <button
                   onClick={() => setViewMode('member')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium ${viewMode === 'member' ? 'bg-accent text-white' : 'bg-soft2 text-sub'}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium ${viewMode === 'member' ? 'bg-accent text-white' : 'bg-soft2 text-sub'}`}
                 >
                   회원별
                 </button>
                 <button
                   onClick={() => setViewMode('club')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium ${viewMode === 'club' ? 'bg-accent text-white' : 'bg-soft2 text-sub'}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium ${viewMode === 'club' ? 'bg-accent text-white' : 'bg-soft2 text-sub'}`}
                 >
                   클럽별
                 </button>
@@ -223,10 +224,10 @@ export default function SearchPage() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-sm font-medium text-gray-900 truncate">{m.display_name || m.name}</span>
                             {m.member_type === '선수' && (
-                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-semibold rounded shrink-0">선수</span>
+                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[11px] font-semibold rounded shrink-0">선수</span>
                             )}
                             {m.grade && (
-                              <span className="px-1.5 py-0.5 bg-accent text-white text-[10px] font-semibold rounded shrink-0">
+                              <span className="px-1.5 py-0.5 bg-accent text-white text-[11px] font-semibold rounded shrink-0">
                                 {m.grade}
                               </span>
                             )}
@@ -261,10 +262,10 @@ export default function SearchPage() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-sm font-medium text-gray-900 truncate">{m.display_name || m.name}</span>
                             {m.member_type === '선수' && (
-                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-semibold rounded shrink-0">선수</span>
+                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[11px] font-semibold rounded shrink-0">선수</span>
                             )}
                             {m.grade && (
-                              <span className="px-1.5 py-0.5 bg-soft2 text-sub text-[10px] font-medium rounded shrink-0">{m.grade}</span>
+                              <span className="px-1.5 py-0.5 bg-soft2 text-sub text-[11px] font-medium rounded shrink-0">{m.grade}</span>
                             )}
                           </div>
                           <p className="text-xs text-sub mt-0.5">{m.member_type === '선수' ? '선수' : (m.division || '-')}</p>
@@ -290,10 +291,10 @@ export default function SearchPage() {
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-semibold text-gray-900 truncate">{m.display_name || m.name}</span>
                       {m.member_type === '선수' && (
-                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-semibold rounded shrink-0">선수</span>
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[11px] font-semibold rounded shrink-0">선수</span>
                       )}
                       {m.grade && (
-                        <span className="px-1.5 py-0.5 bg-soft2 text-sub text-[10px] font-medium rounded shrink-0">{m.grade}</span>
+                        <span className="px-1.5 py-0.5 bg-soft2 text-sub text-[11px] font-medium rounded shrink-0">{m.grade}</span>
                       )}
                     </div>
                     <p className="text-xs text-sub mt-0.5 truncate">{(m.club || '-') + ' · ' + (m.member_type === '선수' ? '선수' : (m.division || '-'))}</p>
