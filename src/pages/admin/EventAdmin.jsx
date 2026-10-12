@@ -761,6 +761,20 @@ export default function EventAdmin() {
                       <option value="singles">단식</option>
                     </select>
                   )}
+                  {selectedEvent.event_type !== 'team' && !d.is_team_division && (d.play_format || 'doubles') === 'doubles' && (
+                    <span className="ml-2 inline-flex items-center gap-1 text-xs text-sub"
+                      title="두 선수 등급 합이 이 점수 이하일 때만 신청 가능 (비우면 제한 없음)">
+                      합산
+                      <input type="number" min="1" step="0.5" defaultValue={d.max_grade_sum ?? ''}
+                        onBlur={e => {
+                          const v = e.target.value ? Number(e.target.value) : null
+                          if (v !== (d.max_grade_sum ?? null)) updateDivision(d.division_id, { max_grade_sum: v })
+                        }}
+                        placeholder="제한없음"
+                        className="w-20 text-xs border border-line rounded px-1.5 py-0.5 bg-white" />
+                      점 이하
+                    </span>
+                  )}
                   {d.has_groups && (
                     <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
                       d.groups_status === 'COMPLETED' ? 'bg-green-50 text-green-700' :

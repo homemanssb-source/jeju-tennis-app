@@ -3,6 +3,10 @@ import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
 import { ageGroupOf } from '../lib/ageGroups'
+import { gradeNumber } from '../lib/grade'
+
+// 합산 상한 계산용 점수 — 등급이 없으면 신규 등록 기본값 1점 (DB grade_points 와 동일)
+const gradePoints = m => gradeNumber(m?.grade) ?? 1
 
 export default function EventEntryPage() {
   const showToast = useContext(ToastContext)
@@ -113,6 +117,10 @@ export default function EventEntryPage() {
       showToast?.('⚠️ 선수2가 활성 회원이 아닙니다.', 'error'); return
     }
 
+    if (overGradeSum) {
+      showToast?.(`⚠️ 등급 합산 ${gradeSum}점 — 이 부서는 ${maxGradeSum}점 이하만 신청할 수 있습니다.`, 'error'); return
+    }
+
     const avail = getEntryAvailability(selectedEvent)
     if (!avail.ok) {
       showToast?.('⚠️ ' + avail.message, 'error'); return
@@ -140,6 +148,9 @@ export default function EventEntryPage() {
   const entryAvail = getEntryAvailability(selectedEvent)
   const divisionInfo = divisions.find(d => d.division_id === selectedDivision)
   const isSingles = divisionInfo?.play_format === 'singles'
+  const maxGradeSum = !isSingles && divisionInfo?.max_grade_sum != null ? Number(divisionInfo.max_grade_sum) : null
+  const gradeSum = member1Info && member2Info ? gradePoints(member1Info) + gradePoints(member2Info) : null
+  const overGradeSum = maxGradeSum != null && gradeSum != null && gradeSum > maxGradeSum
 
   function handleDivisionChange(divisionId) {
     setSelectedDivision(divisionId)
@@ -200,10 +211,14 @@ export default function EventEntryPage() {
                 {divisions.map(d => (
                   <option key={d.division_id} value={d.division_id}>
                     {d.division_name}{d.play_format === 'singles' ? ' (단식)' : ''}
+                    {d.play_format !== 'singles' && d.max_grade_sum != null ? ` · 합산 ${Number(d.max_grade_sum)}점 이하` : ''}
                   </option>
                 ))}
               </select>
               {isSingles && <p className="text-xs text-blue-600 mt-1">🎾 단식 부서 — 선수 1명만 신청합니다.</p>}
+              {maxGradeSum != null && (
+                <p className="text-xs text-blue-600 mt-1">📊 두 선수 등급 합산 <b>{maxGradeSum}점 이하</b>만 신청 가능합니다.</p>
+              )}
             </div>
 
             {selectedDivision && (
@@ -280,8 +295,15 @@ export default function EventEntryPage() {
                 </div>
                 )}
 
+                {maxGradeSum != null && gradeSum != null && (
+                  <div className={`px-3 py-2 rounded-lg text-xs font-medium ${overGradeSum ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700'}`}>
+                    등급 합산 {gradePoints(member1Info)} + {gradePoints(member2Info)} = <b>{gradeSum}점</b>
+                    {overGradeSum ? ` — 상한 ${maxGradeSum}점 초과로 신청할 수 없습니다.` : ` (상한 ${maxGradeSum}점)`}
+                  </div>
+                )}
+
                 <button onClick={handleSubmit}
-                  disabled={submitting || !member1Id || (!isSingles && !member2Id) || member1Pin.length !== 6}
+                  disabled={submitting || !member1Id || (!isSingles && !member2Id) || member1Pin.length !== 6 || overGradeSum}
                   className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm
                     hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   {submitting ? '신청 중..' : '🎾 참가 신청하기'}
