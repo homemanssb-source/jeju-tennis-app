@@ -27,7 +27,7 @@ export default function EventAdmin() {
     entry_open_at: '', entry_close_at: '', description: '', tournament_id: '',
     event_type: 'individual', team_match_type: '3_doubles', team_member_limit: '',
     account_number: '', account_holder: '', account_bank: '',
-    qualification_image_url: '', target_type: '동호인',
+    qualification_image_url: '', target_type: '동호인', payment_required: true,
   })
   const [tournaments, setTournaments] = useState([])
   const [pointRuleDivisions, setPointRuleDivisions] = useState([])
@@ -115,6 +115,7 @@ export default function EventAdmin() {
       account_bank: form.account_bank || null,
       qualification_image_url: form.qualification_image_url || null,
       target_type: form.target_type || '동호인',
+      payment_required: form.payment_required,
     }
     const { error } = await supabase.from('events').insert([insertData])
     if (error) { showToast?.(error.message, 'error'); return }
@@ -124,6 +125,7 @@ export default function EventAdmin() {
       event_name: '', event_date: '', event_date_end: '', entry_fee_team: '', entry_open_at: '', entry_close_at: '',
       description: '', tournament_id: '', event_type: 'individual', team_match_type: '3_doubles', team_member_limit: '',
       account_number: '', account_holder: '', account_bank: '', qualification_image_url: '', target_type: '동호인',
+      payment_required: true,
     })
     fetchAll()
   }
@@ -151,6 +153,7 @@ export default function EventAdmin() {
       account_bank: ev.account_bank || '',
       qualification_image_url: ev.qualification_image_url || '',
       target_type: ev.target_type || '동호인',
+      payment_required: ev.payment_required !== false,
     })
     setShowEditModal(true)
   }
@@ -173,6 +176,7 @@ export default function EventAdmin() {
       account_bank: editForm.account_bank || null,
       qualification_image_url: editForm.qualification_image_url || null,
       target_type: editForm.target_type || '동호인',
+      payment_required: editForm.payment_required,
     }
     const { error } = await supabase.from('events').update(updates).eq('event_id', editingEvent.event_id)
     if (error) { showToast?.(error.message, 'error'); return }
@@ -397,6 +401,15 @@ export default function EventAdmin() {
               </>
             )}
 
+            <div className="col-span-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={!form.payment_required}
+                  onChange={e => setForm({ ...form, payment_required: !e.target.checked })} />
+                참가비 없음 <span className="text-xs text-sub">(결제 확인 생략 — 입금 안내·미납 표시 안 함)</span>
+              </label>
+            </div>
+
+            {form.payment_required && (<>
             <div>
               <label className="block text-xs text-sub mb-1">참가비 (팀/원)</label>
               <input type="number" value={form.entry_fee_team}
@@ -423,6 +436,7 @@ export default function EventAdmin() {
                   className="text-sm border border-line rounded-lg px-3 py-2" />
               </div>
             </div>
+            </>)}
 
             <div>
               <label className="block text-xs text-sub mb-1">신청 시작</label>
@@ -503,6 +517,9 @@ export default function EventAdmin() {
                       <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded ${getTargetBadge(ev.target_type).color}`}>
                         {getTargetBadge(ev.target_type).label}
                       </span>
+                    )}
+                    {ev.payment_required === false && (
+                      <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">참가비 없음</span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-sub">{ev.event_date}</td>
@@ -833,7 +850,7 @@ export default function EventAdmin() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
+                <div className={editForm.payment_required ? '' : 'invisible'}>
                   <label className="block text-xs text-sub mb-1">참가비 (원)</label>
                   <input type="number" value={editForm.entry_fee_team}
                     onChange={e => setEditForm({ ...editForm, entry_fee_team: e.target.value })}
@@ -849,8 +866,14 @@ export default function EventAdmin() {
                 </div>
               </div>
 
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={!editForm.payment_required}
+                  onChange={e => setEditForm({ ...editForm, payment_required: !e.target.checked })} />
+                참가비 없음 <span className="text-xs text-sub">(결제 확인 생략)</span>
+              </label>
+
               {/* 계좌 정보 */}
-              <div>
+              <div className={editForm.payment_required ? '' : 'hidden'}>
                 <label className="block text-xs text-sub mb-1">💳 입금 계좌</label>
                 <div className="grid grid-cols-3 gap-2">
                   <input type="text" value={editForm.account_bank}

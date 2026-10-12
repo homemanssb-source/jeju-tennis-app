@@ -55,7 +55,7 @@ export default function NoticeAdmin() {
 
   async function fetchEvents() {
     const { data } = await supabase.from('events')
-      .select('event_id, event_name, event_date, event_date_end, entry_fee_team, entry_close_at, account_number, account_holder, account_bank, description, event_type, qualification_image_url')
+      .select('event_id, event_name, event_date, event_date_end, entry_fee_team, payment_required, entry_close_at, account_number, account_holder, account_bank, description, event_type, qualification_image_url')
       .order('event_date', { ascending: false })
     setEvents(data || [])
   }
@@ -94,12 +94,13 @@ export default function NoticeAdmin() {
       deadlineStr = `${d.getMonth() + 1}월 ${d.getDate()}일 ${d.getHours()}시까지`
     }
 
+    const free = ev.payment_required === false
     let accountStr = ''
-    if (ev.account_number) {
+    if (!free && ev.account_number) {
       accountStr = `${ev.account_bank ? ev.account_bank + ' ' : ''}${ev.account_number}${ev.account_holder ? ' (' + ev.account_holder + ')' : ''}`
     }
 
-    let feeStr = ev.entry_fee_team > 0 ? `팀당 ${ev.entry_fee_team.toLocaleString()}원` : ''
+    let feeStr = free ? '없음' : ev.entry_fee_team > 0 ? `팀당 ${ev.entry_fee_team.toLocaleString()}원` : ''
 
     setForm(f => ({
       ...f,

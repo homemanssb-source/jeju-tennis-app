@@ -164,7 +164,7 @@ export default function EventEntryPage() {
             <option value="">대회를 선택하세요</option>
             {events.map(ev => (
               <option key={ev.event_id} value={ev.event_id}>
-                {ev.target_type === '선수' ? '🏅 ' : ''}{ev.event_name} ({ev.event_date}){ev.entry_fee_team ? ` - ${ev.entry_fee_team.toLocaleString()}원` : ''}
+                {ev.target_type === '선수' ? '🏅 ' : ''}{ev.event_name} ({ev.event_date}){ev.payment_required !== false && ev.entry_fee_team ? ` - ${ev.entry_fee_team.toLocaleString()}원` : ''}
               </option>
             ))}
           </select>
@@ -176,7 +176,7 @@ export default function EventEntryPage() {
           <div className={`rounded-lg p-3 ${entryAvail.ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
             <p className="text-sm font-semibold text-gray-800">{selectedEvent.event_name}</p>
             <p className="text-xs text-sub mt-1">📅 {selectedEvent.event_date}
-              {selectedEvent.entry_fee_team > 0 && ` · 💰 ${selectedEvent.entry_fee_team.toLocaleString()}원`}
+              {selectedEvent.payment_required !== false && selectedEvent.entry_fee_team > 0 && ` · 💰 ${selectedEvent.entry_fee_team.toLocaleString()}원`}
               {targetType === '선수' && ' · 🏅 선수 대회 (등록 선수만 신청 가능)'}
               {targetType === '전체' && ' · 동호인·선수 모두 신청 가능'}</p>
             {!entryAvail.ok ? (

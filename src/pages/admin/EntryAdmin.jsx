@@ -225,6 +225,8 @@ export default function EntryAdmin() {
   const paidCount    = activeEntries.filter(e => e.payment_status === '결제완료').length
   const unpaidCount  = activeEntries.filter(e => e.payment_status === '미납').length
   const refundCount  = allEntries.filter(e => e.payment_status === '환불대기').length
+  // 참가비 없는 대회 → 결제 상태·결제확인 버튼 숨김
+  const noPayment = events.find(ev => ev.event_id === selectedEventId)?.payment_required === false
 
   // ★ 필터 적용 (이름 검색 포함)
   const filtered = allEntries.filter(e => {
@@ -682,7 +684,7 @@ export default function EntryAdmin() {
       <div className="flex gap-2 mb-4 flex-wrap">
         <select
           value={selectedEventId}
-          onChange={e => { setSelectedEventId(e.target.value); setEntries([]); setTeamEntries([]) }}
+          onChange={e => { setSelectedEventId(e.target.value); setEntries([]); setTeamEntries([]); setFilterPayment('') }}
           className="flex-1 min-w-[200px] text-sm border border-line rounded-lg px-3 py-2">
           <option value="">대회 선택</option>
           {events.map(ev => (
@@ -707,7 +709,7 @@ export default function EntryAdmin() {
           <option value="개인">개인전만</option>
           <option value="단체">단체전만</option>
         </select>
-        <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)}
+        {!noPayment && <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)}
           className="text-sm border border-line rounded-lg px-3 py-2">
           <option value="">전체 결제상태</option>
           <option value="미납">미납만</option>
@@ -715,7 +717,7 @@ export default function EntryAdmin() {
           <option value="현장납부">현장납부</option>
           <option value="환불대기">환불대기만</option>
           <option value="환불완료">환불완료만</option>
-        </select>
+        </select>}
       </div>
 
       {/* ── 카운트 탭 ── */}
@@ -729,6 +731,7 @@ export default function EntryAdmin() {
             <p className="text-[10px] opacity-80">전체</p>
             <p className="text-lg font-bold">{totalCount}팀</p>
           </button>
+          {!noPayment && <>
           <button
             onClick={() => setFilterPayment(filterPayment === '결제완료' ? '' : '결제완료')}
             className={`px-3 py-2 rounded-lg text-left transition-colors ${
@@ -745,6 +748,7 @@ export default function EntryAdmin() {
             <p className="text-[10px] opacity-80">미납</p>
             <p className="text-lg font-bold">{unpaidCount}팀</p>
           </button>
+          </>}
           {refundCount > 0 && (
             <button
               onClick={() => setFilterPayment(filterPayment === '환불대기' ? '' : '환불대기')}
@@ -776,7 +780,7 @@ export default function EntryAdmin() {
                 <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">성별</th>
                 <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">나이</th>
                 <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">상태</th>
-                <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">결제</th>
+                {!noPayment && <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">결제</th>}
                 <th className="px-3 py-2 text-left text-sub font-medium whitespace-nowrap">신청일</th>
                 <th className="px-3 py-2 text-center text-sub font-medium whitespace-nowrap">액션</th>
               </tr>
@@ -784,7 +788,7 @@ export default function EntryAdmin() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-8 text-sub">신청 내역 없음</td>
+                  <td colSpan={noPayment ? 8 : 9} className="text-center py-8 text-sub">신청 내역 없음</td>
                 </tr>
               ) : filtered.map(e => (
                 <tr
@@ -810,7 +814,7 @@ export default function EntryAdmin() {
                       {e.status}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-center whitespace-nowrap">
+                  {!noPayment && <td className="px-3 py-2 text-center whitespace-nowrap">
                     <span className={`text-xs px-1.5 py-0.5 rounded ${payBadgeClass(e.payment_status)}`}>
                       {e.payment_status || '미납'}
                     </span>
@@ -820,7 +824,7 @@ export default function EntryAdmin() {
                         {e._raw.refund_bank} {e._raw.refund_account}
                       </div>
                     )}
-                  </td>
+                  </td>}
                   <td className="px-3 py-2 text-xs text-sub whitespace-nowrap">
                     {e.date ? new Date(e.date).toLocaleDateString('ko-KR') : '-'}
                   </td>
@@ -864,11 +868,11 @@ export default function EntryAdmin() {
                               명단수정
                             </button>
                           )}
-                          {e.payment_status !== '결제완료' && (
+                          {!noPayment && e.payment_status !== '결제완료' && (
                             <button onClick={() => handlePaymentSet(e, '결제완료')}
                               className="text-xs text-green-600 hover:underline">결제확인</button>
                           )}
-                          {e.payment_status !== '현장납부' && e.payment_status !== '결제완료' && (
+                          {!noPayment && e.payment_status !== '현장납부' && e.payment_status !== '결제완료' && (
                             <button onClick={() => handlePaymentSet(e, '현장납부')}
                               className="text-xs text-yellow-600 hover:underline">현장납부</button>
                           )}

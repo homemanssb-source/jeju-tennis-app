@@ -319,6 +319,7 @@ export default function TeamEntryPage() {
         accountNumber: selectedEvent.account_number,
         accountHolder: selectedEvent.account_holder,
         entryFee:      selectedEvent.entry_fee_team,
+        paymentRequired: selectedEvent.payment_required !== false,
         applyTime:     `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
       })
       setSubmitted(true)
@@ -425,7 +426,7 @@ export default function TeamEntryPage() {
             </table>
           </div>
 
-          {submittedInfo.accountNumber && (
+          {submittedInfo.paymentRequired && submittedInfo.accountNumber && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 space-y-1.5">
               <p className="text-xs font-medium text-blue-800">💳 입금 계좌</p>
               <p className="text-sm font-bold text-blue-900">
@@ -442,10 +443,12 @@ export default function TeamEntryPage() {
             </div>
           )}
 
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-700">
-            입금자명은 <b>클럽명({submittedInfo.clubName})</b>으로 해주세요.<br />
-            입금 확인 후 관리자가 확정합니다.
-          </div>
+          {submittedInfo.paymentRequired && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-700">
+              입금자명은 <b>클럽명({submittedInfo.clubName})</b>으로 해주세요.<br />
+              입금 확인 후 관리자가 확정합니다.
+            </div>
+          )}
 
           <button onClick={handleReset}
             className="w-full py-3 border border-line rounded-xl text-sm text-sub hover:bg-soft transition-colors">
@@ -488,9 +491,11 @@ export default function TeamEntryPage() {
             <p className="text-sm font-semibold text-gray-800">{selectedEvent.event_name}</p>
             <p className="text-xs text-sub mt-1">
               📅 {selectedEvent.event_date}{selectedEvent.event_date_end ? ` ~ ${selectedEvent.event_date_end}` : ''}
-              {selectedEvent.entry_fee_team > 0 && ` · 💰 ${selectedEvent.entry_fee_team.toLocaleString()}원`}
+              {selectedEvent.payment_required === false
+                ? ' · 참가비 없음'
+                : selectedEvent.entry_fee_team > 0 && ` · 💰 ${selectedEvent.entry_fee_team.toLocaleString()}원`}
             </p>
-            {selectedEvent.account_number && (
+            {selectedEvent.payment_required !== false && selectedEvent.account_number && (
               <div className="mt-2 bg-white rounded-lg px-3 py-2 border border-green-200">
                 <p className="text-xs font-medium text-gray-700 mb-0.5">💳 입금 계좌</p>
                 <p className="text-sm font-bold text-gray-900">

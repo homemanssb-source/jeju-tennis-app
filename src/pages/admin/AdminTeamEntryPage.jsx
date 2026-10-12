@@ -35,7 +35,7 @@ export default function AdminTeamEntryPage() {
 
   async function fetchEvents() {
     const { data } = await supabase.from('events')
-      .select('event_id, event_name, event_date, status, event_type, team_match_type, team_member_limit')
+      .select('event_id, event_name, event_date, status, event_type, team_match_type, team_member_limit, payment_required')
       .order('event_date', { ascending: false })
     setEvents(data || [])
   }
@@ -177,6 +177,8 @@ export default function AdminTeamEntryPage() {
   }
 
   const selectedEvent = events.find(ev => ev.event_id === selectedEventId)
+  // 참가비 없는 대회 → 결제 상태·결제확인 버튼 숨김
+  const noPayment = selectedEvent?.payment_required === false
   // 신청 화면에 노출되는 팀전 부서와 동일한 목록
   const teamDivisions = filterTeamDivisions(selectedEvent, divisions)
   const allChecked = activeEntries.length > 0 && checkedIds.size === activeEntries.length
@@ -239,6 +241,7 @@ export default function AdminTeamEntryPage() {
             <p className="text-lg font-bold text-green-600">{statusCounts.confirmed}</p>
             <p className="text-xs text-green-600">확정</p>
           </div>
+          {!noPayment && <>
           <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex-1 text-center min-w-[60px]">
             <p className="text-lg font-bold text-green-700">{paymentCounts.paid}</p>
             <p className="text-xs text-green-700">결제완료</p>
@@ -247,6 +250,7 @@ export default function AdminTeamEntryPage() {
             <p className="text-lg font-bold text-red-600">{paymentCounts.unpaid}</p>
             <p className="text-xs text-red-600">미납</p>
           </div>
+          </>}
         </div>
       )}
 
@@ -260,9 +264,11 @@ export default function AdminTeamEntryPage() {
               <span className={`text-xs px-2 py-0.5 rounded ${STATUS_MAP[selectedEntry.status]?.color || ''}`}>
                 {STATUS_MAP[selectedEntry.status]?.label || selectedEntry.status}
               </span>
-              <span className={`text-xs px-2 py-0.5 rounded ${PAYMENT_MAP[selectedEntry.payment_status || '미납']?.color || 'bg-red-50 text-red-600'}`}>
-                {PAYMENT_MAP[selectedEntry.payment_status || '미납']?.label || '미납'}
-              </span>
+              {!noPayment && (
+                <span className={`text-xs px-2 py-0.5 rounded ${PAYMENT_MAP[selectedEntry.payment_status || '미납']?.color || 'bg-red-50 text-red-600'}`}>
+                  {PAYMENT_MAP[selectedEntry.payment_status || '미납']?.label || '미납'}
+                </span>
+              )}
             </div>
           </div>
 
@@ -302,7 +308,7 @@ export default function AdminTeamEntryPage() {
           </div>
 
           {/* 결제 상태 변경 버튼 */}
-          <div className="pt-2 border-t border-line">
+          {!noPayment && <div className="pt-2 border-t border-line">
             <p className="text-xs text-sub mb-2">💰 결제 상태</p>
             <div className="flex gap-2">
               {(selectedEntry.payment_status || '미납') !== '결제완료' && (
@@ -324,7 +330,7 @@ export default function AdminTeamEntryPage() {
                 </button>
               )}
             </div>
-          </div>
+          </div>}
 
           {/* 상태 변경 버튼 */}
           <div className="flex gap-2 pt-2 border-t border-line">
@@ -410,7 +416,7 @@ export default function AdminTeamEntryPage() {
                     >
                       ✅ 일괄 확정
                     </button>
-                    <button
+                    {!noPayment && <button
                       disabled={!someChecked || bulkLoading}
                       onClick={() => setBulkConfirmModal({ type: 'payment', label: '결제완료' })}
                       className="flex-1 py-2 text-sm font-medium rounded-lg transition-colors
@@ -418,7 +424,7 @@ export default function AdminTeamEntryPage() {
                         disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       💰 일괄 결제완료
-                    </button>
+                    </button>}
                   </div>
                   {someChecked && (
                     <p className="text-[11px] text-blue-600 text-center">
@@ -480,9 +486,11 @@ export default function AdminTeamEntryPage() {
                                 )}
                               </div>
                               <div className="flex items-center gap-1 ml-2 shrink-0">
-                                <span className={`text-xs px-1.5 py-0.5 rounded ${PAYMENT_MAP[entry.payment_status || '미납']?.color || 'bg-red-50 text-red-600'}`}>
-                                  {PAYMENT_MAP[entry.payment_status || '미납']?.label || '미납'}
-                                </span>
+                                {!noPayment && (
+                                  <span className={`text-xs px-1.5 py-0.5 rounded ${PAYMENT_MAP[entry.payment_status || '미납']?.color || 'bg-red-50 text-red-600'}`}>
+                                    {PAYMENT_MAP[entry.payment_status || '미납']?.label || '미납'}
+                                  </span>
+                                )}
                                 <span className={`text-xs px-2 py-0.5 rounded ${STATUS_MAP[entry.status]?.color || ''}`}>
                                   {STATUS_MAP[entry.status]?.label || entry.status}
                                 </span>

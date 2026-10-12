@@ -486,6 +486,8 @@ export default function ApplyPage() {
 
   // ── 표시 헬퍼 ──
   const selectedEvent = events.find(e => e.event_id === selectedEventId)
+  // 참가비 없는 대회는 결제 상태 자체를 표시하지 않는다
+  const isPaymentFree = eventId => events.find(e => e.event_id === eventId)?.payment_required === false
 
   const divCounts = {}
   entries.forEach(e => {
@@ -590,7 +592,9 @@ export default function ApplyPage() {
                   <p className="text-sm font-semibold">{selectedEvent.event_name}</p>
                   <p className="text-xs text-sub mt-0.5">
                     📅 {selectedEvent.event_date}
-                    {selectedEvent.entry_fee_team > 0 && ` · 💰 ${selectedEvent.entry_fee_team.toLocaleString()}원/팀`}
+                    {selectedEvent.payment_required === false
+                      ? ' · 참가비 없음'
+                      : selectedEvent.entry_fee_team > 0 && ` · 💰 ${selectedEvent.entry_fee_team.toLocaleString()}원/팀`}
                     {selectedEvent.status === 'OPEN' ? ' · 🟢 접수중' : ' · 🔴 마감'}
                   </p>
                 </div>
@@ -652,9 +656,11 @@ export default function ApplyPage() {
                               </p>
                             </div>
                           </div>
-                          <span className={`shrink-0 text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap ${getPayStyle(entry.payment_status)}`}>
-                            {entry.payment_status || '미납'}
-                          </span>
+                          {selectedEvent?.payment_required !== false && (
+                            <span className={`shrink-0 text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap ${getPayStyle(entry.payment_status)}`}>
+                              {entry.payment_status || '미납'}
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -698,9 +704,11 @@ export default function ApplyPage() {
                                 }`}>
                                   {team.status === 'confirmed' ? '확정' : '대기'}
                                 </span>
-                                <span className={`text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap ${getPayStyle(team.payment_status)}`}>
-                                  {team.payment_status || '미납'}
-                                </span>
+                                {selectedEvent?.payment_required !== false && (
+                                  <span className={`text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap ${getPayStyle(team.payment_status)}`}>
+                                    {team.payment_status || '미납'}
+                                  </span>
+                                )}
                               </div>
                             </div>
                             <div className="mt-2 pt-2 border-t border-line/40">
@@ -785,9 +793,11 @@ export default function ApplyPage() {
                             <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getStatusStyle(e.entry_status)}`}>
                               {getStatusLabel(e.entry_status)}
                             </span>
-                            <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getPayStyle(e.payment_status)}`}>
-                              {e.payment_status || '미납'}
-                            </span>
+                            {!isPaymentFree(e.event_id) && (
+                              <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getPayStyle(e.payment_status)}`}>
+                                {e.payment_status || '미납'}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-sub mb-1">
@@ -861,9 +871,11 @@ export default function ApplyPage() {
                                 }`}>
                                   {t.status === 'confirmed' ? '확정' : '대기'}
                                 </span>
-                                <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getPayStyle(t.payment_status)}`}>
-                                  {t.payment_status || '미납'}
-                                </span>
+                                {!isPaymentFree(t.event_id) && (
+                                  <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getPayStyle(t.payment_status)}`}>
+                                    {t.payment_status || '미납'}
+                                  </span>
+                                )}
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-sub mb-1">
@@ -1114,7 +1126,7 @@ export default function ApplyPage() {
             <div className="bg-soft rounded-xl px-4 py-3 mb-4">
               <p className="text-sm font-semibold text-gray-900">{cancelTarget.event_name}</p>
               <p className="text-xs text-sub mt-0.5">
-                {[cancelTarget.division_name, cancelTarget.payment_status || '미납'].filter(Boolean).join(' · ')}
+                {[cancelTarget.division_name, !isPaymentFree(cancelTarget.event_id) && (cancelTarget.payment_status || '미납')].filter(Boolean).join(' · ')}
               </p>
             </div>
             {isPaid && (
