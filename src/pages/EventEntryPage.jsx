@@ -7,6 +7,8 @@ import { gradeNumber } from '../lib/grade'
 
 // 합산 상한 계산용 점수 — 등급이 없으면 신규 등록 기본값 1점 (DB grade_points 와 동일)
 const gradePoints = m => gradeNumber(m?.grade) ?? 1
+// 지도자 등급 회원은 지도자부(부서명에 '지도자' 포함)에만 출전 (DB _check_coach_division 과 동일)
+const isCoach = m => String(m?.grade || '').startsWith('지도자')
 
 export default function EventEntryPage() {
   const showToast = useContext(ToastContext)
@@ -117,6 +119,9 @@ export default function EventEntryPage() {
       showToast?.('⚠️ 선수2가 활성 회원이 아닙니다.', 'error'); return
     }
 
+    if (coachBlocked(m1) || (!isSingles && coachBlocked(m2))) {
+      showToast?.('⚠️ 지도자 등급 회원은 지도자부에만 신청할 수 있습니다.', 'error'); return
+    }
     if (overGradeSum) {
       showToast?.(`⚠️ 등급 합산 ${gradeSum}점 — 이 부서는 ${maxGradeSum}점 이하만 신청할 수 있습니다.`, 'error'); return
     }
@@ -151,6 +156,8 @@ export default function EventEntryPage() {
   const maxGradeSum = !isSingles && divisionInfo?.max_grade_sum != null ? Number(divisionInfo.max_grade_sum) : null
   const gradeSum = member1Info && member2Info ? gradePoints(member1Info) + gradePoints(member2Info) : null
   const overGradeSum = maxGradeSum != null && gradeSum != null && gradeSum > maxGradeSum
+  const isCoachDivision = (divisionInfo?.division_name || '').includes('지도자')
+  const coachBlocked = m => !isCoachDivision && isCoach(m)
 
   function handleDivisionChange(divisionId) {
     setSelectedDivision(divisionId)
@@ -239,12 +246,14 @@ export default function EventEntryPage() {
                   {showDropdown1 && filterMembers(member1Search).length > 0 && (
                     <div className="absolute left-0 right-0 top-full bg-white border border-line rounded-lg shadow-lg mt-1 z-20 max-h-48 overflow-y-auto">
                       {filterMembers(member1Search).map(m => (
-                        <button key={m.member_id}
+                        <button key={m.member_id} disabled={coachBlocked(m)}
                           onClick={() => { setMember1Id(m.member_id); setMember1Search(m.display_name || m.name); setShowDropdown1(false); setMember1Pin('') }}
-                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30">
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30 disabled:opacity-50 disabled:cursor-not-allowed">
                           <span className="font-medium">{m.display_name || m.name}</span>
                           <span className="text-sub text-xs ml-2">{m.club || ''} · {memberMeta(m)}</span>
-                          <span className="text-xs ml-2 text-green-600">✅</span>
+                          {coachBlocked(m)
+                            ? <span className="text-xs ml-2 text-red-500">지도자부만</span>
+                            : <span className="text-xs ml-2 text-green-600">✅</span>}
                         </button>
                       ))}
                     </div>
@@ -282,17 +291,25 @@ export default function EventEntryPage() {
                   {showDropdown2 && filterMembers(member2Search).some(m => m.member_id !== member1Id) && (
                     <div className="absolute left-0 right-0 top-full bg-white border border-line rounded-lg shadow-lg mt-1 z-20 max-h-48 overflow-y-auto">
                       {filterMembers(member2Search).filter(m => m.member_id !== member1Id).map(m => (
-                        <button key={m.member_id}
+                        <button key={m.member_id} disabled={coachBlocked(m)}
                           onClick={() => { setMember2Id(m.member_id); setMember2Search(m.display_name || m.name); setShowDropdown2(false) }}
-                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30">
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30 disabled:opacity-50 disabled:cursor-not-allowed">
                           <span className="font-medium">{m.display_name || m.name}</span>
                           <span className="text-sub text-xs ml-2">{m.club || ''} · {memberMeta(m)}</span>
-                          <span className="text-xs ml-2 text-green-600">✅</span>
+                          {coachBlocked(m)
+                            ? <span className="text-xs ml-2 text-red-500">지도자부만</span>
+                            : <span className="text-xs ml-2 text-green-600">✅</span>}
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
+                )}
+
+                {(coachBlocked(member1Info) || (!isSingles && coachBlocked(member2Info))) && (
+                  <div className="px-3 py-2 rounded-lg text-xs font-medium bg-red-50 text-red-600">
+                    지도자 등급 회원은 지도자부에만 신청할 수 있습니다.
+                  </div>
                 )}
 
                 {maxGradeSum != null && gradeSum != null && (
@@ -303,7 +320,8 @@ export default function EventEntryPage() {
                 )}
 
                 <button onClick={handleSubmit}
-                  disabled={submitting || !member1Id || (!isSingles && !member2Id) || member1Pin.length !== 6 || overGradeSum}
+                  disabled={submitting || !member1Id || (!isSingles && !member2Id) || member1Pin.length !== 6 || overGradeSum
+                    || coachBlocked(member1Info) || (!isSingles && coachBlocked(member2Info))}
                   className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm
                     hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   {submitting ? '신청 중..' : '🎾 참가 신청하기'}
