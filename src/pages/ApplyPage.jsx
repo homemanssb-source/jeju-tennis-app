@@ -520,15 +520,16 @@ export default function ApplyPage() {
     return formatDate(ev.entry_close_at)
   }
 
-  function getStatusStyle(status) {
+  // 참가비 없는 대회는 입금 확인 단계가 없으므로 '대기' 대신 '신청완료'
+  function getStatusStyle(status, free = false) {
     if (status === 'confirmed') return 'bg-green-50 text-green-700'
-    if (status === 'cancelled') return 'bg-gray-100 text-gray-500'
-    return 'bg-yellow-50 text-yellow-700'
+    if (status === 'cancelled' || status === '취소') return 'bg-gray-100 text-gray-500'
+    return free ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
   }
-  function getStatusLabel(status) {
+  function getStatusLabel(status, free = false) {
     if (status === 'confirmed') return '확정'
-    if (status === 'cancelled') return '취소'
-    return '대기'
+    if (status === 'cancelled' || status === '취소') return '취소'
+    return free ? '신청완료' : '대기'
   }
   function getPayStyle(status) {
     if (status === '결제완료') return 'bg-green-50 text-green-700'
@@ -699,10 +700,8 @@ export default function ApplyPage() {
                                 </div>
                               </div>
                               <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
-                                <span className={`text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap ${
-                                  team.status === 'confirmed' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
-                                }`}>
-                                  {team.status === 'confirmed' ? '확정' : '대기'}
+                                <span className={`text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap ${getStatusStyle(team.status, selectedEvent?.payment_required === false)}`}>
+                                  {getStatusLabel(team.status, selectedEvent?.payment_required === false)}
                                 </span>
                                 {selectedEvent?.payment_required !== false && (
                                   <span className={`text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap ${getPayStyle(team.payment_status)}`}>
@@ -790,8 +789,8 @@ export default function ApplyPage() {
                             <p className="text-xs text-sub mt-0.5">📅 {e.event_date}</p>
                           </div>
                           <div className="flex flex-col gap-1 items-end shrink-0">
-                            <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getStatusStyle(e.entry_status)}`}>
-                              {getStatusLabel(e.entry_status)}
+                            <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getStatusStyle(e.entry_status, isPaymentFree(e.event_id))}`}>
+                              {getStatusLabel(e.entry_status, isPaymentFree(e.event_id))}
                             </span>
                             {!isPaymentFree(e.event_id) && (
                               <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getPayStyle(e.payment_status)}`}>
@@ -866,10 +865,8 @@ export default function ApplyPage() {
                                 <p className="text-xs text-sub mt-0.5">📅 {evDate}</p>
                               </div>
                               <div className="flex flex-col gap-1 items-end shrink-0">
-                                <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${
-                                  t.status === 'confirmed' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
-                                }`}>
-                                  {t.status === 'confirmed' ? '확정' : '대기'}
+                                <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getStatusStyle(t.status, isPaymentFree(t.event_id))}`}>
+                                  {getStatusLabel(t.status, isPaymentFree(t.event_id))}
                                 </span>
                                 {!isPaymentFree(t.event_id) && (
                                   <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${getPayStyle(t.payment_status)}`}>
