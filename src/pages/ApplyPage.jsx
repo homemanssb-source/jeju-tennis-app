@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
 import { formatGrade } from '../lib/grade'
-import { clubBaseKey } from '../lib/teamMatch'
+import { clubBaseKey, memberClubs } from '../lib/teamMatch'
 
 export default function ApplyPage() {
   const showToast = useContext(ToastContext)
@@ -235,6 +235,15 @@ export default function ApplyPage() {
     showToast('✅ 인증 완료')
   }
 
+  // 명단 수정 가능한 회원 — 팀 클럽이 주장 소속 클럽 중 하나면 그 클럽, 아니면 주장 소속 클럽 중 아무거나
+  // (DB rpc_update_team_roster_v2 와 같은 기준)
+  function isRosterClubMember(m) {
+    let allowed = memberClubs(rosterEditClub)
+    const teamClub = clubBaseKey(rosterEditTarget?.club_name)
+    if (allowed.includes(teamClub)) allowed = [teamClub]
+    return memberClubs(m.club).some(c => allowed.includes(c))
+  }
+
   // 선수 검색 (명단 수정)
   async function handleRosterEditSearch() {
     const q = rosterEditSearch.trim()
@@ -249,9 +258,8 @@ export default function ApplyPage() {
       .limit(20)
     setRosterEditSearching(false)
     const currentIds = new Set(rosterEditMembers.map(m => m.member_id).filter(Boolean))
-    const clubKey = clubBaseKey(rosterEditClub)
     setRosterEditResults((data || []).map(m => {
-      const otherClub = clubBaseKey(m.club) !== clubKey
+      const otherClub = !isRosterClubMember(m)
       return {
         ...m,
         disabled: currentIds.has(m.member_id) || otherClub,
@@ -264,7 +272,7 @@ export default function ApplyPage() {
     if (rosterEditMembers.find(r => r.member_id === m.member_id)) {
       showToast('이미 명단에 있습니다.', 'error'); return
     }
-    if (clubBaseKey(m.club) !== clubBaseKey(rosterEditClub)) {
+    if (!isRosterClubMember(m)) {
       showToast('소속 클럽 회원만 명단에 넣을 수 있습니다.', 'error'); return
     }
     setRosterEditMembers(prev => [...prev, {

@@ -40,3 +40,8 @@ export function hasMixedMatchType(event, divisions) {
 export function clubBaseKey(name) {
   return (name || '').replace(/\s+[B-Z]$/, '').replace(/\s/g, '')
 }
+
+// 회원 소속 클럽 목록 — 복수 소속은 공백으로 이어 저장된다 ('제주하나클럽 행복배틀') (SQL member_clubs 와 동일)
+export function memberClubs(club) {
+  return (club || '').trim().split(/\s+/).filter(Boolean)
+}

@@ -2,7 +2,7 @@ import { useState, useEffect, useContext, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
-import { getMatchTypeLabel, resolveMatchType, resolveMemberLimit, filterTeamDivisions, clubBaseKey } from '../lib/teamMatch'
+import { getMatchTypeLabel, resolveMatchType, resolveMemberLimit, filterTeamDivisions, clubBaseKey, memberClubs } from '../lib/teamMatch'
 
 // 같은 부서에서 아직 안 쓴 팀 표기: '', ' B', ' C' ... (취소·중간 팀이 빠져도 이름이 겹치지 않게)
 function getTeamSuffix(base, usedNames) {
@@ -64,12 +64,13 @@ export default function TeamEntryPage() {
   }
 
   // 단체전은 주장 소속 클럽 회원만 — 인증 전에는 목록 없음 (DB rpc_submit_team_entry 와 같은 기준)
-  const captainClubKey = clubBaseKey(captainVerified?.club)
+  // 주장이 여러 클럽 소속이면 그중 하나를 팀 클럽(clubBase)으로 고르고, 그 클럽이 소속에 있는 회원만 넣는다
+  const captainClubs = useMemo(() => memberClubs(captainVerified?.club), [captainVerified])
   const eligibleMembers = useMemo(() => {
-    if (!captainClubKey) return []
+    if (!clubBase) return []
     // 한 선수는 한 대회에서 한 팀(한 부서)만 — 이미 다른 팀에 있는 선수는 제외
-    return allMembers.filter(m => clubBaseKey(m.club) === captainClubKey && !takenIds.has(m.member_id))
-  }, [allMembers, captainClubKey, takenIds])
+    return allMembers.filter(m => memberClubs(m.club).includes(clubBase) && !takenIds.has(m.member_id))
+  }, [allMembers, clubBase, takenIds])
 
   const clubList = useMemo(() => {
     return [...new Set(eligibleMembers.map(m => m.club).filter(Boolean))].sort()
@@ -194,29 +195,34 @@ export default function TeamEntryPage() {
     else if (data && !data.ok) { showToast?.('⚠️ ' + data.message, 'error') }
     else if (data && data.ok) {
       setCaptainVerified(data)
-      const base = (data.club || '').trim()
-      setClubBase(base)
+      const base = memberClubs(data.club)[0] || ''
       if (!base) {
         showToast?.('⚠️ 소속 클럽이 등록되어 있지 않아 단체전을 신청할 수 없습니다.', 'error')
         setVerifying(false); return
       }
-      // 소속 클럽 회원 자동 선택 (표기만 다른 같은 클럽 포함)
-      const key = clubBaseKey(base)
-      const matchedClubs = [...new Set(allMembers
-        .filter(m => m.club && clubBaseKey(m.club) === key).map(m => m.club))]
-      if (matchedClubs.length > 0) handleMultiClubSelect(new Set(matchedClubs), key)
-      await checkExistingClubEntries(base, selectedDivision?.division_id || null)
+      await selectTeamClub(base)
       showToast?.('✅ 본인 인증 완료')
     }
     setVerifying(false)
   }
 
+  // 팀 클럽 선택 — 명단은 클럽마다 달라지므로 비우고, 그 클럽 회원(복수 소속 포함)을 자동 선택
+  async function selectTeamClub(club) {
+    setClubBase(club)
+    setRoster([])
+    const matchedClubs = [...new Set(allMembers
+      .filter(m => m.club && memberClubs(m.club).includes(club)).map(m => m.club))]
+    handleMultiClubSelect(new Set(matchedClubs), club, [])
+    await checkExistingClubEntries(club, selectedDivision?.division_id || null)
+  }
+
   // 클럽 다중 선택 (Set 기반)
-  function handleMultiClubSelect(newClubsSet, key = captainClubKey) {
+  function handleMultiClubSelect(newClubsSet, teamClub = clubBase, currentRoster = roster) {
     setSelectedClubs(newClubsSet)
-    const rosterIds = new Set(roster.map(r => r.member_id))
+    const rosterIds = new Set(currentRoster.map(r => r.member_id))
     const initial = {}
-    allMembers.filter(m => m.club && newClubsSet.has(m.club) && clubBaseKey(m.club) === key).forEach(m => {
+    allMembers.filter(m => m.club && newClubsSet.has(m.club) && memberClubs(m.club).includes(teamClub)
+      && !takenIds.has(m.member_id)).forEach(m => {
       initial[m.member_id] = rosterIds.has(m.member_id)
     })
     setClubChecked(initial); setShowClubPicker(false)
@@ -625,9 +631,20 @@ export default function TeamEntryPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">클럽명</label>
                 <div className="flex gap-2 items-center">
-                  <div className="flex-1 text-sm border border-line rounded-lg px-3 py-2.5 bg-soft text-gray-700">
-                    {clubBase}
-                  </div>
+                  {captainClubs.length > 1 ? (
+                    <div className="flex-1 flex flex-wrap gap-1.5">
+                      {captainClubs.map(c => (
+                        <button key={c} type="button" onClick={() => c !== clubBase && selectTeamClub(c)}
+                          className={`text-sm px-3 py-2 rounded-lg border ${c === clubBase ? 'bg-accent text-white border-accent' : 'bg-white text-gray-700 border-line'}`}>
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex-1 text-sm border border-line rounded-lg px-3 py-2.5 bg-soft text-gray-700">
+                      {clubBase}
+                    </div>
+                  )}
                   {checkingClub && (
                     <span className="text-xs text-sub shrink-0">확인 중..</span>
                   )}
@@ -644,7 +661,7 @@ export default function TeamEntryPage() {
                 ) : !checkingClub && clubBase.trim() ? (
                   <p className="text-xs text-sub mt-1">등록 클럽명: <b>{finalClubName}</b></p>
                 ) : null}
-                <p className="text-xs text-sub mt-1">단체전은 주장 소속 클럽으로만 신청할 수 있고, 선수도 같은 클럽 회원만 넣을 수 있습니다. 이미 다른 팀(부서)에 신청된 선수는 목록에 나오지 않습니다.</p>
+                <p className="text-xs text-sub mt-1">{captainClubs.length > 1 ? '소속 클럽이 여러 개입니다. 신청할 팀 클럽을 선택하세요. ' : ''}단체전은 주장 소속 클럽으로만 신청할 수 있고, 선수도 그 클럽 회원만 넣을 수 있습니다. 이미 다른 팀(부서)에 신청된 선수는 목록에 나오지 않습니다.</p>
               </div>
             )}
 
