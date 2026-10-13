@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 import BulkIndividualEntry from './BulkIndividualEntry'
 import { yearAge } from '../../lib/ageGroups'
+import * as XLSX from 'xlsx'
 
 export default function EntryAdmin() {
   const showToast = useContext(ToastContext)
@@ -114,10 +115,10 @@ export default function EntryAdmin() {
     if (memberIds.length > 0) {
       const { data: membersData } = await supabase
         .from('members')
-        .select('member_id, name, club, gender, birthdate')
+        .select('member_id, name, club, gender, birthdate, grade')
         .in('member_id', memberIds)
       for (const m of (membersData || [])) {
-        memberClubMap[m.member_id] = { name: m.name, club: m.club, gender: m.gender, birthdate: m.birthdate }
+        memberClubMap[m.member_id] = { name: m.name, club: m.club, gender: m.gender, birthdate: m.birthdate, grade: m.grade }
       }
     }
     // ★ 각 entry에 club 정보 첨부
@@ -146,8 +147,9 @@ export default function EntryAdmin() {
     if (entryIds.length > 0) {
       const { data: membersData } = await supabase
         .from('team_event_members')
-        .select('entry_id, member_id, member_name, gender')
+        .select('entry_id, member_id, member_name, gender, grade, member_order')
         .in('entry_id', entryIds)
+        .order('member_order')
       for (const m of (membersData || [])) {
         if (!membersMap[m.entry_id]) membersMap[m.entry_id] = []
         membersMap[m.entry_id].push(m)
@@ -236,6 +238,76 @@ export default function EntryAdmin() {
     if (filterName.trim() && !e.name.toLowerCase().includes(filterName.trim().toLowerCase())) return false
     return true
   })
+
+  // ── 엑셀 다운로드 (현재 필터 적용된 명단) ──
+  function handleExportExcel() {
+    const ev = events.find(x => String(x.event_id) === String(selectedEventId))
+    const genderText = g => (g === 'M' || g === '남') ? '남' : (g === 'F' || g === '여') ? '여' : (g || '')
+    const ageNum = m => { const v = m ? yearAge(m.birthdate, eventYear) : null; return v === null ? '' : v }
+    const dateText = d => d ? new Date(d).toLocaleDateString('ko-KR') : ''
+    // 부서 → 신청 순으로 정렬
+    const byDivision = (a, b) =>
+      a.division.localeCompare(b.division, 'ko') || String(a.date || '').localeCompare(String(b.date || ''))
+
+    const indivRows = filtered.filter(e => e._source === 'individual').sort(byDivision).map((e, i) => {
+      const m1 = e._raw._m1, m2 = e._raw._m2
+      const row = {
+        '번호': i + 1,
+        '부서': e.division,
+        '선수1': m1?.name || e._raw.teams?.team_name || '',
+        '클럽1': m1?.club || '',
+        '성별1': genderText(m1?.gender),
+        '나이1': ageNum(m1),
+        '등급1': m1?.grade || '',
+        '선수2': m2?.name || '',
+        '클럽2': m2?.club || '',
+        '성별2': genderText(m2?.gender),
+        '나이2': ageNum(m2),
+        '등급2': m2?.grade || '',
+        '상태': e.status,
+      }
+      if (!noPayment) row['결제'] = e.payment_status || '미납'
+      row['신청일'] = dateText(e.date)
+      return row
+    })
+
+    const teamRows = filtered.filter(e => e._source === 'team').sort(byDivision).flatMap(e => {
+      const members = e._raw._members?.length ? e._raw._members : [null]
+      return members.map((m, i) => {
+        const row = {
+          '부서': e.division,
+          '클럽': e.name,
+          '주장': e._raw.captain_name || '',
+          '순번': m ? i + 1 : '',
+          '선수명': m?.member_name || '',
+          '성별': genderText(m?.gender),
+          '등급': m?.grade || '',
+          '상태': e.status,
+        }
+        if (!noPayment) row['결제'] = e.payment_status || '미납'
+        row['신청일'] = dateText(e.date)
+        return row
+      })
+    })
+
+    if (indivRows.length === 0 && teamRows.length === 0) {
+      showToast?.('다운로드할 명단이 없습니다.', 'error'); return
+    }
+
+    const wb = XLSX.utils.book_new()
+    const addSheet = (rows, name) => {
+      if (rows.length === 0) return
+      const ws = XLSX.utils.json_to_sheet(rows)
+      ws['!cols'] = Object.keys(rows[0]).map(k =>
+        ({ wch: Math.max(k.length * 2, ...rows.map(r => String(r[k] ?? '').length * 1.6)) + 2 }))
+      XLSX.utils.book_append_sheet(wb, ws, name)
+    }
+    addSheet(indivRows, '개인전')
+    addSheet(teamRows, '단체전')
+
+    const safeName = (ev?.event_name || '대회').replace(/[\\/:*?"<>|]/g, '_')
+    XLSX.writeFile(wb, `${safeName}_참가신청명단.xlsx`)
+  }
 
   // ── 결제 상태 변경 ──
   async function handlePaymentSet(entry, status) {
@@ -670,6 +742,15 @@ export default function EntryAdmin() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold">📋 참가신청 관리</h2>
         {selectedEventId && (
+          <div className="flex gap-2">
+          <button
+            onClick={handleExportExcel}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-2 border border-line bg-white text-sm
+              font-semibold rounded-lg hover:bg-soft transition-colors disabled:opacity-50">
+            <span className="text-base leading-none">📥</span>
+            엑셀
+          </button>
           <button
             onClick={openAddModal}
             className="flex items-center gap-1.5 px-3 py-2 bg-accent text-white text-sm
@@ -677,6 +758,7 @@ export default function EntryAdmin() {
             <span className="text-base leading-none">➕</span>
             직접 등록
           </button>
+          </div>
         )}
       </div>
 
