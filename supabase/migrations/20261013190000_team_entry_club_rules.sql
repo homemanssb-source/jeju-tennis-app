@@ -10,6 +10,9 @@
 --    선수 명단도 같은 소속 클럽 회원만 넣을 수 있다. 명단 수정도 동일.
 --    클럽 비교는 team_club_base() (자동 suffix·공백 제거) 기준.
 --    관리자 등록(AdminTeamEntryPage)은 이 RPC 를 거치지 않으므로 예외 처리 가능.
+--
+-- 3) 한 선수는 한 대회에서 한 팀만 — 같은 부서든 다른 부서든 두 팀에 들어갈 수 없다.
+--    (주장도 선수로 명단에 있으면 동일. 명단에 없는 주장은 여러 팀을 관리할 수 있다.)
 -- ============================================================
 
 -- 1) 중복 허용 기본값
@@ -77,6 +80,16 @@ begin
         return jsonb_build_object('ok', false, 'message',
           v_rec.name || ' 선수는 ' || v_captain.club || ' 소속이 아닙니다. 소속 클럽 회원만 신청할 수 있습니다.');
       end if;
+      select te.club_name || ' (' || coalesce(te.division_name, '-') || ')' into v_other_div
+        from team_event_members tem
+        join team_event_entries te on te.id = tem.entry_id
+       where te.event_id = p_event_id and te.status <> 'cancelled' and tem.member_id = v_rec.member_id
+       limit 1;
+      if v_other_div is not null then
+        return jsonb_build_object('ok', false, 'message',
+          v_rec.name || ' 선수는 이미 ' || v_other_div || ' 팀으로 신청되어 있습니다. 한 선수는 한 팀(한 부서)만 출전할 수 있습니다.');
+      end if;
+      v_other_div := null;
     else
       return jsonb_build_object('ok', false, 'message', (v_member->>'name') || ' 선수는 동호인등록이 되어 있지 않습니다.');
     end if;
@@ -198,13 +211,13 @@ begin
       return jsonb_build_object('ok', false, 'message',
         v_name || ' 선수는 ' || coalesce(v_captain.club, '-') || ' 소속이 아닙니다. 소속 클럽 회원만 넣을 수 있습니다.');
     end if;
-    if v_mid <> v_captain.member_id and exists (
+    if exists (
       select 1 from team_event_members tem
         join team_event_entries te on te.id = tem.entry_id
        where te.event_id = v_entry.event_id and te.id <> p_entry_id
          and te.status <> 'cancelled' and tem.member_id = v_mid
     ) then
-      return jsonb_build_object('ok', false, 'message', v_name || ' 선수가 이미 다른 팀으로 신청되어 있습니다.');
+      return jsonb_build_object('ok', false, 'message', v_name || ' 선수가 이미 다른 팀으로 신청되어 있습니다. 한 선수는 한 팀(한 부서)만 출전할 수 있습니다.');
     end if;
   end loop;
 

@@ -32,6 +32,7 @@ export default function TeamEntryPage() {
   const [existingCount, setExistingCount]       = useState(0)   // 같은 클럽 기존 신청 수
   const [checkingClub, setCheckingClub]         = useState(false)
   const [allMembers, setAllMembers]             = useState([])
+  const [takenIds, setTakenIds]                 = useState(new Set()) // 이 대회 다른 팀에 이미 들어간 선수
   const [roster, setRoster]                     = useState([])
   const [addMode, setAddMode]                   = useState('club')
   const [selectedClubs, setSelectedClubs]       = useState(new Set()) // 복수 클럽 선택
@@ -66,8 +67,9 @@ export default function TeamEntryPage() {
   const captainClubKey = clubBaseKey(captainVerified?.club)
   const eligibleMembers = useMemo(() => {
     if (!captainClubKey) return []
-    return allMembers.filter(m => clubBaseKey(m.club) === captainClubKey)
-  }, [allMembers, captainClubKey])
+    // 한 선수는 한 대회에서 한 팀(한 부서)만 — 이미 다른 팀에 있는 선수는 제외
+    return allMembers.filter(m => clubBaseKey(m.club) === captainClubKey && !takenIds.has(m.member_id))
+  }, [allMembers, captainClubKey, takenIds])
 
   const clubList = useMemo(() => {
     return [...new Set(eligibleMembers.map(m => m.club).filter(Boolean))].sort()
@@ -120,8 +122,16 @@ export default function TeamEntryPage() {
     setSelectedDivision(null); setDivisions([]); setAllDivisions([]); setClubDivisionLock(null)
     setCaptainVerified(null); setCaptainName(''); setCaptainPin('')
     setRoster([]); setClubBase(''); setTeamSuffix(''); setExistingCount(0)
-    setSelectedClubs(new Set()); setClubChecked({})
-    if (ev) fetchDivisions(ev.event_id)
+    setSelectedClubs(new Set()); setClubChecked({}); setTakenIds(new Set())
+    if (ev) { fetchDivisions(ev.event_id); fetchTakenMembers(ev.event_id) }
+  }
+
+  async function fetchTakenMembers(eventId) {
+    const { data } = await supabase.from('team_event_members')
+      .select('member_id, team_event_entries!inner(event_id, status)')
+      .eq('team_event_entries.event_id', eventId)
+      .neq('team_event_entries.status', 'cancelled')
+    setTakenIds(new Set((data || []).map(r => r.member_id).filter(Boolean)))
   }
 
   async function fetchDivisions(eventId) {
@@ -634,7 +644,7 @@ export default function TeamEntryPage() {
                 ) : !checkingClub && clubBase.trim() ? (
                   <p className="text-xs text-sub mt-1">등록 클럽명: <b>{finalClubName}</b></p>
                 ) : null}
-                <p className="text-xs text-sub mt-1">단체전은 주장 소속 클럽으로만 신청할 수 있고, 선수도 같은 클럽 회원만 넣을 수 있습니다.</p>
+                <p className="text-xs text-sub mt-1">단체전은 주장 소속 클럽으로만 신청할 수 있고, 선수도 같은 클럽 회원만 넣을 수 있습니다. 이미 다른 팀(부서)에 신청된 선수는 목록에 나오지 않습니다.</p>
               </div>
             )}
 
