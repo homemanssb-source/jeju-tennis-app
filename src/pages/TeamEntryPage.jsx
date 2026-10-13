@@ -1,13 +1,17 @@
-import { useState, useEffect, useContext, useMemo, useRef } from 'react'
+import { useState, useEffect, useContext, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
 import { getMatchTypeLabel, resolveMatchType, resolveMemberLimit, filterTeamDivisions, clubBaseKey } from '../lib/teamMatch'
 
-// 기존 신청 수에 따라 팀 suffix 반환: 0→'', 1→' B', 2→' C' ...
-function getTeamSuffix(count) {
-  if (count === 0) return ''
-  return ' ' + String.fromCharCode(65 + count) // 1→B, 2→C, 3→D
+// 같은 부서에서 아직 안 쓴 팀 표기: '', ' B', ' C' ... (취소·중간 팀이 빠져도 이름이 겹치지 않게)
+function getTeamSuffix(base, usedNames) {
+  const used = new Set(usedNames.map(n => (n || '').trim()))
+  for (let i = 0; i < 25; i++) {
+    const suffix = i === 0 ? '' : ' ' + String.fromCharCode(65 + i) // 1→B, 2→C ...
+    if (!used.has(base.trim() + suffix)) return suffix
+  }
+  return ''
 }
 
 export default function TeamEntryPage() {
@@ -27,7 +31,6 @@ export default function TeamEntryPage() {
   const [teamSuffix, setTeamSuffix]             = useState('')   // 자동 suffix (B, C...)
   const [existingCount, setExistingCount]       = useState(0)   // 같은 클럽 기존 신청 수
   const [checkingClub, setCheckingClub]         = useState(false)
-  const clubCheckTimer = useRef(null)
   const [allMembers, setAllMembers]             = useState([])
   const [roster, setRoster]                     = useState([])
   const [addMode, setAddMode]                   = useState('club')
@@ -59,24 +62,31 @@ export default function TeamEntryPage() {
     setAllMembers(data || [])
   }
 
+  // 단체전은 주장 소속 클럽 회원만 — 인증 전에는 목록 없음 (DB rpc_submit_team_entry 와 같은 기준)
+  const captainClubKey = clubBaseKey(captainVerified?.club)
+  const eligibleMembers = useMemo(() => {
+    if (!captainClubKey) return []
+    return allMembers.filter(m => clubBaseKey(m.club) === captainClubKey)
+  }, [allMembers, captainClubKey])
+
   const clubList = useMemo(() => {
-    return [...new Set(allMembers.map(m => m.club).filter(Boolean))].sort()
-  }, [allMembers])
+    return [...new Set(eligibleMembers.map(m => m.club).filter(Boolean))].sort()
+  }, [eligibleMembers])
 
   const clubMembers = useMemo(() => {
     if (selectedClubs.size === 0) return []
-    return allMembers.filter(m => m.club && selectedClubs.has(m.club))
-  }, [allMembers, selectedClubs])
+    return eligibleMembers.filter(m => m.club && selectedClubs.has(m.club))
+  }, [eligibleMembers, selectedClubs])
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
     const q = searchQuery.trim().toLowerCase()
     const rosterIds = new Set(roster.map(r => r.member_id))
-    return allMembers.filter(m =>
+    return eligibleMembers.filter(m =>
       !rosterIds.has(m.member_id) &&
       ((m.name || '').toLowerCase().includes(q) || (m.display_name || '').toLowerCase().includes(q))
     ).slice(0, 10)
-  }, [allMembers, searchQuery, roster])
+  }, [eligibleMembers, searchQuery, roster])
 
   const memberLimit = resolveMemberLimit(selectedEvent, selectedDivision)
   const matchType   = resolveMatchType(selectedEvent, selectedDivision)
@@ -141,12 +151,10 @@ export default function TeamEntryPage() {
     const key  = clubBaseKey(base)
     const mine = (data || []).filter(e => clubBaseKey(e.club_name) === key)
 
-    // 같은 부서 기존 팀 수 → 자동 suffix(B, C…)
-    const count = divisionId
-      ? mine.filter(e => e.division_id === divisionId).length
-      : mine.length
-    setExistingCount(count)
-    setTeamSuffix(getTeamSuffix(count))
+    // 같은 부서 기존 팀 → 비어 있는 자동 suffix(B, C…)
+    const sameDiv = mine.filter(e => (e.division_id ?? null) === (divisionId ?? null))
+    setExistingCount(sameDiv.length)
+    setTeamSuffix(getTeamSuffix(base, sameDiv.map(e => e.club_name)))
 
     // 이미 '중복 제한' 부서에 신청했다면 그 부서로 고정된다.
     const locked = mine
@@ -176,18 +184,17 @@ export default function TeamEntryPage() {
     else if (data && !data.ok) { showToast?.('⚠️ ' + data.message, 'error') }
     else if (data && data.ok) {
       setCaptainVerified(data)
-      const base = data.club || ''
+      const base = (data.club || '').trim()
       setClubBase(base)
-      // ✅ clubBase를 포함하는 클럽 전부 자동 선택 (예: "제주하나클럽", "행복배틀" 등)
-      if (base) {
-        const related = clubList.filter(c =>
-          c.includes(base) || base.includes(c)
-        )
-        const matchedClubs = related.length > 0 ? related : (clubList.includes(base) ? [base] : [])
-        if (matchedClubs.length > 0) {
-          handleMultiClubSelect(new Set(matchedClubs))
-        }
+      if (!base) {
+        showToast?.('⚠️ 소속 클럽이 등록되어 있지 않아 단체전을 신청할 수 없습니다.', 'error')
+        setVerifying(false); return
       }
+      // 소속 클럽 회원 자동 선택 (표기만 다른 같은 클럽 포함)
+      const key = clubBaseKey(base)
+      const matchedClubs = [...new Set(allMembers
+        .filter(m => m.club && clubBaseKey(m.club) === key).map(m => m.club))]
+      if (matchedClubs.length > 0) handleMultiClubSelect(new Set(matchedClubs), key)
       await checkExistingClubEntries(base, selectedDivision?.division_id || null)
       showToast?.('✅ 본인 인증 완료')
     }
@@ -195,11 +202,11 @@ export default function TeamEntryPage() {
   }
 
   // 클럽 다중 선택 (Set 기반)
-  function handleMultiClubSelect(newClubsSet) {
+  function handleMultiClubSelect(newClubsSet, key = captainClubKey) {
     setSelectedClubs(newClubsSet)
     const rosterIds = new Set(roster.map(r => r.member_id))
     const initial = {}
-    allMembers.filter(m => m.club && newClubsSet.has(m.club)).forEach(m => {
+    allMembers.filter(m => m.club && newClubsSet.has(m.club) && clubBaseKey(m.club) === key).forEach(m => {
       initial[m.member_id] = rosterIds.has(m.member_id)
     })
     setClubChecked(initial); setShowClubPicker(false)
@@ -212,7 +219,7 @@ export default function TeamEntryPage() {
     setSelectedClubs(next)
     const rosterIds = new Set(roster.map(r => r.member_id))
     const initial = {}
-    allMembers.filter(m => m.club && next.has(m.club)).forEach(m => {
+    eligibleMembers.filter(m => m.club && next.has(m.club)).forEach(m => {
       initial[m.member_id] = rosterIds.has(m.member_id)
     })
     setClubChecked(initial)
@@ -608,18 +615,9 @@ export default function TeamEntryPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">클럽명</label>
                 <div className="flex gap-2 items-center">
-                  <input type="text" value={clubBase}
-                    onChange={e => {
-                      const val = e.target.value
-                      setClubBase(val)
-                      // ✅ debounce: 글자 입력 멈춘 후 600ms 뒤에만 DB 조회
-                      if (clubCheckTimer.current) clearTimeout(clubCheckTimer.current)
-                      clubCheckTimer.current = setTimeout(() => {
-                        checkExistingClubEntries(val, selectedDivision?.division_id || null)
-                      }, 600)
-                    }}
-                    placeholder="클럽명을 입력하세요"
-                    className="flex-1 text-sm border border-line rounded-lg px-3 py-2.5" />
+                  <div className="flex-1 text-sm border border-line rounded-lg px-3 py-2.5 bg-soft text-gray-700">
+                    {clubBase}
+                  </div>
                   {checkingClub && (
                     <span className="text-xs text-sub shrink-0">확인 중..</span>
                   )}
@@ -636,6 +634,7 @@ export default function TeamEntryPage() {
                 ) : !checkingClub && clubBase.trim() ? (
                   <p className="text-xs text-sub mt-1">등록 클럽명: <b>{finalClubName}</b></p>
                 ) : null}
+                <p className="text-xs text-sub mt-1">단체전은 주장 소속 클럽으로만 신청할 수 있고, 선수도 같은 클럽 회원만 넣을 수 있습니다.</p>
               </div>
             )}
 

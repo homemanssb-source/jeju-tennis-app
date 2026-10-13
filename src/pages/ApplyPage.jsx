@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
 import { formatGrade } from '../lib/grade'
+import { clubBaseKey } from '../lib/teamMatch'
 
 export default function ApplyPage() {
   const showToast = useContext(ToastContext)
@@ -51,6 +52,7 @@ export default function ApplyPage() {
 
   // ── 단체전 명단 수정 모달 (내 신청 내역용) ──
   const [rosterEditTarget, setRosterEditTarget]   = useState(null) // my team entry row
+  const [rosterEditClub, setRosterEditClub]       = useState('')   // 대표자 소속 클럽 (명단은 같은 클럽 회원만)
   const [rosterEditMembers, setRosterEditMembers] = useState([])
   const [rosterEditLoading, setRosterEditLoading] = useState(false)
   const [rosterEditSaving, setRosterEditSaving]   = useState(false)
@@ -228,6 +230,7 @@ export default function ApplyPage() {
     if (error || !data?.ok) {
       showToast('PIN 인증 실패: ' + (data?.message || error?.message || '오류'), 'error'); return
     }
+    setRosterEditClub(data.club || '')
     setRosterEditPinVerified(true)
     showToast('✅ 인증 완료')
   }
@@ -246,16 +249,23 @@ export default function ApplyPage() {
       .limit(20)
     setRosterEditSearching(false)
     const currentIds = new Set(rosterEditMembers.map(m => m.member_id).filter(Boolean))
-    setRosterEditResults((data || []).map(m => ({
-      ...m,
-      disabled: currentIds.has(m.member_id),
-      disabledReason: currentIds.has(m.member_id) ? '이미 명단에 있음' : '',
-    })))
+    const clubKey = clubBaseKey(rosterEditClub)
+    setRosterEditResults((data || []).map(m => {
+      const otherClub = clubBaseKey(m.club) !== clubKey
+      return {
+        ...m,
+        disabled: currentIds.has(m.member_id) || otherClub,
+        disabledReason: currentIds.has(m.member_id) ? '이미 명단에 있음' : otherClub ? '다른 클럽' : '',
+      }
+    }))
   }
 
   function handleRosterEditAdd(m) {
     if (rosterEditMembers.find(r => r.member_id === m.member_id)) {
       showToast('이미 명단에 있습니다.', 'error'); return
+    }
+    if (clubBaseKey(m.club) !== clubBaseKey(rosterEditClub)) {
+      showToast('소속 클럽 회원만 명단에 넣을 수 있습니다.', 'error'); return
     }
     setRosterEditMembers(prev => [...prev, {
       id: null, entry_id: rosterEditTarget.id,

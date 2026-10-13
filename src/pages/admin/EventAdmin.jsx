@@ -38,7 +38,7 @@ export default function EventAdmin() {
   const [divForm, setDivForm] = useState({
     division_name: '', has_groups: false,
     team_match_type: '', member_limit: '', is_team_division: true, play_format: 'doubles',
-    allow_multi_entry: false,
+    allow_multi_entry: true,
   })
 
   // 대회 수정 모달
@@ -262,7 +262,7 @@ export default function EventAdmin() {
     showToast?.('부서가 추가되었습니다.')
     setDivForm({
       division_name: '', has_groups: false, team_match_type: '', member_limit: '',
-      is_team_division: true, play_format: 'doubles', allow_multi_entry: false,
+      is_team_division: true, play_format: 'doubles', allow_multi_entry: true,
     })
     fetchDivisions(selectedEvent.event_id)
   }
