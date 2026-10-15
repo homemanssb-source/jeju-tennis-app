@@ -33,7 +33,8 @@ export default function EventEntryPage() {
       .select('*')
       .eq('status', 'OPEN')
       .order('event_date', { ascending: false })
-    setEvents(data || [])
+    // 개인전 신청 — 단체전 전용 대회는 제외 (event_type 미지정은 개인전으로 간주)
+    setEvents((data || []).filter(e => (e.event_type || 'individual') !== 'team'))
   }
 
   async function fetchMembers() {
@@ -59,15 +60,16 @@ export default function EventEntryPage() {
     return m.grade || '-'
   }
 
-  async function fetchDivisions(eventId) {
-    const { data } = await supabase.from('event_divisions').select('*').eq('event_id', eventId).order('division_name')
-    setDivisions(data || [])
+  async function fetchDivisions(ev) {
+    const { data } = await supabase.from('event_divisions').select('*').eq('event_id', ev.event_id).order('division_name')
+    // 개인+팀 대회의 단체전 부서는 개인전 신청 목록에서 제외
+    setDivisions((data || []).filter(d => ev.event_type !== 'both' || !d.is_team_division))
   }
 
   function handleEventChange(eventId) {
     const ev = events.find(e => e.event_id === eventId)
     setSelectedEvent(ev || null); setSelectedDivision('')
-    if (eventId) fetchDivisions(eventId); else setDivisions([])
+    if (ev) fetchDivisions(ev); else setDivisions([])
   }
 
   function getEntryAvailability(ev) {
