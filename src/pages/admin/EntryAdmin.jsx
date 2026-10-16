@@ -33,6 +33,12 @@ export default function EntryAdmin() {
   const [editSearching, setEditSearching]   = useState(false)
   const [editSaving, setEditSaving]         = useState(false)
 
+  // ── 부서 변경 모달 (개인전) ──
+  const [divModal, setDivModal]       = useState(null)   // entry 객체
+  const [divOptions, setDivOptions]   = useState([])     // [{ division_id, division_name, play_format, disabledReason }]
+  const [divSelected, setDivSelected] = useState('')
+  const [divSaving, setDivSaving]     = useState(false)
+
   // ── 단체전 명단 수정 모달 ──
   const [teamEditModal, setTeamEditModal]         = useState(null)  // team entry _raw
   const [teamEditMembers, setTeamEditMembers]     = useState([])    // [{ member_id, member_name, gender, grade }]
@@ -472,6 +478,59 @@ export default function EntryAdmin() {
 
     showToast?.('✅ 선수가 변경되었습니다.')
     closeEditModal()
+    fetchEntries()
+  }
+
+  // ── 부서 변경 (개인전 단식·복식) ──
+  async function openDivModal(entry) {
+    setDivModal(entry)
+    setDivSelected('')
+    setDivOptions([])
+    const raw = entry._raw
+    const ev = events.find(x => x.event_id === selectedEventId)
+    const { data } = await supabase
+      .from('event_divisions')
+      .select('division_id, division_name, play_format, is_team_division')
+      .eq('event_id', selectedEventId)
+      .order('division_name')
+
+    // 단식↔복식 전환은 팀 구성이 달라지므로 같은 경기 방식의 부서만 허용
+    const isSingles = raw?.event_divisions?.play_format === 'singles'
+    const myIds = [raw?.teams?.member1_id, raw?.teams?.member2_id].filter(Boolean)
+    const options = (data || [])
+      .filter(d => ev?.event_type !== 'both' || !d.is_team_division)
+      .filter(d => (d.play_format === 'singles') === isSingles)
+      .filter(d => d.division_id !== raw?.division_id)
+      .map(d => {
+        // 이동할 부서에 이미 신청된 선수가 있으면 선택 불가
+        const dup = entries.some(e =>
+          e.division_id === d.division_id &&
+          e.entry_status !== '취소' &&
+          [e.teams?.member1_id, e.teams?.member2_id].some(id => id && myIds.includes(id))
+        )
+        return { ...d, disabledReason: dup ? '이미 신청됨' : '' }
+      })
+    setDivOptions(options)
+  }
+
+  function closeDivModal() {
+    setDivModal(null)
+    setDivOptions([])
+    setDivSelected('')
+  }
+
+  async function handleDivSave() {
+    if (!divModal || !divSelected) return
+    setDivSaving(true)
+    // 등급 합산·지도자 부서 제한은 DB 트리거(trg_entry_grade_sum 등)에서 검사
+    const { error } = await supabase
+      .from('event_entries')
+      .update({ division_id: divSelected })
+      .eq('entry_id', divModal._raw.entry_id)
+    setDivSaving(false)
+    if (error) { showToast?.('변경 실패: ' + error.message, 'error'); return }
+    showToast?.('✅ 부서가 변경되었습니다.')
+    closeDivModal()
     fetchEntries()
   }
 
@@ -941,6 +1000,14 @@ export default function EntryAdmin() {
                               파트너
                             </button>
                           )}
+                          {e._source === 'individual' && (
+                            <button
+                              onClick={() => openDivModal(e)}
+                              className="text-xs text-teal-600 border border-teal-200 bg-teal-50
+                                hover:bg-teal-100 rounded px-2 py-0.5">
+                              부서
+                            </button>
+                          )}
                           {/* 단체전 명단 수정 */}
                           {e._source === 'team' && (
                             <button
@@ -1152,6 +1219,73 @@ export default function EntryAdmin() {
                 className="flex-1 py-2.5 bg-accent text-white rounded-xl text-sm font-semibold
                   hover:bg-blue-700 disabled:opacity-50">
                 {editSaving ? '저장 중...' : '변경 저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── 부서 변경 모달 (관리자) ── */}
+      {divModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/40" onClick={closeDivModal} />
+          <div className="relative bg-white rounded-2xl p-5 w-full max-w-sm z-10">
+            <h3 className="text-base font-semibold text-gray-900 mb-1">부서 변경</h3>
+
+            <div className="bg-soft rounded-xl px-4 py-2.5 mb-4">
+              <p className="text-xs text-sub mb-0.5">현재 부서</p>
+              <p className="text-sm font-semibold text-gray-900">
+                {divModal.division}
+                <span className="text-xs font-normal text-sub ml-1.5">
+                  ({divModal._raw?.event_divisions?.play_format === 'singles' ? '단식' : '복식'})
+                </span>
+              </p>
+              <p className="text-xs text-sub mt-0.5">{divModal.name}</p>
+            </div>
+
+            <p className="text-xs text-sub mb-2">
+              변경할 부서 ({divModal._raw?.event_divisions?.play_format === 'singles' ? '단식' : '복식'} 부서만 표시)
+            </p>
+            {divOptions.length === 0 ? (
+              <p className="text-sm text-sub text-center py-4 mb-3">변경 가능한 부서가 없습니다.</p>
+            ) : (
+              <div className="border border-line rounded-xl overflow-hidden mb-4 max-h-56 overflow-y-auto">
+                {divOptions.map(d => (
+                  <button
+                    key={d.division_id}
+                    disabled={!!d.disabledReason}
+                    onClick={() => !d.disabledReason && setDivSelected(d.division_id)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-left
+                      border-b border-line last:border-0 transition-colors
+                      ${divSelected === d.division_id
+                        ? 'bg-blue-50'
+                        : d.disabledReason
+                          ? 'opacity-40 cursor-not-allowed bg-gray-50'
+                          : 'hover:bg-soft'
+                      }`}>
+                    <span className="text-sm font-medium">{d.division_name}</span>
+                    {d.disabledReason
+                      ? <span className="text-[10px] text-gray-400">{d.disabledReason}</span>
+                      : divSelected === d.division_id
+                        ? <span className="text-xs text-blue-500 font-medium">✓</span>
+                        : null
+                    }
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={closeDivModal}
+                className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft">
+                닫기
+              </button>
+              <button
+                onClick={handleDivSave}
+                disabled={!divSelected || divSaving}
+                className="flex-1 py-2.5 bg-accent text-white rounded-xl text-sm font-semibold
+                  hover:bg-blue-700 disabled:opacity-50">
+                {divSaving ? '저장 중...' : '변경 저장'}
               </button>
             </div>
           </div>
