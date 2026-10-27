@@ -11,6 +11,17 @@ const DEFAULT_PERMISSIONS = {
   notices: false,
 }
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+// 임시 비밀번호: 헷갈리는 글자(0/O, 1/l/I) 제외 8자
+function randomPassword() {
+  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const buf = new Uint32Array(8)
+  crypto.getRandomValues(buf)
+  return Array.from(buf, n => chars[n % chars.length]).join('')
+}
+
 const PERM_LABELS = {
   members: '👥 회원',
   events: '🏆 대회',
@@ -28,6 +39,8 @@ export default function AdminManagerPage() {
   const [selected, setSelected] = useState(null)
   const [form, setForm] = useState({ email: '', name: '', is_super: false, permissions: { ...DEFAULT_PERMISSIONS } })
   const [newPassword, setNewPassword] = useState('')
+  const [resetting, setResetting] = useState(false)
+  const [resetDone, setResetDone] = useState(false)
 
   // 회원 PIN 초기화용
   const [pinMemberSearch, setPinMemberSearch] = useState('')
@@ -129,7 +142,46 @@ export default function AdminManagerPage() {
   }
 
   // ─── 관리자 비밀번호 초기화 ───────────────────
-  // anon key로는 다른 사용자 비밀번호 변경 불가 → 모달에서 Supabase 대시보드 안내만 표시
+  // 다른 사용자 비밀번호 변경은 service role 이 필요 → Edge Function(admin-reset-password) 호출.
+  // 함수에서 호출자가 슈퍼관리자인지, 대상이 슈퍼가 아닌지 다시 확인한다.
+  async function handlePasswordReset() {
+    if (!selected) return
+    if (newPassword.length < 6) { showToast?.('비밀번호는 6자 이상이어야 합니다.', 'error'); return }
+
+    setResetting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('관리자 로그인이 필요합니다.')
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ email: selected.email, password: newPassword }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || '초기화 실패')
+    } catch (e) {
+      showToast?.('비밀번호 초기화 실패: ' + e.message, 'error')
+      setResetting(false)
+      return
+    }
+
+    await writeLog({
+      adminEmail: adminUser.email,
+      adminName: adminUser.name,
+      action: 'UPDATE',
+      targetTable: 'admin_users',
+      targetId: selected.email,
+      targetLabel: `관리자 비밀번호 초기화: ${selected.name}`,
+    })
+
+    setResetDone(true)
+    setResetting(false)
+    showToast?.(`${selected.name} 관리자 비밀번호가 초기화되었습니다.`)
+  }
 
   // ─── 회원 PIN 검색 ─────────────────────────────
   async function searchPinMembers(q) {
@@ -183,6 +235,8 @@ export default function AdminManagerPage() {
 
   function openPasswordReset(admin) {
     setSelected(admin)
+    setNewPassword(randomPassword())
+    setResetDone(false)
     setModal('password')
   }
 
@@ -243,9 +297,11 @@ export default function AdminManagerPage() {
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center gap-2">
                       <button onClick={() => openEdit(admin)} className="text-xs text-accent hover:underline">수정</button>
-                      <button onClick={() => openPasswordReset(admin)} className="text-xs text-amber-600 hover:underline">비번초기화</button>
                       {!admin.is_super && (
-                        <button onClick={() => handleDelete(admin)} className="text-xs text-red-500 hover:underline">삭제</button>
+                        <>
+                          <button onClick={() => openPasswordReset(admin)} className="text-xs text-amber-600 hover:underline">비번초기화</button>
+                          <button onClick={() => handleDelete(admin)} className="text-xs text-red-500 hover:underline">삭제</button>
+                        </>
                       )}
                     </div>
                   </td>
@@ -366,18 +422,40 @@ export default function AdminManagerPage() {
             <h3 className="text-base font-bold">🔐 비밀번호 초기화</h3>
             <p className="text-sm text-sub">{selected.name} ({selected.email})</p>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <p className="text-sm font-semibold text-amber-800 mb-2">⚠️ 직접 초기화 불가</p>
-              <p className="text-xs text-amber-700 leading-relaxed">
-                보안상 앱에서 다른 관리자의 비밀번호를 직접 변경할 수 없습니다.<br /><br />
-                아래 경로에서 직접 변경해주세요:<br />
-                <b>Supabase 대시보드 → Authentication → Users → 해당 계정 클릭 → Reset password</b>
-              </p>
-            </div>
+            {resetDone ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-sm font-semibold text-green-800 mb-2">✅ 초기화 완료</p>
+                <p className="text-xs text-green-700 leading-relaxed mb-2">
+                  아래 임시 비밀번호를 본인에게 전달하고, 로그인 후 바로 변경하도록 안내해주세요.
+                </p>
+                <p className="text-center font-mono text-lg font-bold tracking-wider bg-white rounded-lg py-2 select-all">
+                  {newPassword}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs text-sub mb-1">새 비밀번호 (6자 이상)</label>
+                <div className="flex gap-2">
+                  <input type="text" value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    autoComplete="off"
+                    className="flex-1 text-sm font-mono border border-line rounded-lg px-3 py-2" />
+                  <button onClick={() => setNewPassword(randomPassword())}
+                    className="text-xs px-3 border border-line rounded-lg text-sub hover:bg-soft">다시 생성</button>
+                </div>
+                <p className="text-xs text-sub mt-2">본인 확인 후 초기화하세요. 기존 비밀번호는 더 이상 쓸 수 없습니다.</p>
+              </div>
+            )}
 
             <div className="flex gap-2">
-              <button onClick={() => setModal(null)}
+              <button onClick={() => { setModal(null); setNewPassword('') }}
                 className="flex-1 py-2 border border-line rounded-lg text-sm text-sub">닫기</button>
+              {!resetDone && (
+                <button onClick={handlePasswordReset} disabled={resetting}
+                  className="flex-1 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                  {resetting ? '초기화 중...' : '초기화'}
+                </button>
+              )}
             </div>
           </div>
         </div>

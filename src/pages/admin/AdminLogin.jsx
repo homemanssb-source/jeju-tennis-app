@@ -11,6 +11,7 @@ export default function AdminLogin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showFind, setShowFind] = useState(false)
 
   // 비밀번호 변경 모드
   const [mode, setMode] = useState('login') // 'login' | 'change'
@@ -227,6 +228,20 @@ export default function AdminLogin() {
         >
           🔑 비밀번호 변경
         </button>
+
+        <button
+          onClick={() => setShowFind(v => !v)}
+          className="w-full text-sm text-sub hover:text-gray-700 py-2 transition-colors"
+        >
+          비밀번호를 잊으셨나요?
+        </button>
+        {showFind && (
+          <div className="bg-soft rounded-xl p-3 text-xs text-gray-600 leading-relaxed mb-1">
+            <b>슈퍼관리자</b>에게 비밀번호 초기화를 요청하세요.
+            슈퍼관리자가 <b>설정 → 관리자 계정 → 비번초기화</b>에서 임시 비밀번호를 발급해 드립니다.
+            받은 임시 비밀번호로 로그인한 뒤 <b>비밀번호 변경</b>에서 새 비밀번호로 바꿔주세요.
+          </div>
+        )}
 
         <button
           onClick={() => navigate('/')}
