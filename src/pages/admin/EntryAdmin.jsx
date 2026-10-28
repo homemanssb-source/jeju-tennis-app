@@ -3,6 +3,7 @@ import { useState, useEffect, useContext, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 import BulkIndividualEntry from './BulkIndividualEntry'
+import AdminTeamQuickEntry from './AdminTeamQuickEntry'
 import { yearAge } from '../../lib/ageGroups'
 import * as XLSX from 'xlsx'
 
@@ -65,18 +66,8 @@ export default function EntryAdmin() {
   const [addM2Selected, setAddM2Selected]     = useState(null)
   const [addM2Searching, setAddM2Searching]   = useState(false)
 
-  // 단체전 직접 등록 state
-  const [addClubName, setAddClubName]         = useState('')
-  const [addCaptainName, setAddCaptainName]   = useState('')
-  const [addTeamDivision, setAddTeamDivision] = useState('')
-  const [addTeamMembers, setAddTeamMembers]   = useState([]) // [{ member_id, name, club, gender, grade }]
-  const [addTmSearch, setAddTmSearch]         = useState('')
-  const [addTmResults, setAddTmResults]       = useState([])
-  const [addTmSearching, setAddTmSearching]   = useState(false)
-
   const m1Timer = useRef(null)
   const m2Timer = useRef(null)
-  const tmTimer = useRef(null)
 
   useEffect(() => { fetchEvents() }, [])
   useEffect(() => {
@@ -621,8 +612,6 @@ export default function EntryAdmin() {
     setAddDivisionId('')
     setAddM1Search(''); setAddM1Results([]); setAddM1Selected(null)
     setAddM2Search(''); setAddM2Results([]); setAddM2Selected(null)
-    setAddClubName(''); setAddCaptainName(''); setAddTeamDivision('')
-    setAddTeamMembers([]); setAddTmSearch(''); setAddTmResults([])
 
     // 현재 선택된 대회의 부서 목록 로드
     if (selectedEventId) {
@@ -669,38 +658,6 @@ export default function EntryAdmin() {
     setResults(data || [])
   }
 
-  // ── 단체전: 선수 검색 ──
-  function handleTmSearchChange(val) {
-    setAddTmSearch(val)
-    if (tmTimer.current) clearTimeout(tmTimer.current)
-    if (!val.trim()) { setAddTmResults([]); return }
-    tmTimer.current = setTimeout(async () => {
-      setAddTmSearching(true)
-      const { data } = await supabase
-        .from('members')
-        .select('member_id, name, club, gender, grade, status')
-        .ilike('name', `%${val.trim()}%`)
-        .eq('status', '활성')
-        .limit(15)
-      setAddTmSearching(false)
-      setAddTmResults(data || [])
-    }, 350)
-  }
-
-  function handleTmAddMember(m) {
-    if (addTeamMembers.find(x => x.member_id === m.member_id)) return
-    setAddTeamMembers(prev => [...prev, {
-      member_id: m.member_id, name: m.name, club: m.club,
-      gender: m.gender || '', grade: m.grade || '',
-    }])
-    setAddTmSearch('')
-    setAddTmResults([])
-  }
-
-  function handleTmRemoveMember(id) {
-    setAddTeamMembers(prev => prev.filter(x => x.member_id !== id))
-  }
-
   // ── 개인전 직접 등록 저장 ──
   const addIsSingles = addDivisions.find(d => d.division_id === addDivisionId)?.play_format === 'singles'
 
@@ -727,55 +684,6 @@ export default function EntryAdmin() {
       showToast?.('✅ 개인전 직접 등록 완료!')
       closeAddModal()
       fetchEntries()
-    } catch (err) {
-      showToast?.('등록 실패: ' + err.message, 'error')
-    } finally {
-      setAddSubmitting(false)
-    }
-  }
-
-  // ── 단체전 직접 등록 저장 ──
-  async function handleAddTeam() {
-    if (!addClubName.trim()) { showToast?.('클럽명을 입력해주세요.', 'error'); return }
-    if (!addCaptainName.trim()) { showToast?.('대표자(주장) 이름을 입력해주세요.', 'error'); return }
-    if (addTeamMembers.length === 0) { showToast?.('선수를 1명 이상 추가해주세요.', 'error'); return }
-
-    setAddSubmitting(true)
-    try {
-      const { data: entry, error: entryErr } = await supabase
-        .from('team_event_entries')
-        .insert({
-          event_id:      selectedEventId,
-          club_name:     addClubName.trim(),
-          captain_name:  addCaptainName.trim(),
-          captain_pin:   '',
-          division_name: addTeamDivision || null,
-          status:        'confirmed',
-          payment_status:'미납',
-          created_at:    new Date().toISOString(),
-        })
-        .select('id')
-        .single()
-      if (entryErr) throw entryErr
-
-      const { error: memberErr } = await supabase
-        .from('team_event_members')
-        .insert(addTeamMembers.map((m, i) => ({
-          entry_id:     entry.id,
-          member_id:    m.member_id || null,
-          member_name:  m.name,
-          gender:       m.gender || '',
-          grade:        m.grade || '',
-          member_order: i + 1,
-        })))
-      if (memberErr) {
-        await supabase.from('team_event_entries').delete().eq('id', entry.id)
-        throw memberErr
-      }
-
-      showToast?.('✅ 단체전 직접 등록 완료!')
-      closeAddModal()
-      fetchTeamEntries()
     } catch (err) {
       showToast?.('등록 실패: ' + err.message, 'error')
     } finally {
@@ -1591,112 +1499,9 @@ export default function EntryAdmin() {
 
               {/* ──── 단체전 등록 ──── */}
               {addTab === 'team' && (
-                <>
-                  {/* 클럽명 */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      클럽명 <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={addClubName}
-                      onChange={e => setAddClubName(e.target.value)}
-                      placeholder="클럽 이름 입력"
-                      className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
-                  </div>
-
-                  {/* 대표자(주장) */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      대표자(주장) 이름 <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={addCaptainName}
-                      onChange={e => setAddCaptainName(e.target.value)}
-                      placeholder="주장 이름 입력"
-                      className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
-                  </div>
-
-                  {/* 부서/조 (선택) */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">부서/조 (선택)</label>
-                    <input
-                      type="text"
-                      value={addTeamDivision}
-                      onChange={e => setAddTeamDivision(e.target.value)}
-                      placeholder="예: A조, 1부"
-                      className="w-full text-sm border border-line rounded-lg px-3 py-2.5" />
-                  </div>
-
-                  {/* 선수 추가 */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      선수 추가 <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={addTmSearch}
-                        onChange={e => handleTmSearchChange(e.target.value)}
-                        placeholder="이름으로 검색하여 추가..."
-                        className="w-full text-sm border border-line rounded-lg px-3 py-2.5 pr-8" />
-                      {addTmSearching && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-sub">⏳</span>
-                      )}
-                    </div>
-
-                    {addTmResults.length > 0 && (
-                      <div className="border border-line rounded-xl mt-1 overflow-hidden max-h-36 overflow-y-auto">
-                        {addTmResults.map(m => {
-                          const already = addTeamMembers.some(x => x.member_id === m.member_id)
-                          return (
-                            <button
-                              key={m.member_id}
-                              onClick={() => !already && handleTmAddMember(m)}
-                              disabled={already}
-                              className={`w-full flex items-center justify-between px-3 py-2 text-left
-                                border-b border-line last:border-0 transition-colors
-                                ${already ? 'opacity-40 cursor-not-allowed bg-gray-50' : 'hover:bg-soft'}`}>
-                              <span className="text-sm font-medium">{m.name}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-sub">{m.club || ''}</span>
-                                {already
-                                  ? <span className="text-xs text-gray-400">추가됨</span>
-                                  : <span className="text-xs text-accent font-medium">+ 추가</span>
-                                }
-                              </div>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-
-                    {/* 선수 명단 */}
-                    {addTeamMembers.length > 0 && (
-                      <div className="mt-2 border border-line rounded-xl overflow-hidden">
-                        <div className="px-3 py-2 bg-soft border-b border-line">
-                          <span className="text-xs font-medium text-gray-700">
-                            선수 명단 ({addTeamMembers.length}명)
-                          </span>
-                        </div>
-                        {addTeamMembers.map((m, i) => (
-                          <div key={m.member_id}
-                            className="flex items-center justify-between px-3 py-2 border-b border-line last:border-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-sub w-5">{i + 1}</span>
-                              <span className="text-sm font-medium">{m.name}</span>
-                              {m.club && <span className="text-xs text-sub">({m.club})</span>}
-                            </div>
-                            <button
-                              onClick={() => handleTmRemoveMember(m.member_id)}
-                              className="text-red-400 hover:text-red-600 text-xs px-1">✕</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
+                <AdminTeamQuickEntry
+                  event={events.find(ev => ev.event_id === selectedEventId)}
+                  onDone={() => { closeAddModal(); fetchTeamEntries() }} />
               )}
             </div>
 
@@ -1707,8 +1512,8 @@ export default function EntryAdmin() {
                 className="flex-1 py-2.5 border border-line rounded-xl text-sm text-sub hover:bg-soft">
                 닫기
               </button>
-              {addTab !== 'bulk' && <button
-                onClick={addTab === 'individual' ? handleAddIndividual : handleAddTeam}
+              {addTab === 'individual' && <button
+                onClick={handleAddIndividual}
                 disabled={addSubmitting}
                 className="flex-1 py-2.5 bg-accent text-white rounded-xl text-sm font-semibold
                   hover:bg-blue-700 disabled:opacity-50">

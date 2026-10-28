@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 import { getMatchTypeLabel, resolveMatchType, filterTeamDivisions } from '../../lib/teamMatch'
+import AdminTeamQuickEntry from './AdminTeamQuickEntry'
 
 const STATUS_MAP = {
   pending: { label: '대기', color: 'text-yellow-600 bg-yellow-50' },
@@ -30,6 +31,9 @@ export default function AdminTeamEntryPage() {
   const [bulkMode, setBulkMode] = useState(false)
   const [bulkLoading, setBulkLoading] = useState(false)
   const [bulkConfirmModal, setBulkConfirmModal] = useState(null) // { type: 'confirm'|'payment', label }
+
+  // ── 관리자 팀 직접 등록 ──
+  const [addOpen, setAddOpen] = useState(false)
 
   useEffect(() => { fetchEvents() }, [])
 
@@ -186,7 +190,15 @@ export default function AdminTeamEntryPage() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-sm font-bold">🏟️ 단체전 신청관리</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold">🏟️ 단체전 신청관리</h2>
+        {selectedEventId && (
+          <button onClick={() => setAddOpen(true)}
+            className="px-3 py-1.5 bg-accent text-white text-sm font-semibold rounded-lg hover:bg-blue-700">
+            ➕ 팀 등록
+          </button>
+        )}
+      </div>
 
       {/* 대회 선택 */}
       <div>
@@ -510,6 +522,26 @@ export default function AdminTeamEntryPage() {
             </>
           )}
         </>
+      )}
+
+      {/* ── 관리자 팀 직접 등록 모달 ── */}
+      {addOpen && selectedEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setAddOpen(false)} />
+          <div className="relative bg-white rounded-2xl w-full max-w-md z-10 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+              <h3 className="text-base font-bold text-gray-900">➕ 단체전 팀 등록</h3>
+              <button onClick={() => setAddOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-soft text-sub text-lg">
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <AdminTeamQuickEntry event={selectedEvent}
+                onDone={() => { setAddOpen(false); fetchEntries(selectedEventId) }} />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── 일괄 처리 확인 모달 ── */}
