@@ -112,10 +112,10 @@ export default function EntryAdmin() {
     if (memberIds.length > 0) {
       const { data: membersData } = await supabase
         .from('members')
-        .select('member_id, name, club, gender, birthdate, grade')
+        .select('member_id, name, club, gender, birthdate, grade, phone, guardian_phone')
         .in('member_id', memberIds)
       for (const m of (membersData || [])) {
-        memberClubMap[m.member_id] = { name: m.name, club: m.club, gender: m.gender, birthdate: m.birthdate, grade: m.grade }
+        memberClubMap[m.member_id] = { name: m.name, club: m.club, gender: m.gender, birthdate: m.birthdate, grade: m.grade, phone: m.phone, guardian_phone: m.guardian_phone }
       }
     }
     // ★ 각 entry에 club 정보 첨부
@@ -150,6 +150,19 @@ export default function EntryAdmin() {
       for (const m of (membersData || [])) {
         if (!membersMap[m.entry_id]) membersMap[m.entry_id] = []
         membersMap[m.entry_id].push(m)
+      }
+      // 엑셀 다운로드용 연락처 (members 에서 조회)
+      const ids = [...new Set((membersData || []).map(m => m.member_id).filter(Boolean))]
+      if (ids.length > 0) {
+        const { data: phoneData } = await supabase
+          .from('members')
+          .select('member_id, phone, guardian_phone')
+          .in('member_id', ids)
+        const phoneMap = Object.fromEntries((phoneData || []).map(p => [p.member_id, p]))
+        for (const m of (membersData || [])) {
+          m.phone = phoneMap[m.member_id]?.phone
+          m.guardian_phone = phoneMap[m.member_id]?.guardian_phone
+        }
       }
     }
 
@@ -242,6 +255,14 @@ export default function EntryAdmin() {
     const genderText = g => (g === 'M' || g === '남') ? '남' : (g === 'F' || g === '여') ? '여' : (g || '')
     const ageNum = m => { const v = m ? yearAge(m.birthdate, eventYear) : null; return v === null ? '' : v }
     const dateText = d => d ? new Date(d).toLocaleDateString('ko-KR') : ''
+    // 본인 번호 우선, 없으면 보호자 번호(선수 회원) — 010-1234-5678 형식
+    const fmtPhone = p => {
+      const d = String(p || '').replace(/[^0-9]/g, '')
+      if (d.length === 11) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`
+      if (d.length === 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`
+      return d
+    }
+    const phoneText = m => m?.phone ? fmtPhone(m.phone) : m?.guardian_phone ? `${fmtPhone(m.guardian_phone)}(보호자)` : ''
     // 부서 → 신청 순으로 정렬
     const byDivision = (a, b) =>
       a.division.localeCompare(b.division, 'ko') || String(a.date || '').localeCompare(String(b.date || ''))
@@ -256,11 +277,13 @@ export default function EntryAdmin() {
         '성별1': genderText(m1?.gender),
         '나이1': ageNum(m1),
         '등급1': m1?.grade || '',
+        '연락처1': phoneText(m1),
         '선수2': m2?.name || '',
         '클럽2': m2?.club || '',
         '성별2': genderText(m2?.gender),
         '나이2': ageNum(m2),
         '등급2': m2?.grade || '',
+        '연락처2': phoneText(m2),
         '상태': e.status,
       }
       if (!noPayment) row['결제'] = e.payment_status || '미납'
@@ -279,6 +302,7 @@ export default function EntryAdmin() {
           '선수명': m?.member_name || '',
           '성별': genderText(m?.gender),
           '등급': m?.grade || '',
+          '연락처': phoneText(m),
           '상태': e.status,
         }
         if (!noPayment) row['결제'] = e.payment_status || '미납'
