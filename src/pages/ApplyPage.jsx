@@ -3,6 +3,7 @@
 import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
+import PlayerDetail from '../components/PlayerDetail'
 import { ToastContext } from '../App'
 import { formatGrade } from '../lib/grade'
 import { clubBaseKey, memberClubs } from '../lib/teamMatch'
@@ -66,6 +67,9 @@ export default function ApplyPage() {
 
   // ── 내 단체전 신청 내역 ──
   const [myTeamEntries, setMyTeamEntries]         = useState([])
+
+  // 선수 이름 누르면 회원상세 (랭킹·선수검색과 같은 PlayerDetail)
+  const [detailMemberId, setDetailMemberId] = useState(null)
 
   useEffect(() => { fetchEvents() }, [])
   useEffect(() => { if (selectedEventId) { fetchEntries(); fetchTeamEntries() } }, [selectedEventId])
@@ -651,17 +655,19 @@ export default function ApplyPage() {
                               <p className="text-sm font-medium break-keep">
                                 {entry._m1 ? (
                                   <>
-                                    <span className="inline-block">
+                                    <button type="button" onClick={() => setDetailMemberId(entry.teams.member1_id)}
+                                      className="inline-block text-left hover:text-accent hover:underline">
                                       {entry._m1.name}
                                       {entry._m1.club && <span className="text-xs text-sub font-normal">({entry._m1.club})</span>}
-                                    </span>
+                                    </button>
                                     {entry._m2 && (
                                       <>
                                         <span className="text-sub mx-1">/</span>
-                                        <span className="inline-block">
+                                        <button type="button" onClick={() => setDetailMemberId(entry.teams.member2_id)}
+                                          className="inline-block text-left hover:text-accent hover:underline">
                                           {entry._m2.name}
                                           {entry._m2.club && <span className="text-xs text-sub font-normal">({entry._m2.club})</span>}
-                                        </span>
+                                        </button>
                                       </>
                                     )}
                                   </>
@@ -961,7 +967,12 @@ export default function ApplyPage() {
                     {rosterViewMembers.map((m, i) => (
                       <tr key={m.id || i} className="border-t border-line/30">
                         <td className="px-3 py-2.5 text-xs text-sub">{i + 1}</td>
-                        <td className="px-3 py-2.5 font-medium">{m.member_name}</td>
+                        <td className="px-3 py-2.5 font-medium">
+                          {m.member_id ? (
+                            <button type="button" onClick={() => setDetailMemberId(m.member_id)}
+                              className="text-left hover:text-accent hover:underline">{m.member_name}</button>
+                          ) : m.member_name}
+                        </td>
                         <td className="px-3 py-2.5 text-xs">{m.gender === 'M' || m.gender === '남' ? '남' : m.gender === 'F' || m.gender === '여' ? '여' : '-'}</td>
                         <td className="px-3 py-2.5 text-xs text-accent">{m.grade || '-'}</td>
                       </tr>
@@ -1267,6 +1278,7 @@ export default function ApplyPage() {
           </div>
         </div>
       )}
+      <PlayerDetail memberId={detailMemberId} open={!!detailMemberId} onClose={() => setDetailMemberId(null)} />
     </div>
   )
 }
