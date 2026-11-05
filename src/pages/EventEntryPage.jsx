@@ -9,6 +9,51 @@ import { gradeNumber } from '../lib/grade'
 const gradePoints = m => gradeNumber(m?.grade) ?? 1
 // 지도자 등급 회원은 지도자부(부서명에 '지도자' 포함)에만 출전 (DB _check_coach_division 과 동일)
 const isCoach = m => String(m?.grade || '').startsWith('지도자')
+// 성별 표기 통일 (DB gender_code 와 동일): '남'/'M' → '남', '여'/'F' → '여'
+const genderOf = m => {
+  const g = m?.gender
+  if (g === '남' || g === 'M' || g === 'm' || g === '남자') return '남'
+  if (g === '여' || g === 'F' || g === 'f' || g === '여자') return '여'
+  return null
+}
+const GENDER_RULE_LABEL = { mixed: '혼복(남1+여1)', male: '남자만', female: '여자만' }
+
+// 부서 조건 요약 — 부서 목록·안내 문구에 표시
+function divisionRuleText(d) {
+  if (!d) return ''
+  const parts = []
+  if (d.gender_rule) parts.push(GENDER_RULE_LABEL[d.gender_rule])
+  if (d.max_male_grade != null) parts.push(`남 ${Number(d.max_male_grade)}점 이하`)
+  if (d.max_female_grade != null) parts.push(`여 ${Number(d.max_female_grade)}점 이하`)
+  if (d.play_format !== 'singles' && d.max_grade_sum != null) parts.push(`합산 ${Number(d.max_grade_sum)}점 이하`)
+  return parts.join(' · ')
+}
+
+// 이 회원을 이 부서에 (partner 와 함께) 신청할 수 없는 이유. 가능하면 null.
+// DB 트리거(_check_coach_division / _check_gender_rules / _check_grade_sum)와 같은 규칙.
+// minPartnerPts: 파트너가 아직 없을 때, 가장 낮은 점수의 파트너와 짝지어도 합산 초과면 미리 막기 위한 값
+function blockReason(d, m, partner, minPartnerPts = null) {
+  if (!d || !m) return null
+  if (!(d.division_name || '').includes('지도자') && isCoach(m)) return '지도자부만'
+  const g = genderOf(m)
+  if (d.gender_rule) {
+    if (!g) return '성별 미등록'
+    if (d.gender_rule === 'male' && g !== '남') return '남자만 신청'
+    if (d.gender_rule === 'female' && g !== '여') return '여자만 신청'
+    if (d.gender_rule === 'mixed' && partner && genderOf(partner) === g) return `혼복 — ${g === '남' ? '여자' : '남자'} 파트너 필요`
+  }
+  if (g === '남' && d.max_male_grade != null && gradePoints(m) > Number(d.max_male_grade)) return `남자 ${Number(d.max_male_grade)}점 초과`
+  if (g === '여' && d.max_female_grade != null && gradePoints(m) > Number(d.max_female_grade)) return `여자 ${Number(d.max_female_grade)}점 초과`
+  if (partner && d.play_format !== 'singles' && d.max_grade_sum != null
+      && gradePoints(m) + gradePoints(partner) > Number(d.max_grade_sum)) {
+    return `합산 ${gradePoints(m) + gradePoints(partner)}점 > ${Number(d.max_grade_sum)}점`
+  }
+  if (!partner && minPartnerPts != null && d.play_format !== 'singles' && d.max_grade_sum != null
+      && gradePoints(m) + minPartnerPts > Number(d.max_grade_sum)) {
+    return `${gradePoints(m)}점 — 합산 ${Number(d.max_grade_sum)}점 초과`
+  }
+  return null
+}
 
 export default function EventEntryPage() {
   const showToast = useContext(ToastContext)
@@ -40,7 +85,7 @@ export default function EventEntryPage() {
   async function fetchMembers() {
     // 동호인·선수 모두 불러오고, 선택한 대회의 대상(target_type)에 따라 필터링
     const { data } = await supabase.from('members_public')
-      .select('member_id, name, display_name, club, division, grade, status, member_type, birth_year')
+      .select('member_id, name, display_name, gender, club, division, grade, status, member_type, birth_year')
       .eq('status', '활성')  // ← 활성만 조회
       .order('name')
     setMembers(data || [])
@@ -56,8 +101,9 @@ export default function EventEntryPage() {
   // 드롭다운/선택 정보에 표시할 부가 정보: 동호인은 등급, 선수는 연령부서
   function memberMeta(m) {
     if (!m) return ''
-    if (m.member_type === '선수') return ageGroupOf(m.birth_year, eventYear) || '선수'
-    return m.grade || '-'
+    const g = genderOf(m) ? `${genderOf(m)} · ` : ''
+    if (m.member_type === '선수') return g + (ageGroupOf(m.birth_year, eventYear) || '선수')
+    return g + (m.grade || '-')
   }
 
   async function fetchDivisions(ev) {
@@ -121,11 +167,8 @@ export default function EventEntryPage() {
       showToast?.('⚠️ 선수2가 활성 회원이 아닙니다.', 'error'); return
     }
 
-    if (coachBlocked(m1) || (!isSingles && coachBlocked(m2))) {
-      showToast?.('⚠️ 지도자 등급 회원은 지도자부에만 신청할 수 있습니다.', 'error'); return
-    }
-    if (overGradeSum) {
-      showToast?.(`⚠️ 등급 합산 ${gradeSum}점 — 이 부서는 ${maxGradeSum}점 이하만 신청할 수 있습니다.`, 'error'); return
+    if (pairError) {
+      showToast?.('⚠️ ' + pairError, 'error'); return
     }
 
     const avail = getEntryAvailability(selectedEvent)
@@ -158,8 +201,13 @@ export default function EventEntryPage() {
   const maxGradeSum = !isSingles && divisionInfo?.max_grade_sum != null ? Number(divisionInfo.max_grade_sum) : null
   const gradeSum = member1Info && member2Info ? gradePoints(member1Info) + gradePoints(member2Info) : null
   const overGradeSum = maxGradeSum != null && gradeSum != null && gradeSum > maxGradeSum
-  const isCoachDivision = (divisionInfo?.division_name || '').includes('지도자')
-  const coachBlocked = m => !isCoachDivision && isCoach(m)
+  const ruleText = divisionRuleText(divisionInfo)
+  // 대상 회원 중 가장 낮은 점수 (파트너 미선택 시 합산 가능성 판단용)
+  const minPartnerPts = members.length ? Math.min(...members.filter(matchesTarget).map(gradePoints)) : null
+  // 현재 선택된 조합의 문제 (선수1/선수2 각각을 상대 기준으로 검사)
+  const reason1 = blockReason(divisionInfo, member1Info, isSingles ? null : member2Info)
+  const reason2 = isSingles ? null : blockReason(divisionInfo, member2Info, member1Info)
+  const pairError = reason1 ? `${member1Info.name}: ${reason1}` : reason2 ? `${member2Info.name}: ${reason2}` : null
 
   function handleDivisionChange(divisionId) {
     setSelectedDivision(divisionId)
@@ -220,13 +268,13 @@ export default function EventEntryPage() {
                 {divisions.map(d => (
                   <option key={d.division_id} value={d.division_id}>
                     {d.division_name}{d.play_format === 'singles' ? ' (단식)' : ''}
-                    {d.play_format !== 'singles' && d.max_grade_sum != null ? ` · 합산 ${Number(d.max_grade_sum)}점 이하` : ''}
+                    {divisionRuleText(d) ? ` · ${divisionRuleText(d)}` : ''}
                   </option>
                 ))}
               </select>
               {isSingles && <p className="text-xs text-blue-600 mt-1">🎾 단식 부서 — 선수 1명만 신청합니다.</p>}
-              {maxGradeSum != null && (
-                <p className="text-xs text-blue-600 mt-1">📊 두 선수 등급 합산 <b>{maxGradeSum}점 이하</b>만 신청 가능합니다.</p>
+              {ruleText && (
+                <p className="text-xs text-blue-600 mt-1">📊 신청 조건: <b>{ruleText}</b> — 조건에 맞지 않는 회원은 선택할 수 없습니다.</p>
               )}
             </div>
 
@@ -247,17 +295,17 @@ export default function EventEntryPage() {
                   )}
                   {showDropdown1 && filterMembers(member1Search).length > 0 && (
                     <div className="absolute left-0 right-0 top-full bg-white border border-line rounded-lg shadow-lg mt-1 z-20 max-h-48 overflow-y-auto">
-                      {filterMembers(member1Search).map(m => (
-                        <button key={m.member_id} disabled={coachBlocked(m)}
+                      {filterMembers(member1Search).map(m => { const why = blockReason(divisionInfo, m, isSingles ? null : member2Info, minPartnerPts); return (
+                        <button key={m.member_id} disabled={!!why}
                           onClick={() => { setMember1Id(m.member_id); setMember1Search(m.display_name || m.name); setShowDropdown1(false); setMember1Pin('') }}
                           className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30 disabled:opacity-50 disabled:cursor-not-allowed">
                           <span className="font-medium">{m.display_name || m.name}</span>
                           <span className="text-sub text-xs ml-2">{m.club || ''} · {memberMeta(m)}</span>
-                          {coachBlocked(m)
-                            ? <span className="text-xs ml-2 text-red-500">지도자부만</span>
+                          {why
+                            ? <span className="text-xs ml-2 text-red-500">{why}</span>
                             : <span className="text-xs ml-2 text-green-600">✅</span>}
                         </button>
-                      ))}
+                      )})}
                     </div>
                   )}
                 </div>
@@ -292,25 +340,25 @@ export default function EventEntryPage() {
                   )}
                   {showDropdown2 && filterMembers(member2Search).some(m => m.member_id !== member1Id) && (
                     <div className="absolute left-0 right-0 top-full bg-white border border-line rounded-lg shadow-lg mt-1 z-20 max-h-48 overflow-y-auto">
-                      {filterMembers(member2Search).filter(m => m.member_id !== member1Id).map(m => (
-                        <button key={m.member_id} disabled={coachBlocked(m)}
+                      {filterMembers(member2Search).filter(m => m.member_id !== member1Id).map(m => { const why = blockReason(divisionInfo, m, member1Info); return (
+                        <button key={m.member_id} disabled={!!why}
                           onClick={() => { setMember2Id(m.member_id); setMember2Search(m.display_name || m.name); setShowDropdown2(false) }}
                           className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-b border-line/30 disabled:opacity-50 disabled:cursor-not-allowed">
                           <span className="font-medium">{m.display_name || m.name}</span>
                           <span className="text-sub text-xs ml-2">{m.club || ''} · {memberMeta(m)}</span>
-                          {coachBlocked(m)
-                            ? <span className="text-xs ml-2 text-red-500">지도자부만</span>
+                          {why
+                            ? <span className="text-xs ml-2 text-red-500">{why}</span>
                             : <span className="text-xs ml-2 text-green-600">✅</span>}
                         </button>
-                      ))}
+                      )})}
                     </div>
                   )}
                 </div>
                 )}
 
-                {(coachBlocked(member1Info) || (!isSingles && coachBlocked(member2Info))) && (
+                {pairError && (
                   <div className="px-3 py-2 rounded-lg text-xs font-medium bg-red-50 text-red-600">
-                    지도자 등급 회원은 지도자부에만 신청할 수 있습니다.
+                    ⚠️ {pairError} — 이 부서 조건({ruleText || '지도자부 전용'})에 맞지 않아 신청할 수 없습니다.
                   </div>
                 )}
 
@@ -322,8 +370,7 @@ export default function EventEntryPage() {
                 )}
 
                 <button onClick={handleSubmit}
-                  disabled={submitting || !member1Id || (!isSingles && !member2Id) || member1Pin.length !== 6 || overGradeSum
-                    || coachBlocked(member1Info) || (!isSingles && coachBlocked(member2Info))}
+                  disabled={submitting || !member1Id || (!isSingles && !member2Id) || member1Pin.length !== 6 || !!pairError}
                   className="w-full bg-accent text-white py-3 rounded-lg font-semibold text-sm
                     hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   {submitting ? '신청 중..' : '🎾 참가 신청하기'}

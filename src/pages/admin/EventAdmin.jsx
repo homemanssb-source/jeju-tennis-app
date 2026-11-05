@@ -775,6 +775,33 @@ export default function EventAdmin() {
                       점 이하
                     </span>
                   )}
+                  {selectedEvent.event_type !== 'team' && !d.is_team_division && (
+                    <div className="flex items-center gap-2 mt-1 flex-wrap text-xs text-sub">
+                      <select value={d.gender_rule || ''}
+                        onChange={e => updateDivision(d.division_id, { gender_rule: e.target.value || null })}
+                        title="신청 가능한 성별 구성"
+                        className={`text-xs border rounded px-1.5 py-0.5 ${d.gender_rule ? 'border-pink-300 bg-pink-50 text-pink-700' : 'border-line bg-white'}`}>
+                        <option value="">성별 제한없음</option>
+                        {(d.play_format || 'doubles') === 'doubles' && <option value="mixed">혼복 (남1+여1)</option>}
+                        <option value="male">남자만</option>
+                        <option value="female">여자만</option>
+                      </select>
+                      {[['max_male_grade', '남자'], ['max_female_grade', '여자']].map(([key, label]) => (
+                        <span key={key} className="inline-flex items-center gap-1"
+                          title={`${label} 선수 1명의 등급이 이 점수 이하일 때만 신청 가능 (비우면 제한 없음)`}>
+                          {label}
+                          <input type="number" min="0" step="0.5" defaultValue={d[key] ?? ''}
+                            onBlur={e => {
+                              const v = e.target.value ? Number(e.target.value) : null
+                              if (v !== (d[key] ?? null)) updateDivision(d.division_id, { [key]: v })
+                            }}
+                            placeholder="제한없음"
+                            className="w-16 text-xs border border-line rounded px-1.5 py-0.5 bg-white" />
+                          점 이하
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {d.has_groups && (
                     <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
                       d.groups_status === 'COMPLETED' ? 'bg-green-50 text-green-700' :
