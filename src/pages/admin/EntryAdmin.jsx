@@ -16,6 +16,7 @@ export default function EntryAdmin() {
   const [filterPayment, setFilterPayment]     = useState('')
   const [filterType, setFilterType]           = useState('')
   const [filterName, setFilterName]           = useState('')  // ★ 이름 검색
+  const [filterDivision, setFilterDivision]   = useState('')  // 부서별 보기
   const [loading, setLoading]                 = useState(false)
 
   // ── 취소 확인 모달 (관리자) ──
@@ -229,19 +230,33 @@ export default function EntryAdmin() {
   ]
 
   // 취소 건 제외한 카운트 기준 목록
-  const activeEntries = allEntries.filter(e =>
-    e.status !== '취소' && e.payment_status !== '환불완료'
-  )
+  const isActive = e => e.status !== '취소' && e.payment_status !== '환불완료'
 
+  // 부서 탭: 신청이 있는 부서 + 부서별 팀 수 (취소·환불완료 제외)
+  const divisionTabs = [...new Set(allEntries.map(e => e.division))]
+    .sort((a, b) => a.localeCompare(b, 'ko'))
+    .map(name => ({
+      name,
+      count: allEntries.filter(e => e.division === name && isActive(e)).length,
+    }))
+  // 선택한 부서가 목록에서 사라지면(취소·부서 변경 등) 전체 보기로
+  const activeDivision = divisionTabs.some(d => d.name === filterDivision) ? filterDivision : ''
+  const inDivision = e => !activeDivision || e.division === activeDivision
+
+  // 카운트는 선택한 부서 기준
+  const activeEntries = allEntries.filter(e => isActive(e) && inDivision(e))
+
+  const allActiveCount = allEntries.filter(isActive).length
   const totalCount   = activeEntries.length
   const paidCount    = activeEntries.filter(e => e.payment_status === '결제완료').length
   const unpaidCount  = activeEntries.filter(e => e.payment_status === '미납').length
-  const refundCount  = allEntries.filter(e => e.payment_status === '환불대기').length
+  const refundCount  = allEntries.filter(e => e.payment_status === '환불대기' && inDivision(e)).length
   // 참가비 없는 대회 → 결제 상태·결제확인 버튼 숨김
   const noPayment = events.find(ev => ev.event_id === selectedEventId)?.payment_required === false
 
   // ★ 필터 적용 (이름 검색 포함)
   const filtered = allEntries.filter(e => {
+    if (!inDivision(e)) return false
     if (filterPayment && e.payment_status !== filterPayment) return false
     if (filterType === '개인' && e.type !== '개인') return false
     if (filterType === '단체' && e.type !== '단체') return false
@@ -327,7 +342,8 @@ export default function EntryAdmin() {
     addSheet(teamRows, '단체전')
 
     const safeName = (ev?.event_name || '대회').replace(/[\\/:*?"<>|]/g, '_')
-    XLSX.writeFile(wb, `${safeName}_참가신청명단.xlsx`)
+    const divSuffix = activeDivision ? `_${activeDivision.replace(/[\\/:*?"<>|]/g, '_')}` : ''
+    XLSX.writeFile(wb, `${safeName}${divSuffix}_참가신청명단.xlsx`)
   }
 
   // ── 결제 상태 변경 ──
@@ -757,7 +773,7 @@ export default function EntryAdmin() {
       <div className="flex gap-2 mb-4 flex-wrap">
         <select
           value={selectedEventId}
-          onChange={e => { setSelectedEventId(e.target.value); setEntries([]); setTeamEntries([]); setFilterPayment('') }}
+          onChange={e => { setSelectedEventId(e.target.value); setEntries([]); setTeamEntries([]); setFilterPayment(''); setFilterDivision('') }}
           className="flex-1 min-w-[200px] text-sm border border-line rounded-lg px-3 py-2">
           <option value="">대회 선택</option>
           {events.map(ev => (
@@ -792,6 +808,26 @@ export default function EntryAdmin() {
           <option value="환불완료">환불완료만</option>
         </select>}
       </div>
+
+      {/* ── 부서 탭 ── */}
+      {selectedEventId && divisionTabs.length > 1 && (
+        <div className="flex gap-1.5 mb-3 flex-wrap">
+          {[{ name: '', label: '전체 부서', count: allActiveCount },
+            ...divisionTabs.map(d => ({ ...d, label: d.name }))].map(d => (
+            <button
+              key={d.name || '__all'}
+              onClick={() => setFilterDivision(d.name)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                activeDivision === d.name
+                  ? 'bg-accent text-white border-accent'
+                  : 'bg-white text-gray-700 border-line hover:bg-soft'
+              }`}>
+              {d.label}
+              <span className={`ml-1 ${activeDivision === d.name ? 'opacity-80' : 'text-sub'}`}>{d.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── 카운트 탭 ── */}
       {selectedEventId && (
