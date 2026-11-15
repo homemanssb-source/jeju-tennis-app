@@ -10,7 +10,8 @@ const REPORT_COLS = 'id, member_id, member_name, reported_at, tournament_name, t
 export default function PlayerDetail({ memberId, open, onClose }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [seasonYear, setSeasonYear] = useState(new Date().getFullYear())
+  // 0 = 현재 (대회별 최근 회차 포인트만 합산 + 전체 대회 이력), 연도 = 그 시즌 기록
+  const [seasonYear, setSeasonYear] = useState(0)
   const [currentRank, setCurrentRank] = useState(null)
   const [externalHistory, setExternalHistory] = useState([])
   const [histTab, setHistTab] = useState('jta')
@@ -57,7 +58,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
   function handleClose() {
     setData(null)
     setCurrentRank(null)
-    setSeasonYear(new Date().getFullYear())
+    setSeasonYear(0)
     setExternalHistory([])
     setHistTab('jta')
     onClose()
@@ -104,11 +105,11 @@ export default function PlayerDetail({ memberId, open, onClose }) {
             {data.total_points !== undefined && (
               <div className="mt-3 flex gap-3">
                 <div className="flex-1 bg-soft rounded-lg px-4 py-3">
-                  <span className="text-xs text-sub">{data.season_year}시즌 총 포인트</span>
+                  <span className="text-xs text-sub">{data.season_year ? `${data.season_year}시즌 총 포인트` : '현재 포인트'}</span>
                   <p className="text-2xl font-bold text-accent">{data.total_points.toLocaleString()}</p>
                 </div>
                 <div className="bg-soft rounded-lg px-4 py-3 text-center min-w-[90px]">
-                  <span className="text-xs text-sub">현재 랭킹</span>
+                  <span className="text-xs text-sub">{data.season_year ? '시즌 순위' : '현재 랭킹'}</span>
                   {currentRank ? (
                     <p className="text-2xl font-bold text-gray-900">
                       {currentRank}<span className="text-sm font-medium text-sub">위</span>
@@ -126,6 +127,7 @@ export default function PlayerDetail({ memberId, open, onClose }) {
             <span className="text-sm font-medium text-gray-700">시즌:</span>
             <select value={seasonYear} onChange={e => setSeasonYear(Number(e.target.value))}
               className="text-sm border border-line rounded-lg px-3 py-1.5 bg-white">
+              <option value={0}>현재 (전체 이력)</option>
               {seasonOptions.map(y => <option key={y} value={y}>{y}년</option>)}
             </select>
           </div>
@@ -161,11 +163,14 @@ export default function PlayerDetail({ memberId, open, onClose }) {
           {histTab === 'jta' && (
             <div>
               {history.length === 0 ? (
-                <p className="text-sm text-sub py-4 text-center">해당 시즌 대회 기록이 없습니다.</p>
+                <p className="text-sm text-sub py-4 text-center">{seasonYear ? '해당 시즌 대회 기록이 없습니다.' : '대회 기록이 없습니다.'}</p>
               ) : (
                 <div className="space-y-2">
-                  {history.map((h, i) => (
-                    <div key={i} className="flex items-start justify-between py-2.5 px-3 bg-soft rounded-lg">
+                  {history.map((h, i) => {
+                    // 현재 보기에서, 다음 회차로 대체돼 현재 포인트에 안 들어가는 대회
+                    const dropped = seasonYear === 0 && h.counted === false
+                    return (
+                    <div key={i} className={`flex items-start justify-between py-2.5 px-3 bg-soft rounded-lg ${dropped ? 'opacity-50' : ''}`}>
                       <div>
                         <p className="text-sm font-medium text-gray-900">{h.tournament_name}</p>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -179,10 +184,12 @@ export default function PlayerDetail({ memberId, open, onClose }) {
                       </div>
                       <div className="text-right ml-2 shrink-0">
                         <p className="text-sm font-semibold text-gray-900">{h.rank}</p>
-                        <p className="text-xs text-accent font-medium">+{h.points}</p>
+                        <p className={`text-xs font-medium ${dropped ? 'text-sub line-through' : 'text-accent'}`}>+{h.points}</p>
+                        {dropped && <p className="text-[11px] text-sub">다음 회차로 대체</p>}
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

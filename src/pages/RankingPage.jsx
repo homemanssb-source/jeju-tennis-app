@@ -30,7 +30,8 @@ export default function RankingPage() {
   const showToast = useContext(ToastContext)
   const [divisions, setDivisions] = useState([])
   const [division, setDivision] = useState('')
-  const [seasonYear, setSeasonYear] = useState(new Date().getFullYear())
+  // 0 = 현재 랭킹 (대회별 최근 회차 포인트만 합산), 연도 = 그 시즌 기록
+  const [seasonYear, setSeasonYear] = useState(0)
   const [seasons, setSeasons] = useState([])
   const [rankings, setRankings] = useState([])
   const [loading, setLoading] = useState(false)
@@ -155,7 +156,7 @@ export default function RankingPage() {
                         <p className="text-xs mt-0.5">
                           {m.rank
                             ? <span className="font-semibold text-gray-800">{m.points.toLocaleString()}점</span>
-                            : <span className="text-sub">{seasonYear}시즌 획득 포인트가 없어요</span>}
+                            : <span className="text-sub">{seasonYear ? `${seasonYear}시즌 획득 포인트가 없어요` : '현재 반영되는 포인트가 없어요'}</span>}
                         </p>
                       </div>
                       <span className="text-sub shrink-0">›</span>
@@ -180,11 +181,15 @@ export default function RankingPage() {
           </select>
           <select value={seasonYear} onChange={e => setSeasonYear(Number(e.target.value))}
             className="shrink-0 text-sm border border-line rounded-lg px-3 py-2 bg-white font-medium">
-            {seasons.length > 0
-              ? seasons.map(y => <option key={y} value={y}>{y}시즌</option>)
-              : <option value={seasonYear}>{seasonYear}시즌</option>}
+            <option value={0}>현재 랭킹</option>
+            {seasons.map(y => <option key={y} value={y}>{y}시즌 기록</option>)}
           </select>
         </div>
+        {seasonYear === 0 && (
+          <p className="text-[11px] text-sub leading-snug">
+            대회마다 가장 최근 회차 포인트만 합산합니다. 같은 대회가 다시 열려 결과가 등록되면 이전 회차 점수는 빠집니다.
+          </p>
+        )}
       </div>
       <div className="max-w-lg mx-auto">
         {loading ? <SkeletonList count={8} /> : rankings.length === 0 ? (
