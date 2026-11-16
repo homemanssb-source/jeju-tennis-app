@@ -792,6 +792,17 @@ export default function EntryAdmin() {
           className="text-sm border border-line rounded-lg px-3 py-2 w-32"
         />
 
+        {/* 부서별 보기 */}
+        {selectedEventId && divisionTabs.length > 0 && (
+          <select value={activeDivision} onChange={e => setFilterDivision(e.target.value)}
+            className="text-sm border border-line rounded-lg px-3 py-2">
+            <option value="">전체 부서 ({allActiveCount})</option>
+            {divisionTabs.map(d => (
+              <option key={d.name} value={d.name}>{d.name} ({d.count})</option>
+            ))}
+          </select>
+        )}
+
         <select value={filterType} onChange={e => setFilterType(e.target.value)}
           className="text-sm border border-line rounded-lg px-3 py-2">
           <option value="">전체 유형</option>
@@ -808,26 +819,6 @@ export default function EntryAdmin() {
           <option value="환불완료">환불완료만</option>
         </select>}
       </div>
-
-      {/* ── 부서 탭 ── */}
-      {selectedEventId && divisionTabs.length > 1 && (
-        <div className="flex gap-1.5 mb-3 flex-wrap">
-          {[{ name: '', label: '전체 부서', count: allActiveCount },
-            ...divisionTabs.map(d => ({ ...d, label: d.name }))].map(d => (
-            <button
-              key={d.name || '__all'}
-              onClick={() => setFilterDivision(d.name)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                activeDivision === d.name
-                  ? 'bg-accent text-white border-accent'
-                  : 'bg-white text-gray-700 border-line hover:bg-soft'
-              }`}>
-              {d.label}
-              <span className={`ml-1 ${activeDivision === d.name ? 'opacity-80' : 'text-sub'}`}>{d.count}</span>
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* ── 카운트 탭 ── */}
       {selectedEventId && (
