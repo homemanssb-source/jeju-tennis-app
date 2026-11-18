@@ -4,7 +4,7 @@
 //  - 복식 부서: 줄마다 선수1·선수2 선택
 //  - 서버(rpc_admin_bulk_apply)에서 전부 성공 또는 전부 취소
 import { useState, useEffect, useMemo, useContext } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase, fetchAllRows } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 import { ageGroupOf } from '../../lib/ageGroups'
 
@@ -24,12 +24,14 @@ export default function BulkIndividualEntry({ event, divisions, entries, onDone 
 
   useEffect(() => {
     (async () => {
-      let q = supabase.from('members')
-        .select('member_id, name, club, grade, member_type, birthdate')
-        .eq('status', '활성')
-        .order('name')
-      if (targetType !== '전체') q = q.eq('member_type', targetType)
-      const { data } = await q
+      const { data } = await fetchAllRows(() => {
+        let q = supabase.from('members')
+          .select('member_id, name, club, grade, member_type, birthdate')
+          .eq('status', '활성')
+          .order('name').order('member_id')
+        if (targetType !== '전체') q = q.eq('member_type', targetType)
+        return q
+      })
       setMembers(data || [])
     })()
   }, [targetType])

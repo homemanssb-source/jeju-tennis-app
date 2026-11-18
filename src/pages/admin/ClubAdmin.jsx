@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react'
-import { supabase, writeLog } from '../../lib/supabase'
+import { supabase, writeLog, fetchAllRows } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 import { useAdmin } from './AdminLayout'
 
@@ -21,10 +21,11 @@ export default function ClubAdmin() {
   async function fetchClubs() {
     setLoading(true)
     // members 테이블에서 club별 카운트
-    const { data, error } = await supabase
+    const { data, error } = await fetchAllRows(() => supabase
       .from('members')
       .select('club')
       .neq('status', '삭제')
+      .order('member_id'))
 
     if (error) { showToast?.('불러오기 실패: ' + error.message, 'error'); setLoading(false); return }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase, fetchAllRows } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 
 export default function PointAdjAdmin() {
@@ -15,7 +15,7 @@ export default function PointAdjAdmin() {
 
   async function fetchAll() {
     const [{ data: mems }, { data: adjs }] = await Promise.all([
-      supabase.from('members').select('member_id, name, display_name, division').eq('status', '활성').order('name'),
+      fetchAllRows(() => supabase.from('members').select('member_id, name, display_name, division').eq('status', '활성').order('name').order('member_id')),
       supabase.from('adjustments').select('*').order('date', { ascending: false }).limit(50),
     ])
     setMembers(mems || [])

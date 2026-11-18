@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, fetchAllRows } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
 import { ageGroupOf } from '../lib/ageGroups'
@@ -84,10 +84,11 @@ export default function EventEntryPage() {
 
   async function fetchMembers() {
     // 동호인·선수 모두 불러오고, 선택한 대회의 대상(target_type)에 따라 필터링
-    const { data } = await supabase.from('members_public')
+    // 활성 회원이 1000명을 넘으므로 나눠서 전부 받는다 (안 그러면 이름순 뒤쪽이 검색에 안 나옴)
+    const { data } = await fetchAllRows(() => supabase.from('members_public')
       .select('member_id, name, display_name, gender, club, division, grade, status, member_type, birth_year')
       .eq('status', '활성')  // ← 활성만 조회
-      .order('name')
+      .order('name').order('member_id'))
     setMembers(data || [])
   }
 

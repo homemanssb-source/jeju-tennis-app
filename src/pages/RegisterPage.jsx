@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, fetchAllRows } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
 import { normalizeGrade, formatGrade } from '../lib/grade'
@@ -77,9 +77,11 @@ function ClubComboBox({ value, onChange, memberType, placeholder = '클럽명 �
 
   useEffect(() => {
     // 동호인 클럽과 학생선수 소속(학교·팀)이 섞이지 않도록 같은 회원 유형의 소속만 보여준다
-    let q = supabase.from('members_public').select('club').neq('status', '삭제')
-    if (memberType) q = q.eq('member_type', memberType)
-    q.then(({ data }) => {
+    fetchAllRows(() => {
+      let q = supabase.from('members_public').select('club').neq('status', '삭제').order('member_id')
+      if (memberType) q = q.eq('member_type', memberType)
+      return q
+    }).then(({ data }) => {
       if (!data) return
       const unique = [...new Set(data.map(r => r.club).filter(Boolean))].sort()
       setClubs(unique)

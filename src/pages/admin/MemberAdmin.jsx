@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, useRef } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase, fetchAllRows } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 import { normalizeGrade, formatGrade } from '../../lib/grade'
 
@@ -127,7 +127,7 @@ export default function MemberAdmin() {
   async function fetchMembers() {
     setLoading(true)
     // 선수(member_type='선수')는 선수 관리 탭에서 별도 관리
-    const { data } = await supabase.from('members').select('*').eq('member_type', '동호인').order('name')
+    const { data } = await fetchAllRows(() => supabase.from('members').select('*').eq('member_type', '동호인').order('name').order('member_id'))
     if (data) {
       setMembers(data)
       setDivisions([...new Set(data.map(m => m.division).filter(Boolean))])

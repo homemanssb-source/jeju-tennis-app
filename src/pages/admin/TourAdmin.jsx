@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase, fetchAllRows } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 
 const RANKS = ['우승', '준우승', '4강', '8강', '16강', '32강', '참가']
@@ -32,9 +32,9 @@ export default function TourAdmin() {
         .select('event_id, event_name, event_date, tournament_id, event_type')
         .order('event_date', { ascending: false }),
       supabase.from('point_rules').select('*'),
-      supabase.from('members')
+      fetchAllRows(() => supabase.from('members')
         .select('member_id, name, display_name, division')
-        .eq('status', '활성').order('name'),
+        .eq('status', '활성').order('name').order('member_id')),
     ])
     setEvents(evs || [])
     setPointRules(rules || [])

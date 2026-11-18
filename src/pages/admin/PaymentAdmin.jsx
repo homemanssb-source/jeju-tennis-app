@@ -1,6 +1,6 @@
 // src/pages/admin/PaymentAdmin.jsx
 import { useState, useEffect, useContext } from 'react'
-import { supabase, writeLog } from '../../lib/supabase'
+import { supabase, writeLog, fetchAllRows } from '../../lib/supabase'
 import { ToastContext } from '../../App'
 import { useAdmin } from './AdminLayout'
 
@@ -31,7 +31,7 @@ export default function PaymentAdmin() {
     setLoading(true)
     const [{ data: pays }, { data: mems }, { data: evts }] = await Promise.all([
       supabase.from('payments').select('*').order('uploaded_at', { ascending: false }).limit(200),
-      supabase.from('members').select('member_id, name, display_name').neq('status', '탈퇴').order('name'),
+      fetchAllRows(() => supabase.from('members').select('member_id, name, display_name').neq('status', '탈퇴').order('name').order('member_id')),
       supabase.from('events').select('event_id, event_name').order('event_date', { ascending: false }),
     ])
     setPayments(pays || [])

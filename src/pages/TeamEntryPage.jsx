@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, useMemo } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, fetchAllRows } from '../lib/supabase'
 import PageHeader from '../components/PageHeader'
 import { ToastContext } from '../App'
 import { getMatchTypeLabel, resolveMatchType, resolveMemberLimit, filterTeamDivisions, clubBaseKey, memberClubs } from '../lib/teamMatch'
@@ -57,9 +57,9 @@ export default function TeamEntryPage() {
   }
 
   async function fetchActiveMembers() {
-    const { data } = await supabase.from('members_public')
+    const { data } = await fetchAllRows(() => supabase.from('members_public')
       .select('member_id, name, display_name, club, grade, gender, status')
-      .eq('status', '활성').eq('member_type', '동호인').order('name')
+      .eq('status', '활성').eq('member_type', '동호인').order('name').order('member_id'))
     setAllMembers(data || [])
   }
 
