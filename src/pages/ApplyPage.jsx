@@ -347,15 +347,26 @@ export default function ApplyPage() {
     setMySearched(true)
   }
 
+  // ── 취소·파트너 변경 마감 시각 ──
+  // 대회에 change_close_at(취소·변경 마감)이 설정돼 있으면 그 시각,
+  // 없으면 접수 마감(entry_close_at)을 따른다. 서버 RPC 와 같은 기준.
+  function getChangeCloseAt(entry) {
+    const ev = events.find(x => x.event_id === entry.event_id)
+    return ev?.change_close_at || entry.entry_close_at || ev?.entry_close_at || null
+  }
+  function isChangeClosed(entry) {
+    const closeAt = getChangeCloseAt(entry)
+    return !!closeAt && new Date(closeAt) < new Date()
+  }
+
   // ── 취소 가능 여부 판단 ──
-  // 접수 마감 전이면 취소 가능 (미납·결제완료 모두)
+  // 취소·변경 마감 전이면 취소 가능 (미납·결제완료 모두)
   // 마감 후 또는 이미 취소/환불 상태면 불가
   function getCancelStatus(entry) {
     if (entry.entry_status === 'cancelled') return 'already'
     if (entry.payment_status === '환불대기') return 'refund_pending'
     if (entry.payment_status === '환불완료') return 'refund_done'
-    // RPC 반환값에 entry_close_at 포함되어 있으므로 직접 사용
-    if (entry.entry_close_at && new Date(entry.entry_close_at) < new Date()) return 'closed'
+    if (isChangeClosed(entry)) return 'closed'
     return 'ok'
   }
 
@@ -364,7 +375,7 @@ export default function ApplyPage() {
     if (status === 'already')        { showToast('이미 취소된 신청입니다.', 'error'); return }
     if (status === 'refund_pending') { showToast('환불 신청 접수 중입니다.', 'error'); return }
     if (status === 'refund_done')    { showToast('이미 환불 완료된 건입니다.', 'error'); return }
-    if (status === 'closed')         { showToast('접수 마감 후에는 취소할 수 없습니다.\n관리자에게 문의하세요.', 'error'); return }
+    if (status === 'closed')         { showToast('취소 마감 후에는 취소할 수 없습니다.\n관리자에게 문의하세요.', 'error'); return }
     setRefundBank('')
     setRefundAccount('')
     setRefundHolder('')
@@ -427,8 +438,8 @@ export default function ApplyPage() {
   function openPartnerModal(entry) {
     if (entry.entry_status === 'cancelled') { showToast('취소된 신청입니다.', 'error'); return }
     if (entry.play_format === 'singles') { showToast('단식 부서는 파트너가 없습니다.', 'error'); return }
-    if (entry.entry_close_at && new Date(entry.entry_close_at) < new Date()) {
-      showToast('접수 마감 후에는 변경할 수 없습니다.', 'error'); return
+    if (isChangeClosed(entry)) {
+      showToast('변경 마감 후에는 변경할 수 없습니다.', 'error'); return
     }
     setPartnerSearch('')
     setPartnerResults([])
@@ -801,7 +812,12 @@ export default function ApplyPage() {
                   {myEntries.map((e, idx) => {
                     const cancelStatus  = getCancelStatus(e)
                     const isCancelled   = e.entry_status === 'cancelled'
-                    const closeDate     = e.entry_close_at ? formatDate(e.entry_close_at) : null
+                    const changeCloseAt = getChangeCloseAt(e)
+                    const closeDate     = changeCloseAt
+                      ? new Date(changeCloseAt).toLocaleString('ko-KR', {
+                          month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+                        })
+                      : null
                     const showCancelBtn = !isCancelled
                       && e.payment_status !== '환불대기'
                       && e.payment_status !== '환불완료'
@@ -841,7 +857,7 @@ export default function ApplyPage() {
                             <span className="text-[11px] text-sub">
                               {cancelStatus === 'closed'
                                 ? '🔴 마감 후 취소불가 · 관리자 문의'
-                                : closeDate ? `마감: ${closeDate}` : ''}
+                                : closeDate ? `취소·변경 마감: ${closeDate}` : ''}
                             </span>
                             <div className="flex gap-1.5 shrink-0">
                               {cancelStatus === 'ok' && e.play_format !== 'singles' && (

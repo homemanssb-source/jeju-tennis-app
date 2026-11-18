@@ -146,6 +146,7 @@ export default function EventAdmin() {
       entry_fee_team: ev.entry_fee_team || '',
       entry_open_at: toKSTLocal(ev.entry_open_at),
       entry_close_at: toKSTLocal(ev.entry_close_at),
+      change_close_at: toKSTLocal(ev.change_close_at),
       description: ev.description || '',
       tournament_id: ev.tournament_id || '',
       account_number: ev.account_number || '',
@@ -169,6 +170,7 @@ export default function EventAdmin() {
       entry_fee_team: editForm.entry_fee_team ? Number(editForm.entry_fee_team) : 0,
       entry_open_at: toUTC(editForm.entry_open_at),
       entry_close_at: toUTC(editForm.entry_close_at),
+      change_close_at: toUTC(editForm.change_close_at),
       description: editForm.description || null,
       tournament_id: editForm.tournament_id || null,
       account_number: editForm.account_number || null,
@@ -942,6 +944,16 @@ export default function EventAdmin() {
                 <input type="datetime-local" value={editForm.entry_close_at}
                   onChange={e => setEditForm({ ...editForm, entry_close_at: e.target.value })}
                   className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+              </div>
+              <div>
+                <label className="block text-xs text-sub mb-1">취소·변경 마감 (선택)</label>
+                <input type="datetime-local" value={editForm.change_close_at || ''}
+                  onChange={e => setEditForm({ ...editForm, change_close_at: e.target.value })}
+                  className="w-full text-sm border border-line rounded-lg px-3 py-2" />
+                <p className="text-[11px] text-sub mt-1">
+                  본인 신청 취소·파트너 변경이 가능한 마지막 시각입니다. 비워 두면 신청 마감을 따릅니다.
+                  신규 신청 마감에는 영향이 없습니다.
+                </p>
               </div>
 
               {/* 부서별 참가자격 이미지 URL — 수정 모달에도 추가 */}
