@@ -188,7 +188,7 @@ export default function AdminManagerPage() {
     if (!q.trim()) { setPinMembers([]); return }
     setPinSearchLoading(true)
     const { data } = await supabase.from('members')
-      .select('member_id, name, display_name, phone')
+      .select('member_id, name, display_name, phone, guardian_phone')
       .or(`name.ilike.%${q}%,member_id.ilike.%${q}%`)
       .neq('status', '탈퇴')
       .limit(10)
@@ -198,7 +198,9 @@ export default function AdminManagerPage() {
 
   // ─── 회원 PIN 초기화 ───────────────────────────
   async function handlePinReset(member) {
-    if (!confirm(`${member.name} 회원의 PIN을 전화번호 뒷 6자리로 초기화하시겠습니까?`)) return
+    // 본인 전화가 없는 학생선수는 보호자 전화 뒷 6자리로 초기화된다 (서버 함수와 같은 규칙)
+    const pinSource = member.phone ? '전화번호' : member.guardian_phone ? '보호자 전화번호' : '전화번호'
+    if (!confirm(`${member.name} 회원의 PIN을 ${pinSource} 뒷 6자리로 초기화하시겠습니까?`)) return
 
     const { data, error } = await supabase.rpc('admin_reset_member_pin', {
       p_member_id: member.member_id,
@@ -315,7 +317,7 @@ export default function AdminManagerPage() {
       {/* ── 회원 PIN 초기화 섹션 ── */}
       <div className="bg-white rounded-xl border border-line p-4">
         <h3 className="text-sm font-bold mb-3">🔑 회원 PIN 초기화</h3>
-        <p className="text-xs text-sub mb-3">초기화하면 전화번호 뒤 6자리로 PIN이 재설정됩니다.</p>
+        <p className="text-xs text-sub mb-3">초기화하면 전화번호 뒤 6자리로 PIN이 재설정됩니다. (본인 전화가 없는 학생선수는 보호자 전화 뒤 6자리)</p>
         <div className="flex gap-2">
           <input
             type="text"
@@ -334,6 +336,8 @@ export default function AdminManagerPage() {
                   <span className="text-sm font-medium">{m.name}</span>
                   <span className="text-xs text-sub ml-2">{m.member_id}</span>
                   {m.phone && <span className="text-xs text-sub ml-2">📱 {m.phone}</span>}
+                  {!m.phone && m.guardian_phone && <span className="text-xs text-sub ml-2">📱 보호자 {m.guardian_phone}</span>}
+                  {!m.phone && !m.guardian_phone && <span className="text-xs text-red-500 ml-2">전화번호 없음</span>}
                 </div>
                 <button
                   onClick={() => handlePinReset(m)}
