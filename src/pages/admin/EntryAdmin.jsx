@@ -418,6 +418,47 @@ export default function EntryAdmin() {
     })
   }
 
+  // ── 취소 복구 (관리자) ──
+  // 본인이 취소해 환불대기 상태인 개인전 신청을 다시 '신청 · 결제완료'로 되돌린다.
+  // 아직 환불 입금 전인 건만 대상 (환불완료 건은 다시 신청받아야 함).
+  function handleRestoreConfirm(entry) {
+    const raw = entry._raw
+    const ids = [raw?.teams?.member1_id, raw?.teams?.member2_id].filter(Boolean)
+    // 같은 부서에 선수 중 한 명이 이미 다른 신청으로 들어가 있으면 복구 불가
+    const dup = entries.find(x =>
+      x.entry_id !== raw.entry_id &&
+      x.division_id === raw.division_id &&
+      x.entry_status !== '취소' &&
+      [x.teams?.member1_id, x.teams?.member2_id].some(id => id && ids.includes(id))
+    )
+    if (dup) {
+      showToast?.(`복구할 수 없습니다. 선수가 이미 같은 부서에 신청되어 있습니다. (${dup.teams?.team_name || ''})`, 'error')
+      return
+    }
+    setConfirmModal({
+      message: `"${entry.name}" 신청의 취소를 되돌리시겠습니까?\n(신청 · 결제완료 상태로 복구되고, 환불 신청 정보는 지워집니다)`,
+      onConfirm: async () => {
+        const { error } = await supabase.from('event_entries')
+          .update({
+            entry_status:        '신청',
+            payment_status:      '결제완료',
+            cancelled_at:        null,
+            refund_bank:         null,
+            refund_account:      null,
+            refund_holder:       null,
+            refund_requested_at: null,
+          })
+          .eq('entry_id', entry.id)
+          .eq('entry_status', '취소')
+          .eq('payment_status', '환불대기')
+        setConfirmModal(null)
+        if (error) { showToast?.('복구 실패: ' + error.message, 'error'); return }
+        showToast?.('✅ 취소가 복구되었습니다.')
+        fetchEntries()
+      }
+    })
+  }
+
   // ── 환불 완료 처리 ──
   async function handleRefundComplete() {
     if (!refundModal) return
@@ -932,12 +973,22 @@ export default function EntryAdmin() {
                     <div className="flex gap-1 justify-center items-center flex-nowrap">
                       {/* 환불대기 → 환불 처리 버튼만 표시 */}
                       {e.payment_status === '환불대기' ? (
-                        <button
-                          onClick={() => setRefundModal(e)}
-                          className="text-xs text-orange-600 border border-orange-200 bg-orange-50
-                            hover:bg-orange-100 rounded px-2 py-0.5 font-medium">
-                          환불 처리
-                        </button>
+                        <>
+                          <button
+                            onClick={() => setRefundModal(e)}
+                            className="text-xs text-orange-600 border border-orange-200 bg-orange-50
+                              hover:bg-orange-100 rounded px-2 py-0.5 font-medium">
+                            환불 처리
+                          </button>
+                          {e._source === 'individual' && (
+                            <button
+                              onClick={() => handleRestoreConfirm(e)}
+                              className="text-xs text-green-700 border border-green-200 bg-green-50
+                                hover:bg-green-100 rounded px-2 py-0.5 font-medium">
+                              취소 복구
+                            </button>
+                          )}
+                        </>
                       ) : e.payment_status === '환불완료' ? (
                         <span className="text-xs text-gray-400">완료</span>
                       ) : (
